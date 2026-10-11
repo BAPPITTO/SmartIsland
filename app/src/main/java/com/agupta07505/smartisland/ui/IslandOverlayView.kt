@@ -453,13 +453,17 @@ fun IslandOverlayView(
                 .width(safeWidth)
                 .height(safeHeight)
                 .graphicsLayer {
+                    // Guard the horizontal slide-in: an unanchored 0.95 scale on a
+                    // top-center-aligned box makes a near-zero-width pill drift
+                    // left/right at the very start/end of the morph (reads as flicker).
+                    val widthPx = size.width
                     translationX = animatedXOffset.toPx() + (if (!currentExpanded) pillDragOffsetX else 0f)
+                    scaleX = if (widthPx > 0f) switchScaleAnim.value else 1f
+                    scaleY = if (widthPx > 0f) switchScaleAnim.value else 1f
                     translationY = yOffset.toPx() + dragOffset
-                    scaleX = switchScaleAnim.value
-                    scaleY = switchScaleAnim.value
                 }
                 .then(
-                    if (settings.enableShadow && settings.shadowElevation > 0f && !isHiding) {
+                    if (settings.enableShadow && settings.shadowElevation > 0f && !isHiding && safeWidth > 0.dp) {
                         val activeMainShadow = if (currentExpanded) {
                             (settings.shadowElevation * 1.5f).dp
                         } else {
