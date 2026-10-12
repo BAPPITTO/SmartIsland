@@ -70,7 +70,10 @@ import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material.icons.rounded.FontDownload
+import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.Widgets
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -81,10 +84,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
+import com.agupta07505.smartisland.ui.components.CollapsibleCard
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -836,18 +841,11 @@ private fun SettingsOverviewSection(
 
             FeatureStudioNavigationCard(
                 title = stringResource(R.string.card_developer_options_title),
-                subtitle = "Developer options, diagnostics & mock events",
+                subtitle = "Diagnostics, log recording & developer options",
                 icon = Icons.Rounded.Code,
-                onClick = { onNavigateTo(FeatureDetailSection.DeveloperOptions) }
-            )
-
-            FeatureStudioNavigationCard(
-                title = "Diagnostic log",
-                subtitle = "Record what the island does, to find problems",
-                icon = Icons.Rounded.BugReport,
                 statusText = if (settings.recordLogs) "Recording" else null,
                 statusColor = MaterialTheme.colorScheme.primary,
-                onClick = { onNavigateTo(FeatureDetailSection.Diagnostics) }
+                onClick = { onNavigateTo(FeatureDetailSection.DeveloperOptions) }
             )
 
             FeatureStudioNavigationCard(
@@ -940,8 +938,18 @@ private fun SettingsOverviewSection(
                     onClick = { onNavigateTo(FeatureDetailSection.ColorStudio) }
                 )
 
-                IslandFontPicker(selected = settings.islandFont, onSelected = onIslandFontChange)
-                com.agupta07505.smartisland.ui.sections.IslandFontMixSection(settings = settings, onChange = onFontMixChange)
+                CollapsibleCard(
+                    title = stringResource(R.string.island_font_title),
+                    stateKey = "settings_appearance_fonts",
+                    summary = "Typography and font mixing",
+                    icon = Icons.Rounded.FontDownload,
+                    initiallyExpanded = false
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        IslandFontPicker(selected = settings.islandFont, onSelected = onIslandFontChange)
+                        com.agupta07505.smartisland.ui.sections.IslandFontMixSection(settings = settings, onChange = onFontMixChange)
+                    }
+                }
             }
 
             if (canEnable) SystemGroup()
@@ -1233,7 +1241,7 @@ private fun DetailScreenHost(
                 BackupRestoreSection(settings = settings, repository = repository)
             }
             FeatureDetailSection.Diagnostics -> {
-                DiagnosticsSection(settings = settings, repository = repository)
+                DeveloperOptionsSection(settings = settings, repository = repository)
             }
             FeatureDetailSection.Timing -> {
                 TimingSection(settings = settings, repository = repository)
@@ -1242,11 +1250,7 @@ private fun DetailScreenHost(
                 IdleWidgetsSettingsSection(settings = settings, repository = repository)
             }
             FeatureDetailSection.About -> {
-                AboutSection(
-                    settings = settings,
-                    repository = repository,
-                    onNavigateToUpdates = { onNavigateTo(FeatureDetailSection.UpdatesAndDownloads) }
-                )
+                AboutSection(settings = settings, repository = repository)
             }
             FeatureDetailSection.UpdatesAndDownloads -> {
                 UpdatesAndDownloadsSection(settings = settings, repository = repository)
@@ -1372,6 +1376,61 @@ private fun WelcomeDialog(
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
+
+                Button(
+                    onClick = {
+                        runCatchingLogged("WelcomeDialog", "Failed to open GitHub link") {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/agupta07505/SmartIsland")))
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary
+                    )
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Star,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.onSecondary
+                        )
+                        Text(
+                            stringResource(R.string.star_on_github),
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSecondary
+                        )
+                    }
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        runCatchingLogged("WelcomeDialog", "Failed to open Telegram link") {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://telegram.me/SmartIslandApp")))
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.People,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            stringResource(R.string.join_telegram),
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
 
                 ElevatedButton(
                     onClick = onDismiss,
