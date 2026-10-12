@@ -30,7 +30,7 @@ jobs:
             const body = pr.body || '';
             const title = pr.title || '';
             const isDraft = pr.draft === true;
-            
+
             const labelsToAdd = [];
             const checksPassed = [];
             const checksWarning = [];

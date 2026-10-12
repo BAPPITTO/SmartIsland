@@ -1,7 +1,8 @@
 ---
-applyTo:
-  - "**"
+applyTo: "**"
+description: "Pull request review guidelines for Smart Island"
 ---
+
 # Pull Request Review Guidelines for GitHub Copilot
 
 When assisting or reviewing Pull Requests for Smart Island:
