@@ -863,8 +863,32 @@ private fun SettingsOverviewSection(
         if (searchQuery.isNotBlank()) {
             SettingsSearchResults(query = searchQuery, results = searchResults, onPick = onSearchPick)
         } else {
-            // Setup incomplete: the system group (permissions) comes first.
-            if (!canEnable) SystemGroup()
+            // Appearance: the app's own theme, then the island's colours. (Position, size, shadow and the
+            // animation choices are on the Layout tab.)
+            SettingsCategoryGroup(title = stringResource(R.string.category_appearance_controls)) {
+                ThemeModeSelector(selected = settings.themeMode, onSelected = onThemeModeChange)
+
+                FeatureStudioNavigationCard(
+                    title = stringResource(R.string.card_color_studio_title),
+                    subtitle = "Colours, opacity, gradients and card styles",
+                    icon = Icons.Rounded.Palette,
+                    statusText = stringResource(R.string.card_color_studio_status, (settings.opacity * 100).toInt()),
+                    onClick = { onNavigateTo(FeatureDetailSection.ColorStudio) }
+                )
+
+                CollapsibleCard(
+                    title = stringResource(R.string.island_font_title),
+                    stateKey = "settings_appearance_fonts",
+                    summary = "Typography and font mixing",
+                    icon = Icons.Rounded.FontDownload,
+                    initiallyExpanded = false
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        IslandFontPicker(selected = settings.islandFont, onSelected = onIslandFontChange)
+                        com.agupta07505.smartisland.ui.sections.IslandFontMixSection(settings = settings, onChange = onFontMixChange)
+                    }
+                }
+            }
 
             // Features: what shows on the island and which apps may use it.
             SettingsCategoryGroup(title = stringResource(R.string.category_behaviors_launcher)) {
@@ -925,34 +949,8 @@ private fun SettingsOverviewSection(
                 )
             }
 
-            // Appearance: the app's own theme, then the island's colours. (Position, size, shadow and the
-            // animation choices are on the Layout tab.)
-            SettingsCategoryGroup(title = stringResource(R.string.category_appearance_controls)) {
-                ThemeModeSelector(selected = settings.themeMode, onSelected = onThemeModeChange)
-
-                FeatureStudioNavigationCard(
-                    title = stringResource(R.string.card_color_studio_title),
-                    subtitle = "Colours, opacity, gradients and card styles",
-                    icon = Icons.Rounded.Palette,
-                    statusText = stringResource(R.string.card_color_studio_status, (settings.opacity * 100).toInt()),
-                    onClick = { onNavigateTo(FeatureDetailSection.ColorStudio) }
-                )
-
-                CollapsibleCard(
-                    title = stringResource(R.string.island_font_title),
-                    stateKey = "settings_appearance_fonts",
-                    summary = "Typography and font mixing",
-                    icon = Icons.Rounded.FontDownload,
-                    initiallyExpanded = false
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        IslandFontPicker(selected = settings.islandFont, onSelected = onIslandFontChange)
-                        com.agupta07505.smartisland.ui.sections.IslandFontMixSection(settings = settings, onChange = onFontMixChange)
-                    }
-                }
-            }
-
-            if (canEnable) SystemGroup()
+            // System: permissions, backup, developer options, about.
+            SystemGroup()
         }
     }
 }
