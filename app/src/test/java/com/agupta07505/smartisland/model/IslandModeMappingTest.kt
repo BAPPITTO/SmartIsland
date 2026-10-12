@@ -41,6 +41,7 @@ class IslandModeMappingTest {
         every { extras.getInt(Notification.EXTRA_PROGRESS_MAX, 0) } returns 0
         every { extras.getInt(Notification.EXTRA_PROGRESS, 0) } returns 0
         every { extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE, false) } returns false
+        every { extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER, false) } returns false
         every { extras.getCharSequence(Notification.EXTRA_TITLE) } returns null
         every { extras.getCharSequence(Notification.EXTRA_TEXT) } returns null
         every { extras.getCharSequence(Notification.EXTRA_BIG_TEXT) } returns null

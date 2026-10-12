@@ -15,7 +15,6 @@ import com.agupta07505.smartisland.di.SmartIslandRepositories
 import com.agupta07505.smartisland.model.IslandMode
 import com.agupta07505.smartisland.model.IslandNotification
 import com.agupta07505.smartisland.data.SmartIslandCommand
-import com.agupta07505.smartisland.util.runCatchingLogged
 
 fun IslandNotification?.trySendFirstAction(context: Context, vararg keywords: String): Boolean {
     if (this == null) return false
@@ -93,4 +92,63 @@ fun sendIntentWithOptions(context: Context, pendingIntent: PendingIntent) {
             }
         }
     }
+}
+
+/** What a notification button does, derived from its label (multi-language keywords). */
+enum class ActionRole { Pause, Resume, Stop, Lap, Reset, AddMinute, Other }
+
+private val PAUSE_WORDS = listOf("pause", "pausa", "pausar", "sospendi", "interrompi", "onderbreek", "रोकें", "暂停", "一時停止", "пауза")
+private val RESUME_WORDS = listOf("resume", "continue", "unpause", "play", "start", "reanudar", "reprendre", "weiter", "riprendi", "continuar", "शुरू", "继续", "再開", "возобновить")
+private val STOP_WORDS = listOf("stop", "finish", "save", "detener", "parar", "arrêter", "beenden", "停止", "结束", "стоп")
+private val RESET_WORDS = listOf("reset", "cancel", "clear", "delete", "dismiss", "annuler", "abbrechen", "eliminar", "borrar", "重置", "取消")
+private val LAP_WORDS = listOf("lap", "split", "vuelta", "tour", "runde", "分段")
+
+/** "+1:00", "+1 min", "+ 1m", "Add 1 minute", "Extend 1 min": the timer's add-a-minute button. */
+private val ADD_MINUTE_SIGN = Regex("""(?<![\d:])\+\s*0?1(:00)?\s*(m|min|mins|minute|minutes)?(?![\d:a-z])""")
+private val ADD_MINUTE_WORDS = Regex("""(add|extend|more|another)\s*(an?\s*)?(1|one)\s*(m|min|mins|minute|minutes)\b""")
+
+fun classifyAction(title: String): ActionRole {
+    val t = title.lowercase()
+    return when {
+        ADD_MINUTE_SIGN.containsMatchIn(t) || ADD_MINUTE_WORDS.containsMatchIn(t) -> ActionRole.AddMinute
+        LAP_WORDS.any { t.contains(it) } -> ActionRole.Lap
+        PAUSE_WORDS.any { t.contains(it) } -> ActionRole.Pause
+        RESUME_WORDS.any { t.contains(it) } -> ActionRole.Resume
+        RESET_WORDS.any { t.contains(it) } -> ActionRole.Reset
+        STOP_WORDS.any { t.contains(it) } -> ActionRole.Stop
+        else -> ActionRole.Other
+    }
+}
+
+/** First real button (one that carries a PendingIntent) with one of the given roles. */
+fun IslandNotification?.actionWithRole(vararg roles: ActionRole): com.agupta07505.smartisland.model.IslandNotificationAction? {
+    if (this == null) return null
+    return actionIntents.firstOrNull { it.pendingIntent != null && classifyAction(it.title) in roles }
+}
+
+/** True when the notification currently offers "resume" (so the underlying timer/recording is paused). */
+fun IslandNotification?.offersResume(): Boolean =
+    this != null && actionIntents.any { classifyAction(it.title) == ActionRole.Resume }
+
+/**
+ * Fires the notification's own button exactly like tapping it in the shade.
+ * Does not touch island state: the listener re-posts the notification when the app updates it.
+ */
+fun IslandNotification.fireAction(context: Context, action: com.agupta07505.smartisland.model.IslandNotificationAction): Boolean {
+    val intent = action.pendingIntent ?: return false
+    triggerAction(context, packageName, intent, action.title, contentIntent)
+    SmartIslandRepositories.notificationRepository(context).resetTimer()
+    return true
+}
+
+/**
+ * Like [fireAction], but for buttons whose PendingIntent starts an activity (voice recorder Save / Stop):
+ * if the app's window pops up because of the press, the accessibility service sends the user straight
+ * back, so the recording is saved without the app staying open.
+ */
+fun IslandNotification.fireActionSilently(context: Context, action: com.agupta07505.smartisland.model.IslandNotificationAction): Boolean {
+    com.agupta07505.smartisland.util.SilentActionGuard.arm(packageName)
+    val fired = fireAction(context, action)
+    if (!fired) com.agupta07505.smartisland.util.SilentActionGuard.disarm()
+    return fired
 }

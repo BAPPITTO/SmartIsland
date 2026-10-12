@@ -10,6 +10,7 @@ package com.agupta07505.smartisland.util
 import android.os.SystemClock
 import android.service.notification.StatusBarNotification
 import com.agupta07505.smartisland.data.SmartIslandSettings
+import com.agupta07505.smartisland.model.IslandEvent
 import com.agupta07505.smartisland.model.IslandMode
 import java.util.ArrayDeque
 import java.util.concurrent.ConcurrentHashMap
@@ -32,6 +33,26 @@ object NotificationCooldownManager {
     // packageName -> cooldown expiration timestamp (elapsedRealtime)
     private val cooldownExpirations = ConcurrentHashMap<String, Long>()
 
+    /**
+     * System events that come from the system (broadcasts and callbacks) rather than from an app's notification, so the
+     * per-app list cannot cover them. Each one can be switched into the cooldown on its own.
+     */
+    val SYSTEM_EVENTS: List<IslandEvent> = listOf(
+        IslandEvent.PLUGGED_IN,
+        IslandEvent.PLUGGED_OUT,
+        IslandEvent.FULLY_CHARGED,
+        IslandEvent.LOW_BATTERY,
+        IslandEvent.BATTERY_SAVER,
+        IslandEvent.WIFI,
+        IslandEvent.VPN,
+        IslandEvent.WIFI_DISCONNECTED,
+        IslandEvent.VPN_DISCONNECTED,
+        IslandEvent.BLUETOOTH,
+        IslandEvent.FLASHLIGHT
+    )
+
+    private const val SYSTEM_KEY_PREFIX = "system:"
+
     // packageName -> latest buffered notification during cooldown
     private val bufferedNotifications = ConcurrentHashMap<String, StatusBarNotification>()
 
@@ -45,10 +66,14 @@ object NotificationCooldownManager {
         sbn: StatusBarNotification,
         settings: SmartIslandSettings,
         mode: IslandMode,
-        currentTimeMs: Long = SystemClock.elapsedRealtime()
+        currentTimeMs: Long = SystemClock.elapsedRealtime(),
+        transferRelated: Boolean = false
     ): Boolean {
         if (!settings.enableNotificationCooldown) return false
         if (isExemptMode(mode)) return false
+        // A download manager's or cloud app's own notification (a finished download has no progress bar, so its mode
+        // is an ordinary notification) is never held back, and never counts towards the spam threshold.
+        if (transferRelated) return false
 
         val pkg = sbn.packageName
         if (pkg in settings.notificationCooldownExcludedPackages) return false
@@ -86,6 +111,42 @@ object NotificationCooldownManager {
     }
 
     /**
+     * Anti-spam for one system event announcement (a charger plugged in again and again, Wi-Fi that keeps reconnecting).
+     * Call it once per announcement that would pop the island open. The caller keeps the card but drops the pop-up when
+     * this returns true. Events the user did not switch in, and every event while the cooldown is off, never throttle.
+     * The window, the trigger count and the quiet period are the same ones the app notifications use.
+     */
+    fun shouldThrottleSystemEvent(
+        eventId: String,
+        settings: SmartIslandSettings,
+        currentTimeMs: Long = SystemClock.elapsedRealtime()
+    ): Boolean {
+        if (!settings.enableNotificationCooldown) return false
+        if (eventId !in settings.notificationCooldownSystemEvents) return false
+
+        val key = SYSTEM_KEY_PREFIX + eventId
+        val cooldownExpiresAt = cooldownExpirations[key] ?: 0L
+        if (currentTimeMs < cooldownExpiresAt) return true
+        if (cooldownExpiresAt != 0L) {
+            cooldownExpirations.remove(key)
+            recentTimestamps.remove(key)
+        }
+
+        val timestamps = recentTimestamps.getOrPut(key) { ArrayDeque() }
+        synchronized(timestamps) {
+            timestamps.addLast(currentTimeMs)
+            while (timestamps.isNotEmpty() && (currentTimeMs - timestamps.first()) > DETECTION_WINDOW_MS) {
+                timestamps.removeFirst()
+            }
+            if (timestamps.size >= settings.notificationCooldownThreshold) {
+                cooldownExpirations[key] = currentTimeMs + settings.notificationCooldownDurationMinutes * 60_000L
+                timestamps.clear()
+            }
+        }
+        return false
+    }
+
+    /**
      * Returns true if the given IslandMode should never be rate-limited
      * (e.g. phone calls, timers, music, navigation).
      */
@@ -96,9 +157,13 @@ object NotificationCooldownManager {
             mode == IslandMode.Music ||
             mode == IslandMode.Navigation ||
             mode == IslandMode.Hotspot ||
+            // A download or upload posts a progress update every second or so. Counted as spam, they started a cooldown
+            // (3 minutes by default) and the "download finished" notification was held until it ended.
+            mode == IslandMode.DownloadUpload ||
             mode == IslandMode.Battery ||
             mode == IslandMode.Flashlight ||
-            mode == IslandMode.ScreenRecording
+            mode == IslandMode.ScreenRecording ||
+            mode == IslandMode.AudioRecording
     }
 
     /**

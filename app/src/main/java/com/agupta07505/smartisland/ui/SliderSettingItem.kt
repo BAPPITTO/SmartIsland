@@ -27,7 +27,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -48,7 +47,8 @@ fun SliderSettingItem(
     modifier: Modifier = Modifier,
     onValueChangeFinished: (() -> Unit)? = null,
     suffix: String = "dp",
-    step: Float = 1f
+    step: Float = 1f,
+    valueText: ((Float) -> String)? = null
 ) {
     Column(
         modifier = modifier
@@ -100,7 +100,7 @@ fun SliderSettingItem(
                         .padding(horizontal = 8.dp, vertical = 3.dp)
                 ) {
                     Text(
-                        text = "${value.roundToInt()} $suffix",
+                        text = valueText?.invoke(value) ?: "${value.roundToInt()} $suffix",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,

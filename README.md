@@ -83,6 +83,16 @@ The project is designed to be 100% transparent, hackable, and privacy-conscious:
 
 | Feature Area | Capabilities & Details |
 | --- | --- |
+| **Per-Event Switches (30 Events)** | Individual toggles for 30 distinct system events across Power, Connectivity, Activities, and Privacy with folding categories, auto-expand badges, and separate Portrait & Landscape configurations. |
+| **Portrait & Landscape Independence** | Fully independent geometry, edge distance, idle camera circle (offset, size, opacity), corner bar, and seamless rotation handling. |
+| **Custom Font Studio** | Bundled open-source typography (Lora, Inter Display, Poppins) plus support for adding any custom `.ttf` or `.otf` font files. |
+| **Privacy Indicator Dots** | Real-time indicators for Camera, Microphone, Location, and Screen Sharing merged into the pill, with 1-tap app usage inspector (enhanced with Shizuku). |
+| **Same-App Grouping & Sibling Picker** | Groups multiple alerts from the same application into a unified card with a secondary cutout sibling switcher. |
+| **VoIP Call Detection** | Audio-mode-based detection for VoIP calls (WhatsApp, Telegram, etc.) displaying native action buttons and active call duration. |
+| **Multi-Stage Transfers Engine** | Scored classification for Download, Upload, Backup, File Copy/Move, Delete, and App Install with speed (MB/s) and ETA. |
+| **Motion Physics & Animation Speeds** | Relaxed, Normal, and Snappy animation presets per orientation that respect Android system animator duration scale. |
+| **Settings Search Engine** | Comprehensive in-settings search indexing all toggles, events, and subpages with instant keyword matching. |
+| **Baseline Profile Optimization** | Bundled `:baselineprofile` module ensures zero JIT compilation stutter and optimal runtime performance. |
 | **Deep Burnt-Orange (#D84315) Design System** | Harmonious curated color palette with rich burnt-orange accents, deep slate/black card surfaces, crisp typography, and unified tinted Material icons throughout all settings cards and switches. |
 | **App Updates & Downloads Hub** | Dedicated section showcasing Total Downloads counter (15,648+), Current Version line (v7.0.0), 1-tap GitHub update checker, in-app changelogs viewer, Top Contributors gallery, and Recent Commits feed. |
 | **In-Pill Swipe Gestures & Media Controls** | Swiping horizontally across the compact pill skips tracks (`skipToNext`/`skipToPrevious`) or cycles notifications without expanding the island. Features master toggle, swipe direction pickers, and individual disable controls. |

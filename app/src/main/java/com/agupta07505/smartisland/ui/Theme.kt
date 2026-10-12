@@ -42,42 +42,62 @@ private val LightColorScheme = lightColorScheme(
     outlineVariant = Color(0xFFEDEDED)
 )
 
+// Dark palette tuned for comfort: no pure black or pure white (less glare and halation), softer
+// surfaces, and a muted coral accent instead of the saturated orange used on light.
 private val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFFFF7043),
-    onPrimary = Color(0xFF2B0B02),
-    primaryContainer = Color(0xFF3D1307),
-    onPrimaryContainer = Color(0xFFFFDBCF),
-    secondary = Color(0xFFFF8A65),
-    onSecondary = Color(0xFF2B0B02),
-    secondaryContainer = Color(0xFF2A1008),
-    onSecondaryContainer = Color(0xFFFFCCBC),
-    tertiary = Color(0xFFFFAB91),
-    onTertiary = Color(0xFF2B0B02),
-    tertiaryContainer = Color(0xFF240D06),
-    onTertiaryContainer = Color(0xFFFFE0D6),
-    background = Color(0xFF0A0A0A),
-    onBackground = Color(0xFFFFFFFF),
-    surface = Color(0xFF141414),
-    onSurface = Color(0xFFF7F7F7),
-    surfaceVariant = Color(0xFF1F1F1F),
-    onSurfaceVariant = Color(0xFFA6A6A6),
-    outline = Color(0xFF2E2E2E),
-    outlineVariant = Color(0xFF202020)
+    primary = Color(0xFFE0957C),
+    onPrimary = Color(0xFF2E140B),
+    primaryContainer = Color(0xFF45291F),
+    onPrimaryContainer = Color(0xFFF2D3C8),
+    secondary = Color(0xFFD6A08F),
+    onSecondary = Color(0xFF2E140B),
+    secondaryContainer = Color(0xFF3A2620),
+    onSecondaryContainer = Color(0xFFEBCFC5),
+    tertiary = Color(0xFFD9AE9E),
+    onTertiary = Color(0xFF2E140B),
+    tertiaryContainer = Color(0xFF33231E),
+    onTertiaryContainer = Color(0xFFEBD3CA),
+    background = Color(0xFF121214),
+    onBackground = Color(0xFFE4E2E0),
+    surface = Color(0xFF1C1C1F),
+    onSurface = Color(0xFFE4E2E0),
+    surfaceVariant = Color(0xFF28282C),
+    onSurfaceVariant = Color(0xFFA9A6A3),
+    outline = Color(0xFF3C3C41),
+    outlineVariant = Color(0xFF2C2C30)
 )
 
 @Composable
 fun SmartIslandTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    /** "system" follows [darkTheme]; "light" / "dark" force one. */
+    themeMode: String = "system",
     dynamicColor: Boolean = false, // Use our tailored premium palette by default for maximum brand consistency
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
+    val useDark = when (themeMode) {
+        "light" -> false
+        "dark" -> true
+        else -> darkTheme
+    }
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            if (useDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-        darkTheme -> DarkColorScheme
+        useDark -> DarkColorScheme
         else -> LightColorScheme
+    }
+
+    // Keep the status / navigation bar icons readable when the chosen theme differs from the phone's.
+    val view = androidx.compose.ui.platform.LocalView.current
+    if (!view.isInEditMode) {
+        androidx.compose.runtime.SideEffect {
+            val window = (context as? android.app.Activity)?.window ?: return@SideEffect
+            val controller = androidx.core.view.WindowCompat.getInsetsController(window, view)
+            controller.isAppearanceLightStatusBars = !useDark
+            controller.isAppearanceLightNavigationBars = !useDark
+        }
     }
 
     MaterialTheme(

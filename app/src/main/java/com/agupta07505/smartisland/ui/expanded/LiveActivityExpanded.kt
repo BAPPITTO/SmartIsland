@@ -7,10 +7,10 @@
 
 package com.agupta07505.smartisland.ui.expanded
 
-import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,7 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
+import com.agupta07505.smartisland.ui.IslandText as Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -44,7 +44,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.agupta07505.smartisland.data.SmartIslandSettings
-import com.agupta07505.smartisland.di.SmartIslandRepositories
 import com.agupta07505.smartisland.model.IslandNotification
 import com.agupta07505.smartisland.ui.bounceClick
 import com.agupta07505.smartisland.util.LiveActivityParser
@@ -113,7 +112,7 @@ fun LiveActivityExpanded(
                             modifier = Modifier
                                 .size(16.dp)
                                 .align(Alignment.BottomEnd)
-                                .background(Color.Black, CircleShape)
+                                .background(LocalIslandPalette.current.surface, CircleShape)
                                 .padding(1.5.dp)
                         ) {
                             Image(
@@ -136,7 +135,7 @@ fun LiveActivityExpanded(
                 ) {
                     Text(
                         text = notification?.appName?.firstOrNull()?.uppercase() ?: "L",
-                        color = Color.White,
+                        color = LocalIslandPalette.current.text,
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp
                     )
@@ -147,7 +146,7 @@ fun LiveActivityExpanded(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = statusTitle,
-                    color = Color.White,
+                    color = LocalIslandPalette.current.text,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     fontSize = 17.sp,
@@ -156,7 +155,7 @@ fun LiveActivityExpanded(
                 )
                 Text(
                     text = subStatusText,
-                    color = Color(0xFFD5DAE0),
+                    color = LocalIslandPalette.current.textSecondary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     fontSize = 13.sp,
@@ -192,6 +191,8 @@ fun LiveActivityExpanded(
                     .height(20.dp),
                 contentAlignment = Alignment.Center
             ) {
+                val trackColor = LocalIslandPalette.current.tint(0.2f)
+                val currentRing = LocalIslandPalette.current.inverseFill
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val width = size.width
                     val cy = size.height / 2f
@@ -199,7 +200,7 @@ fun LiveActivityExpanded(
 
                     // Background path line
                     drawLine(
-                        color = Color(0x33FFFFFF),
+                        color = trackColor,
                         start = Offset(12.dp.toPx(), cy),
                         end = Offset(width - 12.dp.toPx(), cy),
                         strokeWidth = strokeWidth,
@@ -220,7 +221,7 @@ fun LiveActivityExpanded(
                     drawCircle(color = brandColor, radius = 4.dp.toPx(), center = Offset(12.dp.toPx(), cy))
 
                     // Current position dot (Traveled position)
-                    drawCircle(color = Color.White, radius = 6.dp.toPx(), center = Offset(currentX, cy))
+                    drawCircle(color = currentRing, radius = 6.dp.toPx(), center = Offset(currentX, cy))
                     drawCircle(color = brandColor, radius = 4.dp.toPx(), center = Offset(currentX, cy))
 
                     // Destination node dot
@@ -232,9 +233,9 @@ fun LiveActivityExpanded(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("Initial", color = Color(0xFF94A3B8), fontSize = 10.sp)
+                Text("Initial", color = LocalIslandPalette.current.textMuted, fontSize = 10.sp)
                 Text("Traveled ${(progressRatio * 100).toInt()}%", color = brandColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                Text("Destination", color = Color(0xFF94A3B8), fontSize = 10.sp)
+                Text("Destination", color = LocalIslandPalette.current.textMuted, fontSize = 10.sp)
             }
         }
 
@@ -248,24 +249,21 @@ fun LiveActivityExpanded(
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier
+                        .weight(1f)
+                        .horizontalScroll(androidx.compose.foundation.rememberScrollState())
                 ) {
-                    notification.actionIntents.take(2).forEach { action ->
+                    // Every button the app put in its notification, not just the first two.
+                    notification.actionIntents.forEach { action ->
                         Box(
                             modifier = Modifier
                                 .height(28.dp)
                                 .clip(RoundedCornerShape(14.dp))
-                                .background(Color(0xFFE2E8F0))
+                                .background(LocalIslandPalette.current.chipFill)
                                 .bounceClick {
-                                    if (action.pendingIntent != null) {
-                                        triggerAction(context, notification.packageName, action.pendingIntent, action.title, notification.contentIntent)
-                                    } else {
-                                        Toast.makeText(context, "Clicked: ${action.title}", Toast.LENGTH_SHORT).show()
-                                    }
-                                    val repo = SmartIslandRepositories.notificationRepository(context)
-                                    repo.removeNotification(notification.key)
-                                    repo.sendCommand(com.agupta07505.smartisland.data.SmartIslandCommand.CancelNotification(notification.key))
-                                    onCollapse()
+                                    // Like the shade: fire the app's button and leave the card to the app,
+                                    // which removes or updates its notification itself.
+                                    notification.fireAction(context, action)
                                 }
                                 .padding(horizontal = 12.dp),
                             contentAlignment = Alignment.Center
@@ -287,14 +285,14 @@ fun LiveActivityExpanded(
                 modifier = Modifier
                     .size(24.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFF222222))
+                    .background(LocalIslandPalette.current.pick(Color(0xFF222222), Color(0xFFD9D8DB)))
                     .bounceClick { onOpenNotification() },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Rounded.KeyboardArrowDown,
                     contentDescription = "Open App",
-                    tint = Color.White,
+                    tint = LocalIslandPalette.current.text,
                     modifier = Modifier.size(16.dp)
                 )
             }

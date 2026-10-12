@@ -14,7 +14,6 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import android.service.notification.StatusBarNotification
 
 enum class OemDeviceType(val displayName: String, val brandKeywords: List<String>) {
     AUTO("Auto-Detect (Current Device)", emptyList()),
@@ -55,12 +54,9 @@ object OemDeviceRules {
     )
 
     private val XIAOMI_SCREEN_RECORDER_PACKAGES = setOf(
-    "com.miui.screenrecorder"
-    )
-
-    private val XIAOMI_VOICE_RECORDER_PACKAGES = setOf(
-    "com.miui.soundrecorder",
-    "com.android.soundrecorder"
+        "com.miui.screenrecorder",
+        "com.miui.soundrecorder",
+        "com.android.soundrecorder"
     )
 
     private val VIVO_SCREEN_RECORDER_PACKAGES = setOf(
@@ -179,10 +175,11 @@ object OemDeviceRules {
         setOf("com.google.android.dialer", "com.android.dialer", "com.android.server.telecom", "com.android.phone")
 
     private val HOTSPOT_PACKAGES = setOf(
-    "com.samsung.android.app.mobilehotspot",
-    "com.samsung.android.server.wifi.mobilehotspot",
-    "com.vivo.easyshare",
-    "com.google.android.tethering.entitlement"
+        "com.samsung.android.app.mobilehotspot",
+        "com.samsung.android.server.wifi.mobilehotspot",
+        "com.miui.securitycenter",
+        "com.vivo.easyshare",
+        "com.google.android.tethering.entitlement"
     )
 
     private val HOTSPOT_KEYWORDS = listOf(
@@ -220,7 +217,6 @@ object OemDeviceRules {
         titleText: String,
         device: OemDeviceType = detectCurrentDevice()
     ): Boolean {
-        if (packageName in XIAOMI_VOICE_RECORDER_PACKAGES) return false
         val lowerText = titleText.lowercase()
         val isKeywordMatch = SCREEN_RECORDING_KEYWORDS.any { lowerText.contains(it) }
 
@@ -239,6 +235,41 @@ object OemDeviceRules {
         return isPackageMatch || isKeywordMatch
     }
 
+    private val SCREENISH_KEYWORDS = listOf(
+        "screen recording", "recording screen", "screen recorder", "screen record",
+        "record screen", "smart capture", "s-capture", "capturing screen", "capture screen"
+    )
+
+    private val AUDIO_RECORDING_KEYWORDS = listOf(
+        "audio recording", "recording audio", "voice recording", "voice recorder",
+        "audio recorder", "sound recorder", "recording call", "call recording"
+    )
+
+    /**
+     * Voice / audio recorder apps (Google Recorder, Samsung Voice Recorder, OEM sound recorders ...).
+     * Screen-recorder packages and screen-recording wording always win, so this never claims them.
+     */
+    fun isAudioRecording(packageName: String, titleText: String): Boolean {
+        val pkg = packageName.lowercase()
+        val lower = titleText.lowercase()
+        if (pkg.contains("screen") || pkg.contains("videocapture") || SCREENISH_KEYWORDS.any { lower.contains(it) }) {
+            return false
+        }
+        return isRecorderPackage(pkg) || AUDIO_RECORDING_KEYWORDS.any { lower.contains(it) }
+    }
+
+    /** Package names of voice / sound recorder apps (no screen recorders, see isAudioRecording). */
+    fun isRecorderPackage(packageName: String): Boolean {
+        val pkg = packageName.lowercase()
+        if (pkg.contains("screen") || pkg.contains("videocapture")) return false
+        return pkg.contains("soundrecorder") ||
+            pkg.contains("voicenote") ||
+            pkg.contains("voicerecorder") ||
+            pkg.contains("apps.recorder") ||
+            pkg.endsWith(".recorder") ||
+            pkg.endsWith(".record")
+    }
+
     fun isScreenRecordingComplete(
         notification: Notification?,
         titleText: String
@@ -253,6 +284,8 @@ object OemDeviceRules {
             "audio saved", "ended", "tap to open", "tap to play"
         )
         if (completionKeywords.any { lowerText.contains(it) }) return true
+        // A paused recording is still a recording, even if the app drops the ongoing flag while paused.
+        if (RecordingClock.looksPaused(notification)) return false
         if (!isOngoing) return true
 
         return false

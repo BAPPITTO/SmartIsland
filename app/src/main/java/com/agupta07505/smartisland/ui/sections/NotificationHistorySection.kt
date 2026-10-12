@@ -7,16 +7,15 @@
 
 package com.agupta07505.smartisland.ui.sections
 
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
 import androidx.collection.LruCache
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -83,15 +82,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -116,16 +112,8 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-
-private data class RetentionOption(val hours: Int, val label: String)
-
-private val RETENTION_OPTIONS = listOf(
-    RetentionOption(24, "24 Hours (1 Day)"),
-    RetentionOption(72, "3 Days (Recommended)"),
-    RetentionOption(168, "7 Days (1 Week)"),
-    RetentionOption(720, "30 Days (1 Month)"),
-    RetentionOption(-1, "Keep Forever")
-)
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 private object AppIconMemoryCache {
     private val cache = LruCache<String, ImageBitmap>(120)
@@ -164,6 +152,17 @@ data class AppNotificationSummary(
     val count: Int
 )
 
+/** Saves an optional [AppNotificationSummary] across rotation (an empty list means null). */
+private val AppSummarySaver: Saver<AppNotificationSummary?, Any> = listSaver(
+    save = { summary ->
+        if (summary == null) emptyList<Any>() else listOf(summary.packageName, summary.appName, summary.count)
+    },
+    restore = { saved ->
+        if (saved.size < 3) null
+        else AppNotificationSummary(saved[0] as String, saved[1] as String, saved[2] as Int)
+    }
+)
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun NotificationHistorySection(
@@ -182,14 +181,19 @@ fun NotificationHistorySection(
     }
 
     val historyEntries by resolvedHistoryRepo.history.collectAsState(initial = emptyList())
-    var searchQuery by remember { mutableStateOf("") }
-    var selectedFilterPackage by remember { mutableStateOf<String?>(null) }
-    var showClearAllConfirm by remember { mutableStateOf(false) }
-    var showAppFilterDialog by remember { mutableStateOf(false) }
-    var showDeleteByAppDialog by remember { mutableStateOf(false) }
-    var packageToDeleteConfirm by remember { mutableStateOf<AppNotificationSummary?>(null) }
-    var selectedEntryForDetails by remember { mutableStateOf<NotificationHistoryEntry?>(null) }
-    var retentionMenuExpanded by remember { mutableStateOf(false) }
+    // Dialog and filter state is saved, so rotating the phone keeps an open dialog open.
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var selectedFilterPackage by rememberSaveable { mutableStateOf<String?>(null) }
+    var showClearAllConfirm by rememberSaveable { mutableStateOf(false) }
+    var showAppFilterDialog by rememberSaveable { mutableStateOf(false) }
+    var showDeleteByAppDialog by rememberSaveable { mutableStateOf(false) }
+    var packageToDeleteConfirm by rememberSaveable(stateSaver = AppSummarySaver) {
+        mutableStateOf<AppNotificationSummary?>(null)
+    }
+    // Only the id is saved; the entry is looked up again in the live history list.
+    var selectedEntryIdForDetails by rememberSaveable { mutableStateOf<Long?>(null) }
+    val selectedEntryForDetails = selectedEntryIdForDetails?.let { id -> historyEntries.firstOrNull { it.id == id } }
+    var retentionMenuExpanded by rememberSaveable { mutableStateOf(false) }
 
     // Aggregate unique apps for "Delete by App" feature
     val appSummaries = remember(historyEntries) {
@@ -318,11 +322,11 @@ fun NotificationHistorySection(
     selectedEntryForDetails?.let { entry ->
         NotificationDetailDialog(
             entry = entry,
-            onDismiss = { selectedEntryForDetails = null },
+            onDismiss = { selectedEntryIdForDetails = null },
             onDelete = {
                 scope.launch {
                     resolvedHistoryRepo.deleteEntry(entry.id)
-                    selectedEntryForDetails = null
+                    selectedEntryIdForDetails = null
                 }
             },
             onDeleteAllFromApp = {
@@ -331,7 +335,7 @@ fun NotificationHistorySection(
                     appName = entry.appName,
                     count = historyEntries.count { it.packageName == entry.packageName }
                 )
-                selectedEntryForDetails = null
+                selectedEntryIdForDetails = null
             }
         )
     }
@@ -862,7 +866,7 @@ fun NotificationHistorySection(
                     ) { entry ->
                         NotificationHistoryItemCard(
                             entry = entry,
-                            onCardClick = { selectedEntryForDetails = entry },
+                            onCardClick = { selectedEntryIdForDetails = entry.id },
                             onDelete = {
                                 scope.launch { resolvedHistoryRepo.deleteEntry(entry.id) }
                             }

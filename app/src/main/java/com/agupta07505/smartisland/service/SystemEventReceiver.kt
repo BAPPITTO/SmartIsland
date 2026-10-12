@@ -18,25 +18,64 @@ import android.os.BatteryManager
 import android.os.Build
 import android.os.PowerManager
 import com.agupta07505.smartisland.data.INotificationRepository
+import com.agupta07505.smartisland.model.IslandEvent
 import com.agupta07505.smartisland.model.IslandMode
 import com.agupta07505.smartisland.model.IslandNotification
+import com.agupta07505.smartisland.util.NotificationCooldownManager
 import com.agupta07505.smartisland.util.runCatchingLogged
 
 class SystemEventReceiver(
     private val notificationRepository: INotificationRepository,
-    private val settingsProvider: () -> com.agupta07505.smartisland.data.SmartIslandSettings = { com.agupta07505.smartisland.data.SmartIslandSettings.Default }
+    private val settingsProvider: () -> com.agupta07505.smartisland.data.SmartIslandSettings = { com.agupta07505.smartisland.data.SmartIslandSettings.Default },
+    /** True while a battery card is open in the expanded island: its timers wait until the island closes. */
+    private val isBatteryCardExpanded: () -> Boolean = { false }
 ) : BroadcastReceiver() {
 
     private var lastBatteryPct: Int = -1
     private var lastBatteryTitle: String? = null
     private var isCurrentlyCharging: Boolean = false
+    /** False until the first battery broadcast (the sticky one delivered on registration). */
+    private var chargingKnown: Boolean = false
+    private var unpluggedCardUntil: Long = 0L
+    /** While the brief "plugged in" card is up, periodic charging updates must not replace it. */
+    private var pluggedInCardUntil: Long = 0L
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
     private var activeBluetoothAddress: String? = null
     private var lastBluetoothAddress: String? = null
     private var lastBluetoothConnectedTime: Long = 0L
 
+    /**
+     * True when this announcement may pop the island open: [wantsExpand] is what the event asked for, and the anti-spam
+     * cooldown may take it away for an event the user switched into it. A throttled event still posts its card, so the
+     * island shows the real state without the pop-up.
+     */
+    private fun mayExpand(event: IslandEvent, wantsExpand: Boolean): Boolean =
+        wantsExpand && !NotificationCooldownManager.shouldThrottleSystemEvent(event.id, settingsProvider())
+
+    /** Stops the delayed "unplugged" follow-up when the overlay service goes away. */
+    fun release() {
+        mainHandler.removeCallbacksAndMessages(null)
+    }
+
+    /**
+     * Runs [action] after [delayMs], like postDelayed. If a battery card is open in the expanded island at that
+     * moment, the action waits (checked every [EXPANDED_RECHECK_MS]) and runs once the island is closed again, so a
+     * battery card is never taken away while the user is looking at it.
+     */
+    private fun postUnlessExpanded(delayMs: Long, action: () -> Unit) {
+        mainHandler.postDelayed(object : Runnable {
+            override fun run() {
+                if (isBatteryCardExpanded()) mainHandler.postDelayed(this, EXPANDED_RECHECK_MS) else action()
+            }
+        }, delayMs)
+    }
+
     companion object {
         private const val BLUETOOTH_DEBOUNCE_MS = 30_000L
+        private const val EXPANDED_RECHECK_MS = 500L
+        private const val UNPLUGGED_DISPLAY_MS = com.agupta07505.smartisland.util.IslandTimings.UNPLUGGED_CARD_MS
+        private const val PLUGGED_IN_DISPLAY_MS = com.agupta07505.smartisland.util.IslandTimings.PLUGGED_IN_CARD_MS
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -99,7 +138,7 @@ class SystemEventReceiver(
                             progressMax = 100,
                             timeMillis = System.currentTimeMillis()
                         ),
-                        autoExpand = autoExpand
+                        autoExpand = mayExpand(IslandEvent.BLUETOOTH, autoExpand)
                     )
                 }
                 "android.bluetooth.device.action.BATTERY_LEVEL_CHANGED" -> {
@@ -137,56 +176,49 @@ class SystemEventReceiver(
                     }
                 }
                 Intent.ACTION_POWER_CONNECTED -> {
-                    if (!settingsProvider().enableBatteryMode) {
-                        notificationRepository.removeNotification("system_battery")
-                        return@runCatchingLogged
-                    }
+                    // ACTION_BATTERY_CHANGED may already have announced this plug-in.
+                    val alreadyAnnounced = chargingKnown && isCurrentlyCharging
+                    chargingKnown = true
                     isCurrentlyCharging = true
-                    updateBatteryIsland(context, intent, autoExpand = true)
+                    if (!alreadyAnnounced) {
+                        updateBatteryIsland(context, intent, autoExpand = true, event = "plugged_in")
+                    }
                 }
                 Intent.ACTION_POWER_DISCONNECTED -> {
-                    if (!settingsProvider().enableBatteryMode) {
-                        notificationRepository.removeNotification("system_battery")
-                        return@runCatchingLogged
-                    }
+                    chargingKnown = true
                     isCurrentlyCharging = false
-                    updateBatteryState(context, intent, autoExpand = false)
+                    postUnplugged(context, intent)
                 }
                 Intent.ACTION_BATTERY_LOW -> {
-                    if (!settingsProvider().enableBatteryMode) {
-                        notificationRepository.removeNotification("system_battery")
-                        return@runCatchingLogged
-                    }
                     updateBatteryState(context, intent, autoExpand = true)
                 }
                 Intent.ACTION_BATTERY_OKAY -> {
-                    if (!settingsProvider().enableBatteryMode) {
-                        notificationRepository.removeNotification("system_battery")
-                        return@runCatchingLogged
-                    }
                     updateBatteryState(context, intent, autoExpand = false)
                 }
                 PowerManager.ACTION_POWER_SAVE_MODE_CHANGED -> {
-                    if (!settingsProvider().enableBatteryMode) {
-                        notificationRepository.removeNotification("system_battery")
-                        return@runCatchingLogged
-                    }
                     val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
                     val isPowerSave = powerManager?.isPowerSaveMode == true
                     updateBatteryState(context, intent, autoExpand = isPowerSave)
                 }
                 Intent.ACTION_BATTERY_CHANGED -> {
-                    if (!settingsProvider().enableBatteryMode) {
-                        notificationRepository.removeNotification("system_battery")
-                        return@runCatchingLogged
-                    }
                     val charging = isCharging(intent)
-                    if (charging != isCurrentlyCharging) {
+                    if (!chargingKnown) {
+                        // Sticky broadcast on registration: adopt the current state silently
+                        // instead of announcing a "plugged in" or "unplugged" event that
+                        // did not just happen (service start, settings toggle).
+                        chargingKnown = true
                         isCurrentlyCharging = charging
                         if (charging) {
-                            updateBatteryIsland(context, intent, autoExpand = true)
+                            updateBatteryIsland(context, intent, autoExpand = false)
                         } else {
                             updateBatteryState(context, intent, autoExpand = false)
+                        }
+                    } else if (charging != isCurrentlyCharging) {
+                        isCurrentlyCharging = charging
+                        if (charging) {
+                            updateBatteryIsland(context, intent, autoExpand = true, event = "plugged_in")
+                        } else {
+                            postUnplugged(context, intent)
                         }
                     } else if (charging) {
                         updateBatteryIsland(context, intent, autoExpand = false)
@@ -199,6 +231,11 @@ class SystemEventReceiver(
     }
 
     private fun isCharging(intent: Intent): Boolean {
+        // A connected charger counts even when the status says NOT_CHARGING, which is what
+        // phones report while a charge limit (80 to 85%) or heat protection pauses charging.
+        // Without this the island announced "Unplugged" for a cable that was still attached.
+        val plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)
+        if (plugged > 0) return true
         val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
         return status == BatteryManager.BATTERY_STATUS_CHARGING ||
                status == BatteryManager.BATTERY_STATUS_FULL
@@ -207,7 +244,7 @@ class SystemEventReceiver(
     private fun getBatteryIntent(context: Context, batteryIntent: Intent?): Intent? {
         return batteryIntent?.takeIf { it.hasExtra(BatteryManager.EXTRA_LEVEL) } ?: runCatchingLogged("SystemEventReceiver", "registerReceiver BATTERY_CHANGED failed") {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED), Context.RECEIVER_EXPORTED)
+                context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED), Context.RECEIVER_NOT_EXPORTED)
             } else {
                 @Suppress("UnspecifiedRegisterReceiverFlag")
                 context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
@@ -215,7 +252,49 @@ class SystemEventReceiver(
         }
     }
 
+    /** Brief "charger unplugged" card; normal low-battery/saver handling resumes after it fades. */
+    private fun postUnplugged(context: Context, intent: Intent?) {
+        val intentToUse = getBatteryIntent(context, intent)
+        val level = intentToUse?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = intentToUse?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: 100
+        val pct = if (scale > 0 && level >= 0) (level * 100 / scale.toFloat()).toInt().coerceIn(0, 100) else 0
+        unpluggedCardUntil = System.currentTimeMillis() + UNPLUGGED_DISPLAY_MS
+        pluggedInCardUntil = 0L
+        lastBatteryPct = -1
+        lastBatteryTitle = null
+        notificationRepository.postNotification(
+            IslandNotification(
+                key = "system_battery",
+                packageName = "com.android.systemui",
+                appName = "System",
+                title = "Unplugged",
+                text = "$pct%",
+                category = "battery_plugged_out",
+                mode = IslandMode.Battery,
+                timeMillis = System.currentTimeMillis()
+            ),
+            autoExpand = mayExpand(IslandEvent.PLUGGED_OUT, true)
+        )
+        postUnlessExpanded(UNPLUGGED_DISPLAY_MS + 100L) {
+            if (!isCurrentlyCharging) updateBatteryState(context, null, autoExpand = false)
+        }
+    }
+
+    /**
+     * Low battery, battery saver and fully charged are short warnings: they leave the island by
+     * themselves after the battery warning length from settings (default
+     * [com.agupta07505.smartisland.util.IslandTimings.BATTERY_WARNING_CARD_MS]). The check keeps a newer battery card (for
+     * example "Charging") from being removed by an older warning's timer.
+     */
+    private fun scheduleWarningRemoval(category: String) {
+        postUnlessExpanded(settingsProvider().batteryWarningMs.toLong()) {
+            val card = notificationRepository.notifications.value.firstOrNull { it.key == "system_battery" }
+            if (card?.category == category) notificationRepository.removeNotification("system_battery")
+        }
+    }
+
     private fun updateBatteryState(context: Context, intent: Intent?, autoExpand: Boolean) {
+        if (System.currentTimeMillis() < unpluggedCardUntil) return
         val intentToUse = getBatteryIntent(context, intent)
         val level = intentToUse?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: 0
         val scale = intentToUse?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: 100
@@ -232,9 +311,11 @@ class SystemEventReceiver(
 
         if (isPowerSave) {
             val title = "Battery Saver ON"
-            if (!autoExpand && batteryPct == lastBatteryPct && title == lastBatteryTitle) return
+            // A short warning: announced once per state, not again for every percent that follows.
+            if (!autoExpand && title == lastBatteryTitle) return
             lastBatteryPct = batteryPct
             lastBatteryTitle = title
+            scheduleWarningRemoval("battery_saver")
 
             notificationRepository.postNotification(
                 IslandNotification(
@@ -247,13 +328,15 @@ class SystemEventReceiver(
                     mode = IslandMode.Battery,
                     timeMillis = System.currentTimeMillis()
                 ),
-                autoExpand = autoExpand
+                autoExpand = mayExpand(IslandEvent.BATTERY_SAVER, autoExpand)
             )
         } else if (isLowBattery) {
             val title = "Low Battery"
-            if (!autoExpand && batteryPct == lastBatteryPct && title == lastBatteryTitle) return
+            // A short warning: announced once per state, not again for every percent that follows.
+            if (!autoExpand && title == lastBatteryTitle) return
             lastBatteryPct = batteryPct
             lastBatteryTitle = title
+            scheduleWarningRemoval("battery_low")
 
             notificationRepository.postNotification(
                 IslandNotification(
@@ -266,16 +349,26 @@ class SystemEventReceiver(
                     mode = IslandMode.Battery,
                     timeMillis = System.currentTimeMillis()
                 ),
-                autoExpand = autoExpand
+                autoExpand = mayExpand(IslandEvent.LOW_BATTERY, autoExpand)
             )
         } else {
+            // A battery card that is open in the expanded island stays; the held timer clears it after it closes.
+            if (isBatteryCardExpanded()) return
             lastBatteryPct = -1
             lastBatteryTitle = null
             notificationRepository.removeNotification("system_battery")
         }
     }
 
-    private fun updateBatteryIsland(context: Context, batteryIntent: Intent?, autoExpand: Boolean) {
+    /**
+     * Cards while a charger is connected:
+     *  - "plugged in" (category battery_plugged_in): the brief card shown when the cable connects; it is cleared
+     *    after PLUGGED_IN_DISPLAY_MS;
+     *  - "fully charged" (category battery_full) when the battery is full.
+     * Nothing else is shown while charging.
+     */
+    private fun updateBatteryIsland(context: Context, batteryIntent: Intent?, autoExpand: Boolean, event: String? = null) {
+        if (event != "plugged_in" && System.currentTimeMillis() < pluggedInCardUntil) return
         val intentToUse = getBatteryIntent(context, batteryIntent)
         val level = intentToUse?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: 0
         val scale = intentToUse?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: 100
@@ -283,15 +376,26 @@ class SystemEventReceiver(
         val batteryPct = (level * 100 / scale.toFloat()).toInt().coerceIn(0, 100)
         val status = intentToUse?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
 
-        val title = when (status) {
-            BatteryManager.BATTERY_STATUS_FULL -> "Fully Charged"
-            else -> "Charging"
+        val isFull = status == BatteryManager.BATTERY_STATUS_FULL
+        val isPlugEvent = event == "plugged_in" && !isFull
+        if (!isFull && !isPlugEvent) {
+            // Charging, not full, no plug event: no card. Clears the brief plugged-in card once it is over,
+            // unless that card is open in the expanded island (the held timer clears it after the island closes).
+            if (isBatteryCardExpanded()) return
+            lastBatteryPct = -1
+            lastBatteryTitle = null
+            notificationRepository.removeNotification("system_battery")
+            return
         }
+        val title = if (isFull) "Fully Charged" else "Plugged in"
+        val category = if (isFull) "battery_full" else "battery_plugged_in"
+        val cooldownEvent = if (isFull) IslandEvent.FULLY_CHARGED else IslandEvent.PLUGGED_IN
 
         // Skip redundant posts when both the percentage and title haven't changed.
         if (!autoExpand && batteryPct == lastBatteryPct && title == lastBatteryTitle) return
         lastBatteryPct = batteryPct
         lastBatteryTitle = title
+        if (isFull) scheduleWarningRemoval("battery_full")
 
         notificationRepository.postNotification(
             IslandNotification(
@@ -300,13 +404,26 @@ class SystemEventReceiver(
                 appName = "System",
                 title = title,
                 text = "$batteryPct%",
-                category = "battery_charging",
+                category = category,
                 mode = IslandMode.Battery,
                 icon = null,
                 timeMillis = System.currentTimeMillis()
             ),
-            autoExpand = autoExpand
+            autoExpand = mayExpand(cooldownEvent, autoExpand)
         )
+
+        if (isPlugEvent) {
+            pluggedInCardUntil = System.currentTimeMillis() + PLUGGED_IN_DISPLAY_MS
+            postUnlessExpanded(PLUGGED_IN_DISPLAY_MS + 100L) {
+                // Still on the charger: the brief card is over, so clear it (or show "fully charged").
+                if (isCurrentlyCharging) {
+                    pluggedInCardUntil = 0L
+                    lastBatteryPct = -1
+                    lastBatteryTitle = null
+                    updateBatteryIsland(context, null, autoExpand = false)
+                }
+            }
+        }
     }
 
     @SuppressLint("MissingPermission")

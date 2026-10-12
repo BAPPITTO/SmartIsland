@@ -46,10 +46,9 @@ object TimerStopwatchParser {
         "remaining", "sec remaining", "min remaining"
     )
 
-    private val STOPWATCH_KEYWORDS = listOf(
-        "stopwatch", "lap", "laps", "split", "elapsed",
-        "stopwatch running", "stopwatch paused"
-    )
+    /** Whole words only: "lap" must not match "overlap" or "collapse", "split" must not match "splitting". */
+    private val STOPWATCH_WORDS = Regex("""(?<![\p{L}])(stopwatch|laps?|split|elapsed)(?![\p{L}])""")
+    private val LAP_ACTION = Regex("""(?<![\p{L}])(lap|split|vuelta|tour|runde)(?![\p{L}])""")
 
     private val TIME_PATTERN = Pattern.compile("\\b(?:(\\d{1,2}):)?(\\d{1,2}):(\\d{2})(?:\\.(\\d{1,2}))?\\b")
 
@@ -201,11 +200,18 @@ object TimerStopwatchParser {
         val hasTimePattern = TIME_PATTERN.matcher(fullText).find()
 
         if (hasTimerAction) return true
+        // Outside clock apps, wording and a future timestamp only count for an ongoing notification that
+        // is not a message: a chat saying "timer 5:30" or a scheduled reminder is not a timer.
+        val flags = runCatching { notification.flags }.getOrDefault(0)
+        val isOngoing = (flags and Notification.FLAG_ONGOING_EVENT) != 0
+        val isMessage = runCatching { notification.category }.getOrNull().orEmpty().lowercase().let {
+            it == Notification.CATEGORY_MESSAGE || it == Notification.CATEGORY_EMAIL || it == Notification.CATEGORY_SOCIAL
+        }
         val notifWhen = runCatching { notification.`when` }.getOrDefault(0L)
-        if (notifWhen > System.currentTimeMillis()) return true
+        if (notifWhen > System.currentTimeMillis() && (isClockApp || isOngoing) && !isMessage) return true
         if (isClockApp && isTimerPaused(notification) && !actionLabels.any { it.contains("lap") }) return true
         if (isClockApp && (hasTimerKeyword || (hasTimePattern && !actionLabels.any { it.contains("lap") }))) return true
-        if (hasTimerKeyword && hasTimePattern) return true
+        if (hasTimerKeyword && hasTimePattern && isOngoing && !isMessage) return true
 
         return false
     }
@@ -237,8 +243,8 @@ object TimerStopwatchParser {
         }
 
         val isClockApp = CLOCK_PACKAGES.contains(packageName) || packageName.contains("clock") || packageName.contains("stopwatch")
-        val hasLapAction = actionLabels.any { it.contains("lap") || it.contains("split") }
-        val hasStopwatchKeyword = STOPWATCH_KEYWORDS.any { fullText.contains(it) }
+        val hasLapAction = actionLabels.any { LAP_ACTION.containsMatchIn(it) }
+        val hasStopwatchKeyword = STOPWATCH_WORDS.containsMatchIn(fullText)
 
         val extras = notification.extras
         val isChronometer = extras?.let {
@@ -258,6 +264,13 @@ object TimerStopwatchParser {
 
         val hasTimerKeyword = TIMER_KEYWORDS.any { fullText.contains(it) } ||
             actionLabels.any { it.contains("+1") || it.contains("timer") || it.contains("add 1") }
+
+        // Wording alone is not enough: any app's text can contain "stopwatch", "lap" (overlap, collapse)
+        // or "split" (a chat reply, a progress message). Outside clock apps a stopwatch must really
+        // be a running count-up chronometer.
+        val isLiveCountUp = isChronometer && !isChronometerCountDown
+        val trusted = isClockApp || isLiveCountUp
+        if (!trusted) return false
 
         if (hasLapAction) return true
         if (hasStopwatchKeyword) return true
@@ -326,68 +339,26 @@ object TimerStopwatchParser {
 
     /**
      * Extracts the remaining time in seconds from a timer notification.
-    * Reads the precise timer deadline from HyperOS timer metadata.
-    * Reads the most reliable future deadline from a timer notification.
-    * Prefers the notification's deadline before HyperOS-specific fallbacks.
-    */
-    fun parseTimerDeadlineMillis(notification: Notification): Long? {
-        if (isTimerPaused(notification)) return null
+     */
+    fun parseTimerRemainingSeconds(notification: Notification): Long? {
+        val isPaused = isTimerPaused(notification)
+        val extras = notification.extras
 
-        val now = System.currentTimeMillis()
+        // 1. If running and has chronometer countdown base, this is the most accurate
+        if (extras != null && !isPaused) {
+            val isCountDown = runCatching {
+                extras.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN, false) ||
+                extras.getBoolean("android.chronometerCountDown", false)
+            }.getOrDefault(false)
+            val chronometerBase = runCatching {
+                extras.getLong("android.chronometerBase", 0L)
+            }.getOrDefault(0L)
 
-        // 1. Prefer the actual deadline exposed by the notification.
-        val notificationDeadline = runCatching {
-            notification.`when`
-        }.getOrDefault(0L)
-
-        if (notificationDeadline > now) {
-            return notificationDeadline
-        }
-
-        // 2. Try reconstructing the deadline from HyperOS timer metadata.
-        val rawParam = runCatching {
-            notification.extras?.getString("miui.focus.param")
-        }.getOrNull() ?: return null
-
-        val json = runCatching {
-            org.json.JSONObject(rawParam)
-        }.getOrNull() ?: return null
-
-        val timerSystemCurrent = json.optLong("timerSystemCurrent", 0L)
-        val timerTotal = json.optLong("timerTotal", 0L)
-
-        if (timerSystemCurrent > 0L && timerTotal > 0L) {
-            val reconstructedDeadline = timerSystemCurrent + timerTotal
-
-            if (reconstructedDeadline > now) {
-                return reconstructedDeadline
+            if (isCountDown && chronometerBase > 0L) {
+                val diffMs = chronometerBase - SystemClock.elapsedRealtime()
+                if (diffMs > 0) return (diffMs + 500L) / 1000L
             }
         }
-
-        // 3. Last resort: the HyperOS timerWhen field.
-        val timerWhen = json.optLong("timerWhen", 0L)
-
-        return timerWhen.takeIf { it > now }
-    }
-        fun parseTimerRemainingSeconds(notification: Notification): Long? {
-            val isPaused = isTimerPaused(notification)
-            val extras = notification.extras
-
-            // 1. If running and has chronometer countdown base, this is the most accurate
-            if (extras != null && !isPaused) {
-                val isCountDown = runCatching {
-                    extras.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN, false) ||
-                    extras.getBoolean("android.chronometerCountDown", false)
-                }.getOrDefault(false)
-                val chronometerBase = runCatching {
-                    extras.getLong("android.chronometerBase", 0L)
-                }.getOrDefault(0L)
-
-                if (isCountDown && chronometerBase > 0L) {
-                    val diffMs = chronometerBase - SystemClock.elapsedRealtime()
-                    if (diffMs > 0) return (diffMs + 500L) / 1000L
-                }
-            }
 
         // 2. If running and notification.when is in future
         if (!isPaused) {
@@ -404,27 +375,42 @@ object TimerStopwatchParser {
         val subText = runCatching { extras?.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString() }.getOrNull().orEmpty()
         val bigText = runCatching { extras?.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() }.getOrNull().orEmpty()
 
-        for (field in listOf(title, text, subText, bigText)) {
+        return parseRemainingFromFields(listOf(title, text, subText, bigText))
+    }
+
+    /**
+     * A clock-style time ("29:52") in any field wins over a unit-style one ("30m"). Clock apps put the
+     * timer's total in the title ("30M TIMER") and the live remaining time in the text, so reading the
+     * title first made a paused timer show its full length.
+     */
+    private fun parseRemainingFromFields(fields: List<String>): Long? {
+        for (field in fields) {
+            if (field.isBlank()) continue
+            parseClockTimeToSeconds(field)?.let { return it }
+        }
+        for (field in fields) {
             if (field.isBlank()) continue
             val parsed = parseTimeStringToSeconds(field)
             if (parsed != null && parsed >= 0) return parsed
         }
-
         return null
+    }
+
+    /** Only the "mm:ss" / "h:mm:ss" form, no unit words. */
+    fun parseClockTimeToSeconds(input: String): Long? {
+        val matcher = TIME_PATTERN.matcher(input)
+        if (!matcher.find()) return null
+        val hours = matcher.group(1)?.toLongOrNull() ?: 0L
+        val minutes = matcher.group(2)?.toLongOrNull() ?: 0L
+        val seconds = matcher.group(3)?.toLongOrNull() ?: 0L
+        return hours * 3600L + minutes * 60L + seconds
     }
 
     /**
      * Extracts the remaining time in seconds from an IslandNotification.
      */
     fun parseTimerRemainingSeconds(notification: com.agupta07505.smartisland.model.IslandNotification): Long? {
-        val title = notification.title
-        val text = notification.text
-        for (field in listOf(title, text)) {
-            if (field.isBlank()) continue
-            val parsed = parseTimeStringToSeconds(field)
-            if (parsed != null && parsed >= 0) return parsed
-        }
-        return null
+        return parseRemainingFromFields(listOf(notification.title, notification.text))
     }
 
     /**

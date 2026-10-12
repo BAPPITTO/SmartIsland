@@ -35,15 +35,17 @@ import androidx.compose.material.icons.rounded.BatteryAlert
 import androidx.compose.material.icons.rounded.BatteryChargingFull
 import androidx.compose.material.icons.rounded.BatteryFull
 import androidx.compose.material.icons.rounded.BluetoothConnected
+import androidx.compose.material.icons.rounded.VpnKey
+import androidx.compose.material.icons.rounded.VpnKeyOff
+import androidx.compose.material.icons.rounded.WifiOff
+import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
+import com.agupta07505.smartisland.ui.IslandText as Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,6 +59,8 @@ import com.agupta07505.smartisland.R
 import com.agupta07505.smartisland.data.SmartIslandSettings
 import com.agupta07505.smartisland.model.IslandNotification
 import kotlinx.coroutines.delay
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 @Composable
 fun BluetoothExpanded(
@@ -78,7 +82,10 @@ fun BluetoothExpanded(
         }
     }
 
-    val batteryColor = if ((batteryLevel ?: 100) <= 20) Color(0xFFEF4444) else Color(0xFF10B981)
+    // Wi-Fi / VPN "disconnected" reuse this card with a warning accent, a red or amber status dot and no battery chip.
+    val lost = isConnectionLost(notification?.category)
+    val accent = connectivityAccent(notification?.category, settings.bluetoothColor)
+    val batteryColor = if ((batteryLevel ?: 100) <= 20) LocalIslandPalette.current.danger else LocalIslandPalette.current.success
     val batteryIcon = when {
         (batteryLevel ?: 100) >= 80 -> Icons.Rounded.BatteryFull
         (batteryLevel ?: 100) >= 40 -> Icons.Rounded.Battery5Bar
@@ -102,13 +109,13 @@ fun BluetoothExpanded(
                 modifier = Modifier
                     .size(42.dp)
                     .clip(CircleShape)
-                    .background(Color(settings.bluetoothColor).copy(alpha = 0.2f)),
+                    .background(accent.copy(alpha = 0.2f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.BluetoothConnected,
-                    contentDescription = "Bluetooth Connected",
-                    tint = Color(settings.bluetoothColor),
+                    imageVector = connectivityLeadingIcon(notification?.category),
+                    contentDescription = "Connection",
+                    tint = accent,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -116,7 +123,7 @@ fun BluetoothExpanded(
             Column {
                 Text(
                     text = deviceName,
-                    color = Color.White,
+                    color = LocalIslandPalette.current.text,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1
@@ -131,18 +138,18 @@ fun BluetoothExpanded(
                             modifier = Modifier
                                 .size(6.dp)
                                 .clip(CircleShape)
-                                .background(Color(0xFF10B981))
+                                .background(if (lost) accent else LocalIslandPalette.current.success)
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            text = if (settings.showBluetoothBattery && batteryLevel != null) "Connected" else statusText,
-                            color = Color(0xFF10B981),
+                            text = if (settings.showBluetoothBattery && batteryLevel != null && !lost) "Connected" else statusText,
+                            color = if (lost) accent else LocalIslandPalette.current.success,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
 
-                    if (settings.showBluetoothBattery && batteryLevel != null) {
+                    if (!lost && settings.showBluetoothBattery && batteryLevel != null) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(3.dp),
@@ -169,6 +176,31 @@ fun BluetoothExpanded(
             }
         }
 
+        // Wi-Fi and VPN events reuse this card. Wi-Fi has no picture on the right; VPN shows a globe; only Bluetooth has earbuds.
+        when (notification?.category) {
+            // Wi-Fi: signal arcs that count 1 - 2 - 3 - 2 and round again; lost: the same glyph slashed, standing still.
+            "wifi" -> {
+                Spacer(Modifier.width(8.dp))
+                WifiSignalBox(accent = Color(settings.bluetoothColor))
+                return@Row
+            }
+            "wifi_disconnected" -> {
+                Spacer(Modifier.width(8.dp))
+                WifiSignalBox(accent = accent, lost = true)
+                return@Row
+            }
+            "vpn" -> {
+                Spacer(Modifier.width(8.dp))
+                VpnGlobeBox(accent = Color(settings.bluetoothColor))
+                return@Row
+            }
+            // Disconnected VPN: the same globe with a slash through it, in red.
+            "vpn_disconnected" -> {
+                Spacer(Modifier.width(8.dp))
+                VpnGlobeBox(accent = accent, slashed = true)
+                return@Row
+            }
+        }
         Spacer(Modifier.width(8.dp))
 
         // Right side: Earbuds / Battery alternating animation
@@ -249,3 +281,32 @@ fun BluetoothExpanded(
         }
     }
 }
+
+
+/** Icon for the Bluetooth-style island card; Wi-Fi and VPN events reuse this card with a category. */
+internal fun connectivityIcon(category: String?): androidx.compose.ui.graphics.vector.ImageVector = when (category) {
+    "wifi" -> Icons.Rounded.Wifi
+    "vpn" -> Icons.Rounded.VpnKey
+    "wifi_disconnected" -> Icons.Rounded.WifiOff
+    "vpn_disconnected" -> Icons.Rounded.VpnKeyOff
+    else -> Icons.Rounded.BluetoothConnected
+}
+
+/**
+ * Icon for the left glyph (the circle): a lost Wi-Fi keeps the plain Wi-Fi icon there, in red; the slash is on the right-hand glyph.
+ * Everything else uses [connectivityIcon].
+ */
+internal fun connectivityLeadingIcon(category: String?): androidx.compose.ui.graphics.vector.ImageVector =
+    if (category == "wifi_disconnected") Icons.Rounded.Wifi else connectivityIcon(category)
+
+/** True for the Wi-Fi / VPN "disconnected" cards (they share the Bluetooth card but look like a warning). */
+internal fun isConnectionLost(category: String?): Boolean = category == "wifi_disconnected" || category == "vpn_disconnected"
+
+/**
+ * The colour of a Wi-Fi / VPN / Bluetooth card: the Bluetooth colour from the settings for the connected cards, full-strength red
+ * (the same red the Bluetooth card uses for a low battery) for a lost Wi-Fi or VPN.
+ */
+internal fun connectivityAccent(category: String?, bluetoothColor: Long): Color =
+    if (isConnectionLost(category)) CONNECTION_LOST_RED else Color(bluetoothColor)
+
+internal val CONNECTION_LOST_RED = Color(0xFFEF4444)

@@ -7,6 +7,12 @@
 
 package com.agupta07505.smartisland.data
 
+import com.agupta07505.smartisland.util.CustomFonts
+import com.agupta07505.smartisland.util.AnimationSpeed
+import com.agupta07505.smartisland.util.MergeStyle
+import com.agupta07505.smartisland.util.GestureSensitivity
+import com.agupta07505.smartisland.util.HapticStrength
+import com.agupta07505.smartisland.util.IslandTimings
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -33,8 +39,15 @@ data class SmartIslandSettings(
     val timerColor: Long = 0xFFF59E0BL,
     val stopwatchColor: Long = 0xFF06B6D4L,
     val enableAppShortcuts: Boolean = true,
-    val shortcutPackages: Set<String> = emptySet(),
+    /** Pinned quick-launch apps, in the order the island grid shows them. */
+    val shortcutPackages: List<String> = emptyList(),
     val showRecentApps: Boolean = false,
+    /** The Utilities page layout, in the form [com.agupta07505.smartisland.model.UtilityLayout] saves it. */
+    val utilityLayout: String = "",
+    /** The calculator app the Calculator utility opens; blank until it is chosen the first time it is tapped. */
+    val utilityCalculatorPackage: String = "",
+    /** Open that calculator in a floating window (when the floating window is on in the gesture settings). */
+    val utilityCalculatorFloating: Boolean = true,
     val welcomeDialogShown: Boolean = false,
     val showOnLockScreen: Boolean = false,
     val lockScreenPrivacy: String = "AppIconOnly",
@@ -44,17 +57,36 @@ data class SmartIslandSettings(
     val navigationEnabled: Boolean = true,
     val disabledNotificationPackages: Set<String> = emptySet(),
     val disabledSoundPackages: Set<String> = emptySet(),
-    val hideWhenIdle: Boolean = false,
+    val disabledEvents: Set<String> = emptySet(),
     val autoHidePill: Boolean = false,
     val autoHideTimeoutSeconds: Int = 5,
-    val showInLandscape: Boolean = false,
+    val showInLandscape: Boolean = true,
     val autoExpandOnNotification: Boolean = true,
+    /** False: nothing opens the island by itself while the phone is locked (cards still show in the pill). */
+    val autoExpandOnLockScreen: Boolean = true,
     val enableShadow: Boolean = true,
+    val expandedBlurEnabled: Boolean = false,
+    val expandedBlurRadius: Float = 24f,
+    /** See-through blur of whatever is behind an open card (system window blur, heavier). Off by default; the card blur above works without it. */
+    val expandedBlurBehind: Boolean = false,
+    /**
+     * The media (music) card has its own blur and opacity. A phone or backup saved before this
+     * existed starts from the shared values above (see the loaders), so nothing changes until the owner moves them.
+     */
+    val mediaBlurEnabled: Boolean = false,
+    val mediaBlurRadius: Float = 24f,
+    val mediaBlurBehind: Boolean = false,
+    val mediaOpacity: Float = 1f,
+    val expandedGradientEnabled: Boolean = false,
+    val expandedGradientColor: Long = 0xFF2563EBL,
+    val expandedGradientStrength: Float = 0.6f,
     val shadowElevation: Float = 14f,
     val enableMusicArtworkBackground: Boolean = true,
     val enableNotificationBackdrop: Boolean = true,
     val deviceType: String = "AUTO",
     val allowNetworkChecks: Boolean = true,
+    /** Show an estimated transfer card from device-wide network speed when no app notification exists. */
+    val detectTransfersBySpeed: Boolean = true,
     val enableNotificationHistory: Boolean = false,
     val notificationHistoryRetentionHours: Int = 72,
     val showBluetoothBattery: Boolean = true,
@@ -63,22 +95,210 @@ data class SmartIslandSettings(
     val notificationCooldownDurationMinutes: Int = 3,
     val notificationCooldownThreshold: Int = 3,
     val notificationCooldownExcludedPackages: Set<String> = emptySet(),
+    /** Ids of system events (battery, Wi-Fi, VPN, Bluetooth, flashlight) whose pop-ups the anti-spam cooldown may hold back. */
+    val notificationCooldownSystemEvents: Set<String> = emptySet(),
     val developerModeEnabled: Boolean = true,
     val recordLogs: Boolean = false,
+    /** App theme: "system" (follow the phone), "light" or "dark". */
+    val themeMode: String = "system",
+    /** Look of the expanded island: "dark" (the original look), "light", or "system" (follows the phone's light / dark setting). */
+    val expandedTheme: String = EXPANDED_THEME_DARK,
+    /** Font of the island's text: one of [VALID_FONTS] ("serif" is the phone's serif font) or a custom font id (`custom:<file name>`). */
+    val islandFont: String = FONT_LORA,
+    /** Mix fonts (see model/FontMix.kt): the island text uses up to three fonts, picked by the weight each piece of text asks for. */
+    val fontMixEnabled: Boolean = false,
+    /** Font for normal weight and lighter text; empty = the island font. A [VALID_FONTS] id or a custom font id. */
+    val fontMixLight: String = "",
+    /** Font for medium and semi-bold text; empty = the island font. */
+    val fontMixRegular: String = "",
+    /** Font for bold and heavier text; empty = the island font. */
+    val fontMixMedium: String = "",
     val enableNotchMode: Boolean = false,
+    /** Manual camera cutout area, for phones where the hardware detection fails. Used by the expanded island's close target. */
+    val cameraCutoutManual: Boolean = false,
+    /** Manual cutout centre, dp from the screen centre. */
+    val cameraCutoutX: Float = 0f,
+    /** Manual cutout top edge, dp from the top of the screen. */
+    val cameraCutoutY: Float = 12f,
+    val cameraCutoutWidth: Float = 40f,
+    val cameraCutoutHeight: Float = 24f,
     val enableSwipeActions: Boolean = true,
     val swipeUpAction: String = "DismissCurrent",
     val swipeHoldUpAction: String = "DismissAll",
-    val swipeDownAction: String = "FloatingWindow",
+    val swipeDownAction: String = "None",
     val swipeDownCollapsedAction: String = "Expand",
+    val swipeLeftAction: String = "None",
+    val swipeRightAction: String = "None",
     val swipeHorizontalCollapsedAction: String = "NextPrevious",
     val enablePillSwipeActions: Boolean = true,
     val pillSwipeUpAction: String = "DismissCurrent",
     val pillSwipeDownAction: String = "Expand",
     val pillSwipeLeftAction: String = "PreviousNotification",
     val pillSwipeRightAction: String = "NextNotification",
-    val circlePosition: String = CIRCLE_POSITION_RIGHT
+    // Long press on the collapsed pill. One real action (hide / show the pill) or "None" to turn it off.
+    val longPressAction: String = "TogglePill",
+    val circlePosition: String = CIRCLE_POSITION_RIGHT,
+    // ---- Landscape profile (independent of the portrait fields above) ----
+    // Legacy since LR4 (idle landscape cutout is always the camera circle); kept for old backups.
+    val landscapeShape: String = LANDSCAPE_SHAPE_PILL,
+    val landscapeWidth: Float = 112f,
+    val landscapeHeight: Float = 34f,
+    val landscapeXOffset: Float = 0f,
+    val landscapeYOffset: Float = 12f,
+    val landscapeCornerRadius: Float = 22f,
+    val landscapeOpacity: Float = 1f,
+    val landscapeCircleSize: Float = 26f,
+    val landscapeCircleOpacity: Float = 0.6f,
+    val landscapeCircleEdgeInset: Float = 16f,
+    val landscapeCircleYOffset: Float = 12f,
+    val landscapeCirclePosition: String = LANDSCAPE_POSITION_AUTO,
+    // Fine tuning of the idle landscape pill, added on top of the chosen position (camera / left / right / middle).
+    val landscapeCircleXAdjust: Float = 0f,
+    val landscapeCircleYAdjust: Float = 0f,
+    // Where the collapsed landscape pill WITH content sits (camera / left / right / middle).
+    // `landscapeXOffset` is the horizontal fine tuning added on top of that position.
+    val landscapePillPosition: String = LANDSCAPE_POSITION_MIDDLE,
+    val disabledEventsLandscape: Set<String> = emptySet(),
+    // ---- Timing (Settings > Timing). Defaults equal the old fixed values in IslandTimings. ----
+    /** Collapsed island with only static cards falls back to the idle cutout after this long. */
+    val idleTimeoutMs: Int = IslandTimings.STATIC_IDLE_TIMEOUT_MS.toInt(),
+    /** Low battery, battery saver and fully charged cards leave the island after this long. */
+    val batteryWarningMs: Int = IslandTimings.BATTERY_WARNING_CARD_MS.toInt(),
+    /** A fresh short event holds the primary cutout this long when a higher-priority card is live. */
+    val popupMs: Int = IslandTimings.POPUP_MS.toInt(),
+    /** The collapsed secondary round cutout merges into the primary cutout after this long. */
+    val secondaryMergeMs: Int = IslandTimings.SECONDARY_IDLE_MS.toInt(),
+    /** A download / upload card the app has not updated for this many minutes is dropped. 0 = never. */
+    val transferExpiryMinutes: Int = DEFAULT_TRANSFER_EXPIRY_MINUTES,
+    // ---- Idle widgets: live readouts in the collapsed cutout while no event shows (model/IdleWidget.kt). ----
+    val idleWidgetsEnabled: Boolean = false,
+    /** The landscape profile's own on / off switch (the portrait one is [idleWidgetsEnabled]). Old installs start from the portrait value. */
+    val idleWidgetsEnabledLandscape: Boolean = false,
+    /** Idle widgets go off after a tap on the cutout closed the island, per orientation (see model/IdleWidgetOff). */
+    val idleOffAfterTapClose: Boolean = false,
+    val idleOffAfterTapCloseLandscape: Boolean = false,
+    /** Idle widgets go off while a long press has the pill hidden, per orientation. */
+    val idleOffAfterLongPress: Boolean = false,
+    val idleOffAfterLongPressLandscape: Boolean = false,
+    /** Seconds between the sideways ticks of the idle glyphs; shared by portrait and landscape. */
+    val idleGlyphTickSeconds: Float = com.agupta07505.smartisland.model.IdleSlots.DEFAULT_TICK_SECONDS,
+    /** Comma list of widget ids ([com.agupta07505.smartisland.model.IdleWidgetKind.id]); several take turns. */
+    val idleWidgetIds: String = com.agupta07505.smartisland.model.IdleWidgets.DEFAULT_IDS,
+    /** Seconds each widget stays before the next one, when more than one is switched on. */
+    val idleWidgetCycleSeconds: Int = com.agupta07505.smartisland.model.IdleWidgets.DEFAULT_CYCLE_SECONDS,
+    /** Seconds without a touch until the semi-expanded widget island closes by itself; 0 = never (see model/WidgetIslandTimer). */
+    val widgetIslandCloseSeconds: Int = com.agupta07505.smartisland.model.WidgetIslandTimer.DEFAULT_SECONDS,
+    /** What the charging battery island shows besides percent, time to full and temperature: WATT or VOLT ([com.agupta07505.smartisland.model.WidgetIslandContent.BATTERY_WATT]). */
+    val widgetIslandBatteryMetric: String = com.agupta07505.smartisland.model.WidgetIslandContent.BATTERY_WATT,
+    /** Font of the collapsed pill's idle glyphs: empty = the island font, else a [VALID_FONTS] id or a custom font id. */
+    val idleGlyphFont: String = "",
+    /** Size of the idle glyphs in percent of the normal size (see model/IdleSlots). */
+    val idleGlyphScale: Int = com.agupta07505.smartisland.model.IdleSlots.DEFAULT_GLYPH_SCALE,
+    /** AUTO (device region), C or F. */
+    val idleWidgetTempUnit: String = com.agupta07505.smartisland.model.IdleWidgets.UNIT_AUTO,
+    // ---- Animation speed per orientation (Layout tab): relaxed / normal / snappy. ----
+    val animSpeedPortrait: String = AnimationSpeed.ID_NORMAL,
+    val animSpeedLandscape: String = AnimationSpeed.ID_NORMAL,
+    /** How the secondary round cutout merges into the primary one: "slide" (original) or "bubble". */
+    val mergeStyle: String = MergeStyle.ID_SLIDE,
+    /** Same choice for landscape. Old backups and old installs start from the shared [mergeStyle] they had. */
+    val mergeStyleLandscape: String = MergeStyle.ID_SLIDE,
+    // ---- Do Not Disturb ----
+    /** Keep showing cards while Do Not Disturb hides notifications from the shade. Sound stays muted. */
+    val showDuringDnd: Boolean = false,
+    // ---- Haptics: strength of the vibration for expand, collapse, swipe actions and the hold ----
+    val hapticStrength: String = HapticStrength.ID_NORMAL,
+    // ---- Floating window: the white pull handle on the expanded card and the Floating window swipe action ----
+    /** Off hides the white pill (and its pull animation) and makes the Floating window swipe action do nothing. */
+    val floatingWindowEnabled: Boolean = true,
+    /** [com.agupta07505.smartisland.model.FloatingWindowMode] id: Android's own freeform, or LMO Freeform. */
+    val floatingWindowMode: String = com.agupta07505.smartisland.model.FloatingWindowMode.ID_SYSTEM,
+    // ---- Gestures: how easily swipes fire (distance and how clearly one direction must win) ----
+    val gestureSensitivity: String = GestureSensitivity.ID_NORMAL,
+    // ---- Per-app event rules (deny sets: an app in no set behaves as before). Sound uses disabledSoundPackages. ----
+    /** Apps whose cards never open into the expanded card. */
+    val noExpandPackages: Set<String> = emptySet(),
+    /** Apps whose new notifications never open the card by themselves (beats the loud-notification exception). */
+    val noAutoExpandPackages: Set<String> = emptySet(),
+    /**
+     * Apps the user switched auto-expand ON for. An app in neither set is at its default: only its loud
+     * (non-silent) notifications open the card by themselves.
+     */
+    val autoExpandPackages: Set<String> = emptySet(),
+    /** System events (event ids) that never open the card by themselves; they still show in the pill. */
+    val noAutoExpandEvents: Set<String> = emptySet(),
+    /**
+     * True: while the phone is locked no event shows in the collapsed pill (calls excepted); the idle
+     * cutout stays. Only matters when [showOnLockScreen] is on. Off by default, so nothing changes.
+     */
+    val hideAllOnLockScreen: Boolean = false,
+    /** Event ids whose card (or privacy dot) is kept out of the pill while the phone is locked. */
+    val hideOnLockScreenEvents: Set<String> = emptySet(),
+    /**
+     * Universal switch for app notifications. Off: the notification cards are not shown and the listener
+     * ignores the notifications completely (they stay in the system shade). On by default.
+     */
+    val notificationsEnabled: Boolean = true,
+    /** Apps whose cards stay out of the pill while the phone is locked (their notifications are untouched). */
+    val hideOnLockScreenPackages: Set<String> = emptySet()
 ) {
+    /** Animation speed for the orientation being rendered. */
+    fun animationSpeed(isLandscape: Boolean): AnimationSpeed =
+        AnimationSpeed.fromId(if (isLandscape) animSpeedLandscape else animSpeedPortrait)
+
+    /** Merge animation for the secondary round cutout. */
+    fun mergeStyleKind(): MergeStyle = MergeStyle.fromId(mergeStyle)
+
+    /** Merge animation of the given orientation (the overlay reads [mergeStyle] after `forOrientation` has swapped it). */
+    fun mergeStyleKind(landscape: Boolean): MergeStyle =
+        MergeStyle.fromId(if (landscape) mergeStyleLandscape else mergeStyle)
+
+    /** True when the given event id is not switched off by the user. */
+    fun isEventEnabled(eventId: String): Boolean = eventId !in disabledEvents && !notificationsSwitchedOff(eventId)
+
+    /** True for the app-notification event while the universal notifications switch is off. */
+    private fun notificationsSwitchedOff(eventId: String): Boolean =
+        !notificationsEnabled && eventId == com.agupta07505.smartisland.model.IslandEvent.NOTIFICATION.id
+
+    /**
+     * True when the event must stay out of the pill while the phone is locked: the universal lock-screen switch or the
+     * event's own. Calls are never hidden (a ringing call has to stay reachable).
+     */
+    /**
+     * True when a card of [packageName] must stay out of the pill while the phone is locked because of the per-app
+     * rule. Calls are never hidden, whatever app they come from.
+     */
+    fun isAppHiddenOnLockScreen(packageName: String, mode: com.agupta07505.smartisland.model.IslandMode): Boolean =
+        mode != com.agupta07505.smartisland.model.IslandMode.IncomingCall && packageName in hideOnLockScreenPackages
+
+    fun isEventHiddenOnLockScreen(eventId: String): Boolean {
+        if (eventId == com.agupta07505.smartisland.model.IslandEvent.CALL.id) return false
+        return hideAllOnLockScreen || eventId in hideOnLockScreenEvents
+    }
+
+    /** True when the given event may open the island by itself (its own auto-expand switch is not off). */
+    fun isEventAutoExpand(eventId: String): Boolean = eventId !in noAutoExpandEvents
+
+    /** True when the given event id is switched on in the landscape profile. */
+    fun isLandscapeEventEnabled(eventId: String): Boolean =
+        eventId !in disabledEventsLandscape && !notificationsSwitchedOff(eventId)
+
+    /**
+     * True when no profile that can be shown would display the event. The notification listener
+     * ignores such events completely and leaves them in the system shade.
+     */
+    fun isEventDisabledEverywhere(eventId: String): Boolean =
+        notificationsSwitchedOff(eventId) ||
+            (eventId in disabledEvents && (!showInLandscape || eventId in disabledEventsLandscape))
+
+    /**
+     * True when at least one displayable profile has the event switched off. The listener must not
+     * pull such a notification out of the system shade, or it would vanish in that orientation.
+     */
+    fun isEventDisabledSomewhere(eventId: String): Boolean =
+        notificationsSwitchedOff(eventId) ||
+            eventId in disabledEvents || (showInLandscape && eventId in disabledEventsLandscape)
+
     fun toJson(appVersion: String = ""): String {
         val root = JSONObject()
         root.put("formatVersion", BACKUP_FORMAT_VERSION)
@@ -117,6 +337,9 @@ data class SmartIslandSettings(
         settingsObj.put("shortcutPackages", shortcutsArray)
 
         settingsObj.put("showRecentApps", showRecentApps)
+        settingsObj.put("utilityLayout", utilityLayout)
+        settingsObj.put("utilityCalculatorPackage", utilityCalculatorPackage)
+        settingsObj.put("utilityCalculatorFloating", utilityCalculatorFloating)
         settingsObj.put("welcomeDialogShown", welcomeDialogShown)
         settingsObj.put("showOnLockScreen", showOnLockScreen)
         settingsObj.put("lockScreenPrivacy", lockScreenPrivacy)
@@ -133,17 +356,32 @@ data class SmartIslandSettings(
         disabledSoundPackages.forEach { disabledSoundArray.put(it) }
         settingsObj.put("disabledSoundPackages", disabledSoundArray)
 
-        settingsObj.put("hideWhenIdle", hideWhenIdle)
+        val disabledEventsArray = JSONArray()
+        disabledEvents.forEach { disabledEventsArray.put(it) }
+        settingsObj.put("disabledEvents", disabledEventsArray)
+
         settingsObj.put("autoHidePill", autoHidePill)
         settingsObj.put("autoHideTimeoutSeconds", autoHideTimeoutSeconds)
         settingsObj.put("showInLandscape", showInLandscape)
         settingsObj.put("autoExpandOnNotification", autoExpandOnNotification)
+        settingsObj.put("autoExpandOnLockScreen", autoExpandOnLockScreen)
         settingsObj.put("enableShadow", enableShadow)
+        settingsObj.put("expandedBlurEnabled", expandedBlurEnabled)
+        settingsObj.put("expandedBlurRadius", expandedBlurRadius.toDouble())
+        settingsObj.put("expandedBlurBehind", expandedBlurBehind)
+        settingsObj.put("mediaBlurEnabled", mediaBlurEnabled)
+        settingsObj.put("mediaBlurRadius", mediaBlurRadius.toDouble())
+        settingsObj.put("mediaBlurBehind", mediaBlurBehind)
+        settingsObj.put("mediaOpacity", mediaOpacity.toDouble())
+        settingsObj.put("expandedGradientEnabled", expandedGradientEnabled)
+        settingsObj.put("expandedGradientColor", expandedGradientColor)
+        settingsObj.put("expandedGradientStrength", expandedGradientStrength.toDouble())
         settingsObj.put("shadowElevation", shadowElevation.toDouble())
         settingsObj.put("enableMusicArtworkBackground", enableMusicArtworkBackground)
         settingsObj.put("enableNotificationBackdrop", enableNotificationBackdrop)
         settingsObj.put("deviceType", deviceType)
         settingsObj.put("allowNetworkChecks", allowNetworkChecks)
+        settingsObj.put("detectTransfersBySpeed", detectTransfersBySpeed)
         settingsObj.put("enableNotificationHistory", enableNotificationHistory)
         settingsObj.put("notificationHistoryRetentionHours", notificationHistoryRetentionHours)
         settingsObj.put("showBluetoothBattery", showBluetoothBattery)
@@ -155,22 +393,110 @@ data class SmartIslandSettings(
         val cooldownExcludedArray = JSONArray()
         notificationCooldownExcludedPackages.forEach { cooldownExcludedArray.put(it) }
         settingsObj.put("notificationCooldownExcludedPackages", cooldownExcludedArray)
+        val cooldownSystemEventsArray = JSONArray()
+        notificationCooldownSystemEvents.forEach { cooldownSystemEventsArray.put(it) }
+        settingsObj.put("notificationCooldownSystemEvents", cooldownSystemEventsArray)
 
         settingsObj.put("developerModeEnabled", developerModeEnabled)
         settingsObj.put("recordLogs", recordLogs)
+        settingsObj.put("themeMode", themeMode)
+        settingsObj.put("expandedTheme", expandedTheme)
+        settingsObj.put("islandFont", islandFont)
         settingsObj.put("enableNotchMode", enableNotchMode)
+        settingsObj.put("cameraCutoutManual", cameraCutoutManual)
+        settingsObj.put("cameraCutoutX", cameraCutoutX.toDouble())
+        settingsObj.put("cameraCutoutY", cameraCutoutY.toDouble())
+        settingsObj.put("cameraCutoutWidth", cameraCutoutWidth.toDouble())
+        settingsObj.put("cameraCutoutHeight", cameraCutoutHeight.toDouble())
         settingsObj.put("enableSwipeActions", enableSwipeActions)
         settingsObj.put("swipeUpAction", swipeUpAction)
         settingsObj.put("swipeHoldUpAction", swipeHoldUpAction)
         settingsObj.put("swipeDownAction", swipeDownAction)
         settingsObj.put("swipeDownCollapsedAction", swipeDownCollapsedAction)
+        settingsObj.put("swipeLeftAction", swipeLeftAction)
+        settingsObj.put("swipeRightAction", swipeRightAction)
         settingsObj.put("swipeHorizontalCollapsedAction", swipeHorizontalCollapsedAction)
         settingsObj.put("enablePillSwipeActions", enablePillSwipeActions)
         settingsObj.put("pillSwipeUpAction", pillSwipeUpAction)
         settingsObj.put("pillSwipeDownAction", pillSwipeDownAction)
         settingsObj.put("pillSwipeLeftAction", pillSwipeLeftAction)
         settingsObj.put("pillSwipeRightAction", pillSwipeRightAction)
+        settingsObj.put("longPressAction", longPressAction)
         settingsObj.put("circlePosition", circlePosition)
+        settingsObj.put("landscapeShape", landscapeShape)
+        settingsObj.put("landscapeWidth", landscapeWidth.toDouble())
+        settingsObj.put("landscapeHeight", landscapeHeight.toDouble())
+        settingsObj.put("landscapeXOffset", landscapeXOffset.toDouble())
+        settingsObj.put("landscapeYOffset", landscapeYOffset.toDouble())
+        settingsObj.put("landscapeCornerRadius", landscapeCornerRadius.toDouble())
+        settingsObj.put("landscapeOpacity", landscapeOpacity.toDouble())
+        settingsObj.put("landscapeCircleSize", landscapeCircleSize.toDouble())
+        settingsObj.put("landscapeCircleOpacity", landscapeCircleOpacity.toDouble())
+        settingsObj.put("landscapeCircleEdgeInset", landscapeCircleEdgeInset.toDouble())
+        settingsObj.put("landscapeCircleYOffset", landscapeCircleYOffset.toDouble())
+        settingsObj.put("landscapeCirclePosition", landscapeCirclePosition)
+        settingsObj.put("landscapeCircleXAdjust", landscapeCircleXAdjust.toDouble())
+        settingsObj.put("landscapeCircleYAdjust", landscapeCircleYAdjust.toDouble())
+        settingsObj.put("landscapePillPosition", landscapePillPosition)
+
+        val disabledEventsLandscapeArray = JSONArray()
+        disabledEventsLandscape.forEach { disabledEventsLandscapeArray.put(it) }
+        settingsObj.put("disabledEventsLandscape", disabledEventsLandscapeArray)
+
+        settingsObj.put("idleTimeoutMs", idleTimeoutMs)
+        settingsObj.put("batteryWarningMs", batteryWarningMs)
+        settingsObj.put("popupMs", popupMs)
+        settingsObj.put("secondaryMergeMs", secondaryMergeMs)
+        settingsObj.put("transferExpiryMinutes", transferExpiryMinutes)
+        settingsObj.put("idleWidgetsEnabled", idleWidgetsEnabled)
+        settingsObj.put("idleWidgetsEnabledLandscape", idleWidgetsEnabledLandscape)
+        settingsObj.put("idleOffAfterTapClose", idleOffAfterTapClose)
+        settingsObj.put("idleOffAfterTapCloseLandscape", idleOffAfterTapCloseLandscape)
+        settingsObj.put("idleOffAfterLongPress", idleOffAfterLongPress)
+        settingsObj.put("idleOffAfterLongPressLandscape", idleOffAfterLongPressLandscape)
+        settingsObj.put("idleGlyphTickSeconds", idleGlyphTickSeconds.toDouble())
+        settingsObj.put("idleWidgetIds", idleWidgetIds)
+        settingsObj.put("idleWidgetCycleSeconds", idleWidgetCycleSeconds)
+        settingsObj.put("widgetIslandCloseSeconds", widgetIslandCloseSeconds)
+        settingsObj.put("idleWidgetTempUnit", idleWidgetTempUnit)
+        settingsObj.put("idleGlyphFont", idleGlyphFont)
+        settingsObj.put("fontMixEnabled", fontMixEnabled)
+        settingsObj.put("fontMixLight", fontMixLight)
+        settingsObj.put("fontMixRegular", fontMixRegular)
+        settingsObj.put("fontMixMedium", fontMixMedium)
+        settingsObj.put("idleGlyphScale", idleGlyphScale)
+        settingsObj.put("widgetIslandBatteryMetric", widgetIslandBatteryMetric)
+        settingsObj.put("animSpeedPortrait", animSpeedPortrait)
+        settingsObj.put("animSpeedLandscape", animSpeedLandscape)
+        settingsObj.put("mergeStyle", mergeStyle)
+        settingsObj.put("mergeStyleLandscape", mergeStyleLandscape)
+        settingsObj.put("showDuringDnd", showDuringDnd)
+        settingsObj.put("hapticStrength", hapticStrength)
+        settingsObj.put("gestureSensitivity", gestureSensitivity)
+        settingsObj.put("floatingWindowEnabled", floatingWindowEnabled)
+        settingsObj.put("floatingWindowMode", floatingWindowMode)
+
+        val noExpandArray = JSONArray()
+        noExpandPackages.forEach { noExpandArray.put(it) }
+        settingsObj.put("noExpandPackages", noExpandArray)
+
+        val noAutoExpandArray = JSONArray()
+        noAutoExpandPackages.forEach { noAutoExpandArray.put(it) }
+        settingsObj.put("noAutoExpandPackages", noAutoExpandArray)
+        val autoExpandArray = JSONArray()
+        autoExpandPackages.forEach { autoExpandArray.put(it) }
+        settingsObj.put("autoExpandPackages", autoExpandArray)
+        val noAutoExpandEventsArray = JSONArray()
+        noAutoExpandEvents.forEach { noAutoExpandEventsArray.put(it) }
+        settingsObj.put("noAutoExpandEvents", noAutoExpandEventsArray)
+        settingsObj.put("hideAllOnLockScreen", hideAllOnLockScreen)
+        val hideOnLockArray = JSONArray()
+        hideOnLockScreenEvents.forEach { hideOnLockArray.put(it) }
+        settingsObj.put("hideOnLockScreenEvents", hideOnLockArray)
+        settingsObj.put("notificationsEnabled", notificationsEnabled)
+        val hideOnLockPackagesArray = JSONArray()
+        hideOnLockScreenPackages.forEach { hideOnLockPackagesArray.put(it) }
+        settingsObj.put("hideOnLockScreenPackages", hideOnLockPackagesArray)
 
         root.put("settings", settingsObj)
         return root.toString(2)
@@ -183,9 +509,53 @@ data class SmartIslandSettings(
         val settingsCount: Int
     )
 
+    /**
+     * The settings the media (music) card draws with: the shared blur and opacity fields hold the media values, so
+     * every existing helper (`cardBackgroundBlur`, `islandSurface`, the blur window) works unchanged on this copy.
+     */
+    fun forMedia(): SmartIslandSettings = copy(
+        opacity = mediaOpacity,
+        expandedBlurEnabled = mediaBlurEnabled,
+        expandedBlurRadius = mediaBlurRadius,
+        expandedBlurBehind = mediaBlurBehind
+    )
+
+    /** [forMedia] when [media] is true (the shown card is a music card), else these settings. */
+    fun forCard(media: Boolean): SmartIslandSettings = if (media) forMedia() else this
+
     companion object {
+        const val EXPANDED_THEME_DARK = "dark"
+        const val EXPANDED_THEME_LIGHT = "light"
+        const val EXPANDED_THEME_SYSTEM = "system"
+        val VALID_EXPANDED_THEMES = setOf(EXPANDED_THEME_DARK, EXPANDED_THEME_LIGHT, EXPANDED_THEME_SYSTEM)
+        const val FONT_SYSTEM = "system"
+        const val FONT_SERIF = "serif"
+        const val FONT_MONOSPACE = "monospace"
+        const val FONT_LORA = "lora"
+        const val FONT_INTER_DISPLAY = "inter_display"
+        const val FONT_POPPINS = "poppins"
+        /** The fonts that ship with the app. A font the user added has the id `custom:<file name>` (see [CustomFonts]). */
+        val VALID_FONTS = setOf(FONT_SYSTEM, FONT_SERIF, FONT_MONOSPACE, FONT_LORA, FONT_INTER_DISPLAY, FONT_POPPINS)
+
+        /** True for a built-in font id or a well-formed custom font id. Whether the file exists is checked when the font is drawn. */
+        fun isValidFont(id: String): Boolean = id in VALID_FONTS || CustomFonts.fileNameOf(id) != null
+
         const val CIRCLE_POSITION_RIGHT = "right"
         const val CIRCLE_POSITION_LEFT = "left"
+
+        const val LANDSCAPE_SHAPE_PILL = "pill"
+        const val LANDSCAPE_SHAPE_CIRCLE = "circle"
+        const val LANDSCAPE_POSITION_AUTO = "auto"
+        const val LANDSCAPE_POSITION_LEFT = "left"
+        const val LANDSCAPE_POSITION_RIGHT = "right"
+        const val LANDSCAPE_POSITION_MIDDLE = "middle"
+
+        const val MIN_CIRCLE_SIZE = 16f
+        const val MAX_CIRCLE_SIZE = 56f
+        const val MIN_CIRCLE_EDGE_INSET = 0f
+        const val MAX_CIRCLE_EDGE_INSET = 120f
+        const val MAX_LANDSCAPE_Y_OFFSET = 240f
+        const val MAX_LANDSCAPE_X_OFFSET = 700f
 
         val Default = SmartIslandSettings()
 
@@ -195,6 +565,10 @@ data class SmartIslandSettings(
         const val MAX_WIDTH = 180f
         const val MIN_HEIGHT = 24f
         const val MAX_HEIGHT = 60f
+        const val MIN_CUTOUT_WIDTH = 12f
+        const val MAX_CUTOUT_WIDTH = 120f
+        const val MIN_CUTOUT_HEIGHT = 12f
+        const val MAX_CUTOUT_HEIGHT = 60f
         const val MIN_X_OFFSET = -140f
         const val MAX_X_OFFSET = 140f
         const val MIN_Y_OFFSET = 0f
@@ -202,9 +576,25 @@ data class SmartIslandSettings(
         const val MIN_CORNER_RADIUS = 8f
         const val MAX_CORNER_RADIUS = 40f
         const val MIN_OPACITY = 0.2f
+        const val MIN_EXPANDED_BLUR = 4f
+        const val MAX_EXPANDED_BLUR = 60f
+        const val MIN_GRADIENT_STRENGTH = 0.1f
+        const val MAX_GRADIENT_STRENGTH = 1f
         const val MAX_OPACITY = 1f
         const val MIN_SHADOW_ELEVATION = 0f
         const val MAX_SHADOW_ELEVATION = 32f
+
+        // Timing bounds (milliseconds) and the step the sliders move in.
+        const val MIN_IDLE_TIMEOUT_MS = 1_000
+        const val MAX_IDLE_TIMEOUT_MS = 30_000
+        const val MIN_BATTERY_WARNING_MS = 1_000
+        const val MAX_BATTERY_WARNING_MS = 15_000
+        const val MIN_POPUP_MS = 500
+        const val MAX_POPUP_MS = 6_000
+        const val MIN_SECONDARY_MERGE_MS = 500
+        const val MAX_SECONDARY_MERGE_MS = 10_000
+        const val MAX_TRANSFER_EXPIRY_MINUTES = 120
+        const val DEFAULT_TRANSFER_EXPIRY_MINUTES = 15
 
         fun parseBackupMetadata(jsonString: String): BackupMetadata? {
             return runCatching {
@@ -231,6 +621,10 @@ data class SmartIslandSettings(
                 val raw = if (obj.has(key)) obj.optDouble(key, default.toDouble()).toFloat() else default
                 return if (raw.isFinite()) raw.coerceIn(min, max) else default
             }
+
+            // A merge style id: unknown or missing values fall back to [fallback].
+            fun mergeId(key: String, fallback: String): String =
+                obj.optString(key, fallback).takeIf { it in MergeStyle.VALID_IDS } ?: fallback
 
             fun safeColor(key: String, default: Long): Long {
                 return if (obj.has(key)) {
@@ -275,8 +669,15 @@ data class SmartIslandSettings(
                 timerColor = safeColor("timerColor", defaults.timerColor),
                 stopwatchColor = safeColor("stopwatchColor", defaults.stopwatchColor),
                 enableAppShortcuts = obj.optBoolean("enableAppShortcuts", defaults.enableAppShortcuts),
-                shortcutPackages = safeStringSet("shortcutPackages", defaults.shortcutPackages, 8),
+                shortcutPackages = obj.optJSONArray("shortcutPackages")?.let { arr ->
+                    PinnedApps.normalize((0 until arr.length()).map { arr.optString(it, "") })
+                } ?: defaults.shortcutPackages,
                 showRecentApps = obj.optBoolean("showRecentApps", defaults.showRecentApps),
+                utilityLayout = com.agupta07505.smartisland.model.UtilityLayout.encode(
+                    com.agupta07505.smartisland.model.UtilityLayout.decode(obj.optString("utilityLayout", defaults.utilityLayout))
+                ),
+                utilityCalculatorPackage = obj.optString("utilityCalculatorPackage", defaults.utilityCalculatorPackage).take(255),
+                utilityCalculatorFloating = obj.optBoolean("utilityCalculatorFloating", defaults.utilityCalculatorFloating),
                 welcomeDialogShown = obj.optBoolean("welcomeDialogShown", defaults.welcomeDialogShown),
                 showOnLockScreen = obj.optBoolean("showOnLockScreen", defaults.showOnLockScreen),
                 lockScreenPrivacy = obj.optString("lockScreenPrivacy", defaults.lockScreenPrivacy).let {
@@ -288,17 +689,38 @@ data class SmartIslandSettings(
                 navigationEnabled = obj.optBoolean("navigationEnabled", defaults.navigationEnabled),
                 disabledNotificationPackages = safeStringSet("disabledNotificationPackages", defaults.disabledNotificationPackages),
                 disabledSoundPackages = safeStringSet("disabledSoundPackages", defaults.disabledSoundPackages),
-                hideWhenIdle = obj.optBoolean("hideWhenIdle", defaults.hideWhenIdle),
+                disabledEvents = safeStringSet("disabledEvents", defaults.disabledEvents),
                 autoHidePill = obj.optBoolean("autoHidePill", defaults.autoHidePill),
                 autoHideTimeoutSeconds = obj.optInt("autoHideTimeoutSeconds", defaults.autoHideTimeoutSeconds).coerceIn(1, 120),
                 showInLandscape = obj.optBoolean("showInLandscape", defaults.showInLandscape),
                 autoExpandOnNotification = obj.optBoolean("autoExpandOnNotification", defaults.autoExpandOnNotification),
+                autoExpandOnLockScreen = obj.optBoolean("autoExpandOnLockScreen", defaults.autoExpandOnLockScreen),
                 enableShadow = obj.optBoolean("enableShadow", defaults.enableShadow),
+                expandedBlurEnabled = obj.optBoolean("expandedBlurEnabled", defaults.expandedBlurEnabled),
+                expandedBlurRadius = safeFloat("expandedBlurRadius", defaults.expandedBlurRadius, MIN_EXPANDED_BLUR, MAX_EXPANDED_BLUR),
+                expandedBlurBehind = obj.optBoolean("expandedBlurBehind", defaults.expandedBlurBehind),
+                // Old backups have no media keys: the media card starts from the shared blur and opacity.
+                mediaBlurEnabled = obj.optBoolean("mediaBlurEnabled", obj.optBoolean("expandedBlurEnabled", defaults.mediaBlurEnabled)),
+                mediaBlurRadius = safeFloat(
+                    "mediaBlurRadius",
+                    safeFloat("expandedBlurRadius", defaults.mediaBlurRadius, MIN_EXPANDED_BLUR, MAX_EXPANDED_BLUR),
+                    MIN_EXPANDED_BLUR, MAX_EXPANDED_BLUR
+                ),
+                mediaBlurBehind = obj.optBoolean("mediaBlurBehind", obj.optBoolean("expandedBlurBehind", defaults.mediaBlurBehind)),
+                mediaOpacity = safeFloat(
+                    "mediaOpacity",
+                    safeFloat("opacity", defaults.mediaOpacity, MIN_OPACITY, MAX_OPACITY),
+                    MIN_OPACITY, MAX_OPACITY
+                ),
+                expandedGradientEnabled = obj.optBoolean("expandedGradientEnabled", defaults.expandedGradientEnabled),
+                expandedGradientColor = safeColor("expandedGradientColor", defaults.expandedGradientColor),
+                expandedGradientStrength = safeFloat("expandedGradientStrength", defaults.expandedGradientStrength, MIN_GRADIENT_STRENGTH, MAX_GRADIENT_STRENGTH),
                 shadowElevation = safeFloat("shadowElevation", defaults.shadowElevation, MIN_SHADOW_ELEVATION, MAX_SHADOW_ELEVATION),
                 enableMusicArtworkBackground = obj.optBoolean("enableMusicArtworkBackground", defaults.enableMusicArtworkBackground),
                 enableNotificationBackdrop = obj.optBoolean("enableNotificationBackdrop", defaults.enableNotificationBackdrop),
                 deviceType = obj.optString("deviceType", defaults.deviceType),
                 allowNetworkChecks = obj.optBoolean("allowNetworkChecks", defaults.allowNetworkChecks),
+                detectTransfersBySpeed = obj.optBoolean("detectTransfersBySpeed", defaults.detectTransfersBySpeed),
                 enableNotificationHistory = obj.optBoolean("enableNotificationHistory", defaults.enableNotificationHistory),
                 notificationHistoryRetentionHours = obj.optInt("notificationHistoryRetentionHours", defaults.notificationHistoryRetentionHours).coerceIn(1, 720),
                 showBluetoothBattery = obj.optBoolean("showBluetoothBattery", defaults.showBluetoothBattery),
@@ -307,23 +729,136 @@ data class SmartIslandSettings(
                 notificationCooldownDurationMinutes = obj.optInt("notificationCooldownDurationMinutes", defaults.notificationCooldownDurationMinutes).coerceIn(1, 60),
                 notificationCooldownThreshold = obj.optInt("notificationCooldownThreshold", defaults.notificationCooldownThreshold).coerceIn(2, 20),
                 notificationCooldownExcludedPackages = safeStringSet("notificationCooldownExcludedPackages", defaults.notificationCooldownExcludedPackages),
+                notificationCooldownSystemEvents = safeStringSet("notificationCooldownSystemEvents", defaults.notificationCooldownSystemEvents),
                 developerModeEnabled = obj.optBoolean("developerModeEnabled", defaults.developerModeEnabled),
                 recordLogs = obj.optBoolean("recordLogs", defaults.recordLogs),
+                themeMode = obj.optString("themeMode", defaults.themeMode).takeIf { it in setOf("system", "light", "dark") } ?: defaults.themeMode,
+                expandedTheme = obj.optString("expandedTheme", defaults.expandedTheme).takeIf { it in VALID_EXPANDED_THEMES } ?: defaults.expandedTheme,
+                islandFont = obj.optString("islandFont", defaults.islandFont).takeIf { isValidFont(it) } ?: defaults.islandFont,
                 enableNotchMode = obj.optBoolean("enableNotchMode", defaults.enableNotchMode),
+                cameraCutoutManual = obj.optBoolean("cameraCutoutManual", defaults.cameraCutoutManual),
+                cameraCutoutX = safeFloat("cameraCutoutX", defaults.cameraCutoutX, MIN_X_OFFSET, MAX_X_OFFSET),
+                cameraCutoutY = safeFloat("cameraCutoutY", defaults.cameraCutoutY, MIN_Y_OFFSET, MAX_Y_OFFSET),
+                cameraCutoutWidth = safeFloat("cameraCutoutWidth", defaults.cameraCutoutWidth, MIN_CUTOUT_WIDTH, MAX_CUTOUT_WIDTH),
+                cameraCutoutHeight = safeFloat("cameraCutoutHeight", defaults.cameraCutoutHeight, MIN_CUTOUT_HEIGHT, MAX_CUTOUT_HEIGHT),
                 enableSwipeActions = obj.optBoolean("enableSwipeActions", defaults.enableSwipeActions),
                 swipeUpAction = obj.optString("swipeUpAction", defaults.swipeUpAction),
                 swipeHoldUpAction = obj.optString("swipeHoldUpAction", defaults.swipeHoldUpAction),
                 swipeDownAction = obj.optString("swipeDownAction", defaults.swipeDownAction),
                 swipeDownCollapsedAction = obj.optString("swipeDownCollapsedAction", defaults.swipeDownCollapsedAction),
+                swipeLeftAction = obj.optString("swipeLeftAction", defaults.swipeLeftAction),
+                swipeRightAction = obj.optString("swipeRightAction", defaults.swipeRightAction),
                 swipeHorizontalCollapsedAction = obj.optString("swipeHorizontalCollapsedAction", defaults.swipeHorizontalCollapsedAction),
                 enablePillSwipeActions = obj.optBoolean("enablePillSwipeActions", defaults.enablePillSwipeActions),
                 pillSwipeUpAction = obj.optString("pillSwipeUpAction", defaults.pillSwipeUpAction),
                 pillSwipeDownAction = obj.optString("pillSwipeDownAction", defaults.pillSwipeDownAction),
                 pillSwipeLeftAction = obj.optString("pillSwipeLeftAction", defaults.pillSwipeLeftAction),
                 pillSwipeRightAction = obj.optString("pillSwipeRightAction", defaults.pillSwipeRightAction),
+                longPressAction = obj.optString("longPressAction", defaults.longPressAction),
                 circlePosition = obj.optString("circlePosition", defaults.circlePosition).let {
                     if (it == CIRCLE_POSITION_LEFT || it == CIRCLE_POSITION_RIGHT) it else defaults.circlePosition
-                }
+                },
+                landscapeShape = obj.optString("landscapeShape", defaults.landscapeShape).let {
+                    if (it == LANDSCAPE_SHAPE_PILL || it == LANDSCAPE_SHAPE_CIRCLE) it else defaults.landscapeShape
+                },
+                landscapeWidth = safeFloat("landscapeWidth", defaults.landscapeWidth, MIN_WIDTH, MAX_WIDTH),
+                landscapeHeight = safeFloat("landscapeHeight", defaults.landscapeHeight, MIN_HEIGHT, MAX_HEIGHT),
+                landscapeXOffset = safeFloat("landscapeXOffset", defaults.landscapeXOffset, -MAX_LANDSCAPE_X_OFFSET, MAX_LANDSCAPE_X_OFFSET),
+                landscapeYOffset = safeFloat("landscapeYOffset", defaults.landscapeYOffset, MIN_Y_OFFSET, MAX_LANDSCAPE_Y_OFFSET),
+                landscapeCornerRadius = safeFloat("landscapeCornerRadius", defaults.landscapeCornerRadius, MIN_CORNER_RADIUS, MAX_CORNER_RADIUS),
+                landscapeOpacity = safeFloat("landscapeOpacity", defaults.landscapeOpacity, MIN_OPACITY, MAX_OPACITY),
+                landscapeCircleSize = safeFloat("landscapeCircleSize", defaults.landscapeCircleSize, MIN_CIRCLE_SIZE, MAX_CIRCLE_SIZE),
+                landscapeCircleOpacity = safeFloat("landscapeCircleOpacity", defaults.landscapeCircleOpacity, MIN_OPACITY, MAX_OPACITY),
+                landscapeCircleEdgeInset = safeFloat("landscapeCircleEdgeInset", defaults.landscapeCircleEdgeInset, MIN_CIRCLE_EDGE_INSET, MAX_CIRCLE_EDGE_INSET),
+                landscapeCircleYOffset = safeFloat("landscapeCircleYOffset", defaults.landscapeCircleYOffset, MIN_Y_OFFSET, MAX_LANDSCAPE_Y_OFFSET),
+                landscapeCirclePosition = obj.optString("landscapeCirclePosition", defaults.landscapeCirclePosition).let {
+                    if (it == LANDSCAPE_POSITION_AUTO || it == LANDSCAPE_POSITION_LEFT ||
+                        it == LANDSCAPE_POSITION_RIGHT || it == LANDSCAPE_POSITION_MIDDLE) it else defaults.landscapeCirclePosition
+                },
+                landscapeCircleXAdjust = safeFloat("landscapeCircleXAdjust", defaults.landscapeCircleXAdjust, -MAX_LANDSCAPE_X_OFFSET, MAX_LANDSCAPE_X_OFFSET),
+                landscapeCircleYAdjust = safeFloat("landscapeCircleYAdjust", defaults.landscapeCircleYAdjust, -MAX_LANDSCAPE_Y_OFFSET, MAX_LANDSCAPE_Y_OFFSET),
+                landscapePillPosition = obj.optString("landscapePillPosition", defaults.landscapePillPosition).let {
+                    if (it == LANDSCAPE_POSITION_AUTO || it == LANDSCAPE_POSITION_LEFT ||
+                        it == LANDSCAPE_POSITION_RIGHT || it == LANDSCAPE_POSITION_MIDDLE) it else defaults.landscapePillPosition
+                },
+                disabledEventsLandscape = safeStringSet("disabledEventsLandscape", defaults.disabledEventsLandscape),
+                idleTimeoutMs = obj.optInt("idleTimeoutMs", defaults.idleTimeoutMs)
+                    .coerceIn(MIN_IDLE_TIMEOUT_MS, MAX_IDLE_TIMEOUT_MS),
+                batteryWarningMs = obj.optInt("batteryWarningMs", defaults.batteryWarningMs)
+                    .coerceIn(MIN_BATTERY_WARNING_MS, MAX_BATTERY_WARNING_MS),
+                popupMs = obj.optInt("popupMs", defaults.popupMs)
+                    .coerceIn(MIN_POPUP_MS, MAX_POPUP_MS),
+                transferExpiryMinutes = obj.optInt("transferExpiryMinutes", defaults.transferExpiryMinutes)
+                    .coerceIn(0, MAX_TRANSFER_EXPIRY_MINUTES),
+                idleWidgetsEnabled = obj.optBoolean("idleWidgetsEnabled", defaults.idleWidgetsEnabled),
+                idleWidgetsEnabledLandscape = obj.optBoolean(
+                    "idleWidgetsEnabledLandscape",
+                    obj.optBoolean("idleWidgetsEnabled", defaults.idleWidgetsEnabledLandscape)
+                ),
+                idleOffAfterTapClose = obj.optBoolean("idleOffAfterTapClose", defaults.idleOffAfterTapClose),
+                idleOffAfterTapCloseLandscape = obj.optBoolean("idleOffAfterTapCloseLandscape", defaults.idleOffAfterTapCloseLandscape),
+                idleOffAfterLongPress = obj.optBoolean("idleOffAfterLongPress", defaults.idleOffAfterLongPress),
+                idleOffAfterLongPressLandscape = obj.optBoolean("idleOffAfterLongPressLandscape", defaults.idleOffAfterLongPressLandscape),
+                idleGlyphTickSeconds = com.agupta07505.smartisland.model.IdleSlots.normalizeTickSeconds(
+                    obj.optDouble("idleGlyphTickSeconds", defaults.idleGlyphTickSeconds.toDouble()).toFloat()
+                ),
+                idleWidgetIds = com.agupta07505.smartisland.model.IdleWidgets.normalize(
+                    obj.optString("idleWidgetIds", defaults.idleWidgetIds)
+                ),
+                idleWidgetCycleSeconds = obj.optInt("idleWidgetCycleSeconds", defaults.idleWidgetCycleSeconds)
+                    .coerceIn(
+                        com.agupta07505.smartisland.model.IdleWidgets.MIN_CYCLE_SECONDS,
+                        com.agupta07505.smartisland.model.IdleWidgets.MAX_CYCLE_SECONDS
+                    ),
+                widgetIslandCloseSeconds = com.agupta07505.smartisland.model.WidgetIslandTimer.normalize(
+                    obj.optInt("widgetIslandCloseSeconds", defaults.widgetIslandCloseSeconds)
+                ),
+                widgetIslandBatteryMetric = obj.optString("widgetIslandBatteryMetric", defaults.widgetIslandBatteryMetric)
+                    .takeIf { it in com.agupta07505.smartisland.model.WidgetIslandContent.VALID_BATTERY_METRICS } ?: defaults.widgetIslandBatteryMetric,
+                idleGlyphFont = obj.optString("idleGlyphFont", defaults.idleGlyphFont)
+                    .takeIf { it.isEmpty() || isValidFont(it) } ?: defaults.idleGlyphFont,
+                fontMixEnabled = obj.optBoolean("fontMixEnabled", defaults.fontMixEnabled),
+                fontMixLight = obj.optString("fontMixLight", defaults.fontMixLight)
+                    .takeIf { it.isEmpty() || isValidFont(it) } ?: defaults.fontMixLight,
+                fontMixRegular = obj.optString("fontMixRegular", defaults.fontMixRegular)
+                    .takeIf { it.isEmpty() || isValidFont(it) } ?: defaults.fontMixRegular,
+                fontMixMedium = obj.optString("fontMixMedium", defaults.fontMixMedium)
+                    .takeIf { it.isEmpty() || isValidFont(it) } ?: defaults.fontMixMedium,
+                idleGlyphScale = com.agupta07505.smartisland.model.IdleSlots.normalizeGlyphScale(
+                    obj.optInt("idleGlyphScale", defaults.idleGlyphScale)
+                ),
+                idleWidgetTempUnit = obj.optString("idleWidgetTempUnit", defaults.idleWidgetTempUnit)
+                    .takeIf { it in com.agupta07505.smartisland.model.IdleWidgets.VALID_UNITS } ?: defaults.idleWidgetTempUnit,
+                secondaryMergeMs = obj.optInt("secondaryMergeMs", defaults.secondaryMergeMs)
+                    .coerceIn(MIN_SECONDARY_MERGE_MS, MAX_SECONDARY_MERGE_MS),
+                animSpeedPortrait = obj.optString("animSpeedPortrait", defaults.animSpeedPortrait)
+                    .takeIf { it in AnimationSpeed.VALID_IDS } ?: defaults.animSpeedPortrait,
+                animSpeedLandscape = obj.optString("animSpeedLandscape", defaults.animSpeedLandscape)
+                    .takeIf { it in AnimationSpeed.VALID_IDS } ?: defaults.animSpeedLandscape,
+                mergeStyle = mergeId("mergeStyle", defaults.mergeStyle),
+                // An old backup has one shared choice: landscape starts from it.
+                mergeStyleLandscape = mergeId("mergeStyleLandscape", mergeId("mergeStyle", defaults.mergeStyleLandscape)),
+                showDuringDnd = obj.optBoolean("showDuringDnd", defaults.showDuringDnd),
+                hapticStrength = obj.optString("hapticStrength", defaults.hapticStrength)
+                    .takeIf { it in HapticStrength.VALID_IDS } ?: defaults.hapticStrength,
+                gestureSensitivity = obj.optString("gestureSensitivity", defaults.gestureSensitivity)
+                    .takeIf { it in GestureSensitivity.VALID_IDS } ?: defaults.gestureSensitivity,
+                floatingWindowEnabled = obj.optBoolean("floatingWindowEnabled", defaults.floatingWindowEnabled),
+                floatingWindowMode = obj.optString("floatingWindowMode", defaults.floatingWindowMode)
+                    .takeIf { it in com.agupta07505.smartisland.model.FloatingWindowMode.VALID_IDS } ?: defaults.floatingWindowMode,
+                noExpandPackages = safeStringSet("noExpandPackages", defaults.noExpandPackages),
+                noAutoExpandPackages = safeStringSet("noAutoExpandPackages", defaults.noAutoExpandPackages),
+                // An app in both sets is off: the explicit "off" wins.
+                autoExpandPackages = safeStringSet("autoExpandPackages", defaults.autoExpandPackages)
+                    - safeStringSet("noAutoExpandPackages", defaults.noAutoExpandPackages),
+                noAutoExpandEvents = safeStringSet("noAutoExpandEvents", defaults.noAutoExpandEvents)
+                    .filterTo(HashSet()) { id -> com.agupta07505.smartisland.model.IslandEvent.entries.any { it.id == id } },
+                hideAllOnLockScreen = obj.optBoolean("hideAllOnLockScreen", defaults.hideAllOnLockScreen),
+                hideOnLockScreenEvents = safeStringSet("hideOnLockScreenEvents", defaults.hideOnLockScreenEvents)
+                    .filterTo(HashSet()) { id -> com.agupta07505.smartisland.model.IslandEvent.entries.any { it.id == id } },
+                notificationsEnabled = obj.optBoolean("notificationsEnabled", defaults.notificationsEnabled),
+                hideOnLockScreenPackages = safeStringSet("hideOnLockScreenPackages", defaults.hideOnLockScreenPackages)
+                    .filterTo(HashSet()) { it.isNotBlank() && it.length <= 255 }
             )
         }
     }
