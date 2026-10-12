@@ -177,7 +177,6 @@ object OemDeviceRules {
     private val HOTSPOT_PACKAGES = setOf(
         "com.samsung.android.app.mobilehotspot",
         "com.samsung.android.server.wifi.mobilehotspot",
-        "com.miui.securitycenter",
         "com.vivo.easyshare",
         "com.google.android.tethering.entitlement"
     )

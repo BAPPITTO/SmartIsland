@@ -377,4 +377,35 @@ class IslandModeMappingTest {
 
         assertEquals(IslandMode.Notification, notification.toIslandMode(sbn))
     }
+
+    @Test
+    fun testVoiceRecorderNotificationMapsToAudioRecordingRatherThanScreenRecording() {
+        val testCases = listOf(
+            Triple("com.sec.android.app.voicenote", "Voice recording", "SAMSUNG"),
+            Triple("com.miui.soundrecorder", "Sound Recorder", "XIAOMI_REDMI_POCO"),
+            Triple("com.google.android.apps.recorder", "Voice recording in progress", "GOOGLE_PIXEL")
+        )
+
+        for ((pkg, title, device) in testCases) {
+            val notification = mockk<Notification>()
+            notification.category = Notification.CATEGORY_SERVICE
+            notification.flags = Notification.FLAG_ONGOING_EVENT
+            notification.actions = null
+
+            val sbn = mockk<StatusBarNotification>()
+            val extras = createBaseExtras()
+            notification.extras = extras
+            every { sbn.packageName } returns pkg
+            every { sbn.notification } returns notification
+
+            every { extras.getCharSequence(Notification.EXTRA_TITLE) } returns title
+            every { extras.getCharSequence(Notification.EXTRA_TEXT) } returns "Recording active"
+
+            assertEquals(
+                "Expected $pkg to resolve to AudioRecording mode",
+                IslandMode.AudioRecording,
+                notification.toIslandMode(sbn, deviceType = device)
+            )
+        }
+    }
 }

@@ -877,6 +877,7 @@ class SmartIslandOverlayService : AccessibilityService() {
         com.agupta07505.smartisland.ui.expanded.SystemNight.update(resources.configuration.uiMode)
         super.onServiceConnected()
         isSystemConnected = true
+        com.agupta07505.smartisland.util.SystemServiceRecovery.resetAccessibilityRefreshAttempt()
         installUtilityBridge()
         com.agupta07505.smartisland.util.InAppStopwatch.restore(this)
         com.agupta07505.smartisland.util.InAppTimer.restore(this)
@@ -896,6 +897,7 @@ class SmartIslandOverlayService : AccessibilityService() {
 
     override fun onUnbind(intent: Intent?): Boolean {
         isSystemConnected = false
+        com.agupta07505.smartisland.util.SystemServiceRecovery.resetAccessibilityRefreshAttempt()
         com.agupta07505.smartisland.util.UtilityBridge.clear()
         com.agupta07505.smartisland.util.AppLogRecorder.w("OverlayLifecycle", "onUnbind: accessibility overlay service unbound by the system")
         // Return true so Android system knows to re-bind the accessibility service automatically

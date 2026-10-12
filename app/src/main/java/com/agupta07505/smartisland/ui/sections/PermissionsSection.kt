@@ -72,14 +72,17 @@ fun PermissionsSection(
     overlayGranted: Boolean,
     notificationGranted: Boolean,
     batteryIgnored: Boolean = false,
+    bluetoothGranted: Boolean = false,
     onOverlayClick: () -> Unit,
     onNotificationClick: () -> Unit,
     onBatteryClick: () -> Unit,
+    onBluetoothClick: () -> Unit = {},
     onRefreshPermissions: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var isExecutingShizuku by remember { mutableStateOf(false) }
+    var isRepairingAccessibility by remember { mutableStateOf(false) }
     // The "try the Shizuku methods" check: asked for after the auto setup, and always available from its button.
     var showCheckDialog by remember { mutableStateOf(false) }
     var isChecking by remember { mutableStateOf(false) }
@@ -229,6 +232,54 @@ fun PermissionsSection(
                     lineHeight = 16.sp
                 )
                 OutlinedButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isRepairingAccessibility && !isExecutingShizuku,
+                    onClick = {
+                        when {
+                            !ShizukuManager.isBinderAvailable() -> {
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.shizuku_not_running),
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                            !ShizukuManager.hasPermission() -> {
+                                ShizukuManager.requestPermission()
+                            }
+                            else -> {
+                                isRepairingAccessibility = true
+                                scope.launch {
+                                    val result = ShizukuManager.repairAccessibility(context)
+                                    isRepairingAccessibility = false
+                                    result.onSuccess {
+                                        Toast.makeText(
+                                            context,
+                                            "Accessibility service repaired via Shizuku!",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                        onRefreshPermissions()
+                                    }.onFailure { err ->
+                                        Toast.makeText(
+                                            context,
+                                            "Repair failed: ${err.localizedMessage ?: "Unknown error"}",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = if (isRepairingAccessibility) "Repairing Accessibility..." else "Repair Accessibility (Shizuku)",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                OutlinedButton(
                     enabled = !isExecutingShizuku,
                     onClick = {
                         when {
@@ -360,7 +411,16 @@ fun PermissionsSection(
             onClick = onNotificationClick
         )
 
-        // Recommended Permission 3: Battery Optimization
+        // Recommended Permission 3: Nearby devices / Bluetooth
+        PermissionCard(
+            title = stringResource(R.string.perm_bluetooth_title),
+            description = stringResource(R.string.perm_bluetooth_desc),
+            granted = bluetoothGranted,
+            buttonText = stringResource(R.string.btn_grant),
+            onClick = onBluetoothClick
+        )
+
+        // Recommended Permission 4: Battery Optimization
         PermissionCard(
             title = stringResource(R.string.perm_battery_title),
             description = stringResource(R.string.perm_battery_desc),

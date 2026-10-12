@@ -7,13 +7,21 @@
 
 package com.agupta07505.smartisland.ui
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
@@ -247,12 +255,60 @@ fun SmartIslandHomeScreen(
     var notificationGranted by remember { mutableStateOf(isNotificationListenerEnabled(context)) }
     var batteryIgnored by remember { mutableStateOf(isBatteryOptimizationIgnored(context)) }
 
+    val batteryRefreshHandler = remember { Handler(Looper.getMainLooper()) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            batteryRefreshHandler.removeCallbacksAndMessages(null)
+        }
+    }
+
+    fun refreshBatteryOptimizationWithRetry() {
+        batteryRefreshHandler.removeCallbacksAndMessages(null)
+
+        val initialState = isBatteryOptimizationIgnored(context)
+        batteryIgnored = initialState
+
+        var attempts = 0
+
+        val refreshRunnable = object : Runnable {
+            override fun run() {
+                val currentState = isBatteryOptimizationIgnored(context)
+                batteryIgnored = currentState
+                attempts++
+
+                if (currentState != initialState || attempts >= 8) {
+                    return
+                }
+
+                batteryRefreshHandler.postDelayed(this, 150L)
+            }
+        }
+
+        batteryRefreshHandler.postDelayed(refreshRunnable, 150L)
+    }
+
+    var bluetoothGranted by remember { mutableStateOf(isBluetoothConnectPermissionGranted(context)) }
+
+    val bluetoothPermissionLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestPermission()
+        ) { granted ->
+            bluetoothGranted = granted
+
+            if (granted) {
+                SystemServiceRecovery.resetAccessibilityRefreshAttempt()
+                SystemServiceRecovery.requestRecovery(context)
+            }
+        }
+
     DisposableEffect(lifecycleOwner, context) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 overlayGranted = isAccessibilityServiceEnabled(context)
                 notificationGranted = isNotificationListenerEnabled(context)
-                batteryIgnored = isBatteryOptimizationIgnored(context)
+                refreshBatteryOptimizationWithRetry()
+                bluetoothGranted = isBluetoothConnectPermissionGranted(context)
                 SystemServiceRecovery.requestRecovery(context)
             }
         }
@@ -304,7 +360,7 @@ fun SmartIslandHomeScreen(
         searchFocus.jumpTo(entry.rowKey)
     }
 
-    val canEnable = overlayGranted && notificationGranted && batteryIgnored
+    val canEnable = overlayGranted && notificationGranted
 
     // The island's settings button: open the App Shortcuts configuration, then forget the request.
     LaunchedEffect(openSection) {
@@ -493,14 +549,31 @@ fun SmartIslandHomeScreen(
                     overlayGranted = overlayGranted,
                     notificationGranted = notificationGranted,
                     batteryIgnored = batteryIgnored,
+                    bluetoothGranted = bluetoothGranted,
                     onBack = {
                         transitionDirection = -1
                         activeDetailSection = null
                     },
+                    onBluetoothClick = {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            if (!bluetoothGranted) {
+                                bluetoothPermissionLauncher.launch(
+                                    Manifest.permission.BLUETOOTH_CONNECT
+                                )
+                            } else {
+                                val intent = Intent(
+                                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                    Uri.parse("package:${context.packageName}")
+                                )
+                                context.startActivity(intent)
+                            }
+                        }
+                    },
                     onRefreshPermissions = {
                         overlayGranted = isAccessibilityServiceEnabled(context)
                         notificationGranted = isNotificationListenerEnabled(context)
-                        batteryIgnored = isBatteryOptimizationIgnored(context)
+                        refreshBatteryOptimizationWithRetry()
+                        bluetoothGranted = isBluetoothConnectPermissionGranted(context)
                     },
                     onNavigateTo = { section ->
                         transitionDirection = 1
@@ -700,7 +773,6 @@ private fun MasterPowerCard(
             ) {
                 SetupChip("Accessibility", overlayGranted, onSetupPermissionsClick)
                 SetupChip("Notifications", notificationGranted, onSetupPermissionsClick)
-                SetupChip("Battery", batteryIgnored, onSetupPermissionsClick)
             }
             Box(
                 modifier = Modifier
@@ -805,7 +877,7 @@ private fun SettingsOverviewSection(
     onFontMixChange: (Boolean, String, String, String) -> Unit,
     onNavigateTo: (FeatureDetailSection) -> Unit
 ) {
-    val canEnable = overlayGranted && notificationGranted && batteryIgnored
+    val canEnable = overlayGranted && notificationGranted
 
     val SystemGroup: @Composable () -> Unit = {
         SettingsCategoryGroup(title = stringResource(R.string.category_system_core)) {
@@ -1112,7 +1184,9 @@ private fun DetailScreenHost(
     overlayGranted: Boolean,
     notificationGranted: Boolean,
     batteryIgnored: Boolean,
+    bluetoothGranted: Boolean,
     onBack: () -> Unit,
+    onBluetoothClick: () -> Unit,
     onRefreshPermissions: () -> Unit,
     onNavigateTo: (FeatureDetailSection) -> Unit = {}
 ) {
@@ -1208,6 +1282,7 @@ private fun DetailScreenHost(
                     overlayGranted = overlayGranted,
                     notificationGranted = notificationGranted,
                     batteryIgnored = batteryIgnored,
+                    bluetoothGranted = bluetoothGranted,
                     onOverlayClick = {
                         context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                     },
@@ -1232,6 +1307,7 @@ private fun DetailScreenHost(
                             context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
                         }
                     },
+                    onBluetoothClick = onBluetoothClick,
                     onRefreshPermissions = onRefreshPermissions
                 )
             }
@@ -1448,6 +1524,17 @@ private fun WelcomeDialog(
             }
         }
     }
+}
+
+private fun isBluetoothConnectPermissionGranted(context: Context): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+        return true
+    }
+
+    return ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.BLUETOOTH_CONNECT
+    ) == PackageManager.PERMISSION_GRANTED
 }
 
 @Preview(showBackground = true, name = "Light Mode")

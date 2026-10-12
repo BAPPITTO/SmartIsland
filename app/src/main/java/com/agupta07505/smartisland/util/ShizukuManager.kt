@@ -7,6 +7,7 @@
 
 package com.agupta07505.smartisland.util
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
 import android.provider.Settings
@@ -232,6 +233,47 @@ object ShizukuManager {
         ) + runtimePermissionCommands(pkg) + sensitiveNotificationCommands(pkg)
         runShizukuCommands(commands)
     }
+
+    /**
+     * Repairs a stale/crashed AccessibilityService binding through Shizuku.
+     *
+     * Reproduces the effective Accessibility OFF -> ON refresh that was
+     * verified on HyperOS, while preserving every other enabled service.
+     */
+    suspend fun repairAccessibility(context: Context): Result<String> =
+        withContext(Dispatchers.IO) {
+            val pkg = context.packageName
+            val accessibilityClass =
+                "$pkg/${SmartIslandOverlayService::class.java.name}"
+
+            val shortAccessibilityClass =
+                ComponentName(
+                    context,
+                    SmartIslandOverlayService::class.java
+                ).flattenToShortString()
+
+            val commands = listOf(
+                "current=\$(settings get secure enabled_accessibility_services)",
+
+                // Temporarily disable Accessibility globally.
+                "settings put secure accessibility_enabled 0",
+
+                // Remove Smart Island in either representation, while preserving
+                // every other enabled Accessibility service.
+                "new=''; IFS=':'; for s in \$current; do if [ -n \"\$s\" ] && [ \"\$s\" != \"$accessibilityClass\" ] && [ \"\$s\" != \"$shortAccessibilityClass\" ]; then if [ -n \"\$new\" ]; then new=\"\$new:\$s\"; else new=\"\$s\"; fi; fi; done; if [ -n \"\$new\" ] && [ \"\$new\" != \"null\" ]; then settings put secure enabled_accessibility_services \"\$new\"; else settings delete secure enabled_accessibility_services; fi",
+
+                // Give Android/HyperOS time to process the disable.
+                "sleep 2",
+
+                // Add Smart Island back using the short component form.
+                "current=\$(settings get secure enabled_accessibility_services); if [ -n \"\$current\" ] && [ \"\$current\" != \"null\" ]; then current=\"\$current:$shortAccessibilityClass\"; else current=\"$shortAccessibilityClass\"; fi; settings put secure enabled_accessibility_services \"\$current\"",
+
+                // Re-enable Accessibility.
+                "settings put secure accessibility_enabled 1"
+            )
+
+            runShizukuCommands(commands)
+        }
 
     /**
      * Runtime permissions the app declares that the setup grants for the user: nearby devices (Bluetooth connect, for the Bluetooth cards) and
