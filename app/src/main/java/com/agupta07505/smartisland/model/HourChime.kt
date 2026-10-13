@@ -20,11 +20,11 @@ object HourChime {
     const val MINUTES_AFTER = "00"
 
     /** The pill shows the old time for this long (ms) before it ticks over, so "59" is seen. */
-    const val HOLD_BEFORE_MS = 280
+    const val HOLD_BEFORE_MS = 700
     /** The tick itself (ms), including its slow suspended pull-back ([IdleSlots.heavyTickProgress]). */
-    const val TICK_MS = 900
+    const val TICK_MS = 2200
     /** The new time stays this long (ms) after the tick, then the pill goes back to what it showed. */
-    const val HOLD_AFTER_MS = 1700
+    const val HOLD_AFTER_MS = 2500
     /** Fade of the chime in and out (ms). */
     const val FADE_IN_MS = 160
     const val FADE_OUT_MS = 260

@@ -18,6 +18,8 @@ enum class IdleWidgetKind(val id: String) {
     Clock("clock"),
     Date("date"),
     Weather("weather"),
+    /** Wind speed from the same lookup as the weather: a wind glyph on the left, the speed on the right; the island adds the direction. */
+    Wind("wind"),
     Battery("battery"),
     NextAlarm("alarm"),
     NetSpeed("speed"),
@@ -83,6 +85,55 @@ object IdleWidgets {
         return "${Math.round(value)}\u00B0"
     }
 
+    /** Wind speed units: follow the device region (mph in the US, UK and a few others, else km/h), or force one. */
+    const val WIND_KMH = "KMH"
+    const val WIND_MS = "MS"
+    const val WIND_MPH = "MPH"
+    const val WIND_KN = "KN"
+    val VALID_WIND_UNITS = setOf(UNIT_AUTO, WIND_KMH, WIND_MS, WIND_MPH, WIND_KN)
+
+    private val MPH_REGIONS = setOf("US", "GB", "LR", "MM", "BS", "BZ", "KY", "PW", "FM", "MH")
+
+    /** The unit to draw: a forced one as it is, [UNIT_AUTO] by the device region. */
+    fun resolveWindUnit(unit: String, regionCountry: String): String = when (unit) {
+        WIND_KMH, WIND_MS, WIND_MPH, WIND_KN -> unit
+        else -> if (regionCountry.uppercase() in MPH_REGIONS) WIND_MPH else WIND_KMH
+    }
+
+    /** [kmh] (what the weather service reports) in [unit] (a resolved unit). */
+    fun windValue(kmh: Float, unit: String): Float = when (unit) {
+        WIND_MS -> kmh / 3.6f
+        WIND_MPH -> kmh * 0.621371f
+        WIND_KN -> kmh * 0.539957f
+        else -> kmh
+    }
+
+    fun windUnitLabel(unit: String): String = when (unit) {
+        WIND_MS -> "m/s"
+        WIND_MPH -> "mph"
+        WIND_KN -> "kn"
+        else -> "km/h"
+    }
+
+    /** The pill's wind text: just the rounded number ("12"); "--" while the speed is unknown (negative). */
+    fun displayWind(kmh: Float, unit: String): String =
+        if (kmh < 0f) "--" else Math.round(windValue(kmh, unit)).toString()
+
+    /** The island's wind text with its unit: "12 km/h", "3.3 m/s". */
+    fun windIslandText(kmh: Float, unit: String): String {
+        if (kmh < 0f) return "--"
+        val value = windValue(kmh, unit)
+        return if (unit == WIND_MS) String.format(java.util.Locale.US, "%.1f %s", value, windUnitLabel(unit))
+        else "${Math.round(value)} ${windUnitLabel(unit)}"
+    }
+
+    /** The compass point the wind comes from ("N", "NE", ...), null when the direction is unknown (negative). */
+    fun compass(degrees: Int): String? {
+        if (degrees < 0) return null
+        val points = listOf("N", "NE", "E", "SE", "S", "SW", "W", "NW")
+        return points[((degrees % 360) + 22) / 45 % 8]
+    }
+
     /** Short speed text for the pill ("320K", "4.2M"): bytes per second in, a few characters out. */
     fun shortSpeed(bytesPerSecond: Long): String {
         val b = bytesPerSecond.coerceAtLeast(0L).toDouble()
@@ -100,7 +151,11 @@ data class WeatherSnapshot(
     val temperatureC: Float,
     val weatherCode: Int,
     val isDay: Boolean,
-    val fetchedAtMs: Long
+    val fetchedAtMs: Long,
+    /** Wind speed in km/h as the weather service reports it; negative = not known (an older stored reading). */
+    val windKmh: Float = -1f,
+    /** Direction the wind comes from, degrees; negative = not known. */
+    val windDirectionDeg: Int = -1
 )
 
 /** What a weather code looks like, grouped to the few icons the pill can show. */

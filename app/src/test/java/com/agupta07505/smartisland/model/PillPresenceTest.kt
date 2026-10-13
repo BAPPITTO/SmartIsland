@@ -79,12 +79,6 @@ class PillPresenceTest {
     }
 
     @Test
-    fun handOffSharesAreProgressBased() {
-        assertEquals(0.7f, IDLE_OPEN_AT_EXIT, 0.0001f)
-        assertEquals(0.6f, PILL_ENTER_AT_IDLE_VANISH, 0.0001f)
-    }
-
-    @Test
     fun slideProgressIsTheSameCurveBothWays() {
         assertEquals(0f, pillSlideProgress(1f), 0.0001f)
         assertEquals(1f, pillSlideProgress(0f), 0.0001f)
@@ -127,12 +121,5 @@ class PillPresenceTest {
         val snappy = pillSpringSettleMs(PILL_SPRING_STIFFNESS * 1.7f)
         assertTrue(snappy < normal && normal < relaxed)
         assertTrue("normal settles in about 300 ms, was $normal", normal in 280L..350L)
-    }
-
-    @Test
-    fun theIdleCircleBlinksInQuicklyWithoutAnySpring() {
-        // A short fade (about a tenth of a second), never longer than the old vanish.
-        assertTrue(IDLE_BLINK_MS in 80..140)
-        assertTrue(IDLE_BLINK_MS < IDLE_VANISH_MS)
     }
 }

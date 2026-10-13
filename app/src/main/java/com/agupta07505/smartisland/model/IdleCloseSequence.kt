@@ -18,13 +18,13 @@ const val SECONDARY_RETURN_BASE_MS = 460
  * The idle-circle tap, as a two-step close that is exactly as long as the opening it mirrors.
  * Orientation-neutral: portrait and landscape use the same numbers, each with its own animation speed.
  *
- * Opening (a tap on the idle circle brings the stored cards back): the idle circle vanishes, the pill springs in
- * once the vanish is [PILL_ENTER_AT_IDLE_VANISH] done, and the secondary cutout returns from its merge at the same
- * time. [openingMs] adds those up from the very constants the opening animation runs on.
+ * Opening (a tap on the idle circle brings the stored cards back): the pill springs in at once and the secondary
+ * cutout returns from its merge at the same time. [openingMs] is the longer of the two, from the very constants the
+ * opening animation runs on. The idle circle itself does not animate.
  *
  * Closing ([plan]):
  *  - step 2 ([Plan.step2Ms]) is as long as the pill's arrival ([pillArrivalMs]): the collapsed pill leaves (the presence
- *    spring, at [Plan.exitStiffness]) at the same pace it slides in, and the idle circle blinks in as it always did.
+ *    spring, at [Plan.exitStiffness]) at the same pace it slides in. The idle circle just stays on.
  *  - step 1 ([Plan.step1Ms]) comes first and is [STEP1_OVER_STEP2] times as long as step 2: the expanded island closes and
  *    the secondary cutout merges, together, slower than the pill's own movement. The pill stays.
  *
@@ -66,18 +66,11 @@ object IdleCloseSequence {
         pillSpringSettleMs(speed.userStiffness(PILL_SPRING_STIFFNESS)).toInt()
 
     /**
-     * Real length (ms, user speed) of the idle-circle tap's opening animation: the idle circle's vanish up to the
-     * hand-over, then the pill's arrival spring; the secondary cutout's return runs next to it, so the longer one wins.
+     * Real length (ms, user speed) of the idle-circle tap's opening animation: the pill's arrival spring; the secondary
+     * cutout's return runs next to it, so the longer one wins.
      */
-    fun openingMs(speed: AnimationSpeed): Int {
-        val vanishMs = speed.userDurationMs(IDLE_VANISH_MS)
-        // The pill starts when the idle circle is down to (1 - PILL_ENTER_AT_IDLE_VANISH) of its opacity, which the
-        // vanish's FastOutSlowIn easing reaches after this share of its length.
-        val handOverMs = (vanishMs * fastOutSlowInTimeFor(PILL_ENTER_AT_IDLE_VANISH)).toInt()
-        val pillMs = pillArrivalMs(speed)
-        val secondaryMs = speed.userDurationMs(SECONDARY_RETURN_BASE_MS)
-        return max(handOverMs + pillMs, secondaryMs)
-    }
+    fun openingMs(speed: AnimationSpeed): Int =
+        max(pillArrivalMs(speed), speed.userDurationMs(SECONDARY_RETURN_BASE_MS))
 
     /** The close for [speed]: step 2 as long as the pill's arrival, step 1 [STEP1_OVER_STEP2] times that. */
     fun plan(speed: AnimationSpeed): Plan {
@@ -114,27 +107,5 @@ object IdleCloseSequence {
             if ((1.0 + mid) * exp(-mid) > target) lo = mid else hi = mid
         }
         return (lo + hi) / 2.0
-    }
-
-    /**
-     * Share of a FastOutSlowIn tween's length (0..1) after which it has covered [progress] of its travel.
-     * FastOutSlowIn is the cubic Bezier (0.4, 0, 0.2, 1); solved by bisection on the curve parameter.
-     */
-    internal fun fastOutSlowInTimeFor(progress: Float): Float {
-        val p = progress.toDouble().coerceIn(0.0, 1.0)
-        var lo = 0.0
-        var hi = 1.0
-        repeat(40) {
-            val s = (lo + hi) / 2.0
-            if (bezier(s, 0.0, 1.0) < p) lo = s else hi = s
-        }
-        val s = (lo + hi) / 2.0
-        return bezier(s, 0.4, 0.2).toFloat()
-    }
-
-    /** One coordinate of the cubic Bezier from 0 to 1 with inner control values [c1] and [c2], at parameter [s]. */
-    private fun bezier(s: Double, c1: Double, c2: Double): Double {
-        val u = 1.0 - s
-        return 3.0 * u * u * s * c1 + 3.0 * u * s * s * c2 + s * s * s
     }
 }

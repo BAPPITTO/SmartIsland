@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Air
 import androidx.compose.material.icons.rounded.Alarm
 import androidx.compose.material.icons.rounded.BatteryChargingFull
 import androidx.compose.material.icons.rounded.CalendarToday
@@ -31,7 +32,7 @@ import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material.icons.rounded.WbTwilight
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import com.agupta07505.smartisland.ui.glass.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -85,7 +86,7 @@ fun IdleWidgetsSection(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val selected = remember(settings.idleWidgetIds) { IdleWidgets.parse(settings.idleWidgetIds) }
-    val weatherOn = anyEnabled && IdleWidgetKind.Weather in selected
+    val weatherOn = anyEnabled && (IdleWidgetKind.Weather in selected || IdleWidgetKind.Wind in selected)
     var locationGranted by remember { mutableStateOf(IdleWeather.hasLocationPermission(context)) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         locationGranted = granted
@@ -184,7 +185,7 @@ fun IdleWidgetsSection(
                     NoteText(stringResource(R.string.idle_widgets_battery_metric_desc))
                 }
 
-                if (IdleWidgetKind.Weather in selected) {
+                if (IdleWidgetKind.Weather in selected || IdleWidgetKind.Wind in selected) {
                     ChoiceBlock(title = stringResource(R.string.idle_widgets_unit_title)) {
                         listOf(
                             IdleWidgets.UNIT_AUTO to stringResource(R.string.idle_widgets_unit_auto),
@@ -226,6 +227,7 @@ internal fun kindIcon(kind: IdleWidgetKind): ImageVector = when (kind) {
     IdleWidgetKind.Clock -> Icons.Rounded.Schedule
     IdleWidgetKind.Date -> Icons.Rounded.CalendarToday
     IdleWidgetKind.Weather -> Icons.Rounded.WbSunny
+    IdleWidgetKind.Wind -> Icons.Rounded.Air
     IdleWidgetKind.Battery -> Icons.Rounded.BatteryChargingFull
     IdleWidgetKind.NextAlarm -> Icons.Rounded.Alarm
     IdleWidgetKind.NetSpeed -> Icons.Rounded.Speed
@@ -238,6 +240,7 @@ internal fun kindTint(kind: IdleWidgetKind): Color = when (kind) {
     IdleWidgetKind.Clock -> Color(0xFF6366F1)
     IdleWidgetKind.Date -> Color(0xFFEF4444)
     IdleWidgetKind.Weather -> Color(0xFFF59E0B)
+    IdleWidgetKind.Wind -> Color(0xFF5EEAD4)
     IdleWidgetKind.Battery -> Color(0xFF10B981)
     IdleWidgetKind.NextAlarm -> Color(0xFFFF9F0A)
     IdleWidgetKind.NetSpeed -> Color(0xFF38BDF8)
@@ -250,6 +253,7 @@ internal fun kindTitle(kind: IdleWidgetKind): Int = when (kind) {
     IdleWidgetKind.Clock -> R.string.idle_widget_clock_title
     IdleWidgetKind.Date -> R.string.idle_widget_date_title
     IdleWidgetKind.Weather -> R.string.idle_widget_weather_title
+    IdleWidgetKind.Wind -> R.string.idle_widget_wind_title
     IdleWidgetKind.Battery -> R.string.idle_widget_battery_title
     IdleWidgetKind.NextAlarm -> R.string.idle_widget_alarm_title
     IdleWidgetKind.NetSpeed -> R.string.idle_widget_speed_title
@@ -262,6 +266,7 @@ internal fun kindDesc(kind: IdleWidgetKind): Int = when (kind) {
     IdleWidgetKind.Clock -> R.string.idle_widget_clock_desc
     IdleWidgetKind.Date -> R.string.idle_widget_date_desc
     IdleWidgetKind.Weather -> R.string.idle_widget_weather_desc
+    IdleWidgetKind.Wind -> R.string.idle_widget_wind_desc
     IdleWidgetKind.Battery -> R.string.idle_widget_battery_desc
     IdleWidgetKind.NextAlarm -> R.string.idle_widget_alarm_desc
     IdleWidgetKind.NetSpeed -> R.string.idle_widget_speed_desc

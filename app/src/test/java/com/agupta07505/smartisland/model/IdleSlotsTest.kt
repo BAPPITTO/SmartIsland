@@ -23,14 +23,14 @@ class IdleSlotsTest {
     }
 
     @Test
-    fun dateIsDayAndNumericMonth() {
+    fun dateIsDayAndAbbreviatedMonth() {
         assertEquals("dd", IdleSlots.DAY_PATTERN)
-        assertEquals("MM", IdleSlots.MONTH_PATTERN)
+        assertEquals("MMM", IdleSlots.MONTH_PATTERN)
         val d = java.text.SimpleDateFormat(IdleSlots.DAY_PATTERN, java.util.Locale.US)
         val m = java.text.SimpleDateFormat(IdleSlots.MONTH_PATTERN, java.util.Locale.US)
         val feb5 = java.util.GregorianCalendar(2026, java.util.Calendar.FEBRUARY, 5).time
         assertEquals("05", d.format(feb5))
-        assertEquals("02", m.format(feb5))
+        assertEquals("Feb", m.format(feb5))
     }
 
     @Test

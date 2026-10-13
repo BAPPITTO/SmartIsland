@@ -47,6 +47,9 @@ private const val WIDGET_ISLAND_DAMPING = 0.82f
 /** The content starts to show once the island is this far open, so it never shows squeezed in the cutout. */
 private const val WIDGET_ISLAND_CONTENT_FROM = 0.55f
 
+/** Gap (dp) between the collapsed pill's bottom edge and the open island, so the camera cutout never covers its content. */
+private const val WIDGET_ISLAND_BELOW_GAP_DP = 4f
+
 /** A sideways drag on the open island of at least this much (dp) changes the widget. */
 private const val WIDGET_ISLAND_SWIPE_DP = 28f
 
@@ -88,7 +91,7 @@ internal fun WidgetIslandLayer(
     SideEffect { ui.widgetIslandOpen = open }
     DisposableEffect(ui) { onDispose { ui.widgetIslandOpen = false } }
 
-    // The island follows the widget on the pill (a swipe on the pill steps both). Its content has to exist (charger plugged, alarm within 12 h, ...).
+    // The island follows the widget on the pill (a swipe on the pill steps both). Its content has to exist (charger plugged, an alarm still to come, ...).
     val hasContent = source == null || WidgetIslandContent.hasContent(
         kind = source.kind,
         charging = source.data.charging,
@@ -168,6 +171,8 @@ internal fun WidgetIslandLayer(
             .graphicsLayer {
                 val p = progress.value
                 translationX = lerpF(pillCentre, islandCentre, p).dp.toPx()
+                // The island drops out from under the pill instead of growing over it: its top ends just below the collapsed pill.
+                translationY = ((settings.height + WIDGET_ISLAND_BELOW_GAP_DP) * p).dp.toPx()
                 val radius = lerpF(settings.cornerRadius, WIDGET_ISLAND_CORNER_RADIUS_DP, p).dp.toPx()
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(radius)
                 clip = true
@@ -243,7 +248,7 @@ internal fun WidgetIslandWiring(
     val changeNow = androidx.compose.runtime.rememberUpdatedState(onOpenChange)
     val strengthNow = androidx.compose.runtime.rememberUpdatedState(settings.hapticStrength)
     val toggle: () -> Unit = toggle@{
-        // A widget with nothing to say (battery off the charger, an alarm further than 12 h away) has no island to open.
+        // A widget with nothing to say (battery off the charger, no alarm set) has no island to open.
         if (!openNow.value) {
             val frame = ui.idleFrameNow
             val data = frame?.data

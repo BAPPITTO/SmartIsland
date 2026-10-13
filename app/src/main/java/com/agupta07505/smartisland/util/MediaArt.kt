@@ -48,10 +48,13 @@ object MediaArt {
     private const val MAX_EDGE_PX = 1080
 
     /** Longest edge a picture is blurred at: a blur hides detail, so it stays small (and fast). */
-    private const val BLUR_WORK_EDGE_PX = 160
+    private const val BLUR_WORK_EDGE_PX = 128
 
-    /** Blur radius in working pixels per dp of the setting (the card is about 360 dp wide, so 160 px is about 0.44 px per dp, doubled for a strong look). */
-    private const val BLUR_PX_PER_DP = 0.9f
+    /**
+     * Blur radius in working pixels per dp of the setting. The picture is worked at 128 px, so 1.4 px per dp makes the low end of the
+     * slider already visibly soft and the high end (60 dp, capped at half the picture) a smooth wash of colour: the whole slider shows.
+     */
+    private const val BLUR_PX_PER_DP = 1.4f
 
     private const val CACHE_SIZE = 6
 

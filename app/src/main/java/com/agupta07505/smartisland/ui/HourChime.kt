@@ -62,11 +62,14 @@ internal fun HourChimeLayer(
     animSpeed: AnimationSpeed,
     modifier: Modifier = Modifier,
     /** The idle widgets are held off the pill: no hourly tick either. */
-    suppressed: Boolean = false
+    suppressed: Boolean = false,
+    /** Landscape: the pill may be brought in for the tick although a long press hid it ([withTickPill]). */
+    canHold: Boolean = false
 ) {
     val context = LocalContext.current
     val clockOn = remember(settings.idleWidgetIds) { IdleWidgetKind.Clock in IdleWidgets.parse(settings.idleWidgetIds) }
-    val enabled = settings.idleWidgetsEnabled && !suppressed && clockOn && settings.width > IDLE_WIDGET_COMPACT_MAX_DP
+    val enabled = settings.idleWidgetsEnabled && !suppressed && clockOn && (canHold || settings.width > IDLE_WIDGET_COMPACT_MAX_DP)
+    val settingsNow = androidx.compose.runtime.rememberUpdatedState(settings)
     val screenOn = rememberScreenInteractive()
     val tick = remember { Animatable(0f) }
     var labels by remember { mutableStateOf<HourChimeLabels?>(null) }
@@ -77,15 +80,18 @@ internal fun HourChimeLayer(
             while (true) {
                 val target = HourChime.nextFullHourMs(System.currentTimeMillis())
                 delay((target - System.currentTimeMillis()).coerceAtLeast(0L))
-                val is24 = android.text.format.DateFormat.is24HourFormat(context)
-                labels = hourChimeLabels(HourChime.hourOf(target), is24)
-                tick.snapTo(0f)
-                ui.chimeShow.animateTo(1f, tween(animSpeed.durationMs(HourChime.FADE_IN_MS)))
-                delay(animSpeed.durationMs(HourChime.HOLD_BEFORE_MS).toLong())
-                tick.animateTo(1f, tween(animSpeed.durationMs(HourChime.TICK_MS), easing = Easing { IdleSlots.heavyTickProgress(it) }))
-                delay(animSpeed.durationMs(HourChime.HOLD_AFTER_MS).toLong())
-                ui.chimeShow.animateTo(0f, tween(animSpeed.durationMs(HourChime.FADE_OUT_MS)))
-                labels = null
+                // Landscape with the pill hidden: the pill comes in just for the tick (see withTickPill).
+                ui.withTickPill(canHold, { settingsNow.value.width > IDLE_WIDGET_COMPACT_MAX_DP }) {
+                    val is24 = android.text.format.DateFormat.is24HourFormat(context)
+                    labels = hourChimeLabels(HourChime.hourOf(target), is24)
+                    tick.snapTo(0f)
+                    ui.chimeShow.animateTo(1f, tween(animSpeed.durationMs(HourChime.FADE_IN_MS)))
+                    delay(animSpeed.durationMs(HourChime.HOLD_BEFORE_MS).toLong())
+                    tick.animateTo(1f, tween(animSpeed.durationMs(HourChime.TICK_MS), easing = Easing { IdleSlots.heavyTickProgress(it) }))
+                    delay(animSpeed.durationMs(HourChime.HOLD_AFTER_MS).toLong())
+                    ui.chimeShow.animateTo(0f, tween(animSpeed.durationMs(HourChime.FADE_OUT_MS)))
+                    labels = null
+                }
             }
         } finally {
             // Cancelled half way (screen off, the island expands, the setting is switched off): the pill's own content must come back.

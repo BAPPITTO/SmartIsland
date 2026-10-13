@@ -50,6 +50,11 @@ data class SmartIslandSettings(
     val utilityCalculatorFloating: Boolean = true,
     val welcomeDialogShown: Boolean = false,
     val showOnLockScreen: Boolean = false,
+    /**
+     * Live cards (music, navigation, timers, recordings, downloads, live activities) of the app that is in the foreground.
+     * Off by default: the app shows them itself, so the island hides them. On: the island keeps showing them.
+     */
+    val showLiveEventsInForeground: Boolean = false,
     val lockScreenPrivacy: String = "AppIconOnly",
     val showNotificationActions: Boolean = true,
     val hideFromNotificationShade: Boolean = true,
@@ -68,14 +73,12 @@ data class SmartIslandSettings(
     val expandedBlurEnabled: Boolean = false,
     val expandedBlurRadius: Float = 24f,
     /** See-through blur of whatever is behind an open card (system window blur, heavier). Off by default; the card blur above works without it. */
-    val expandedBlurBehind: Boolean = false,
     /**
      * The media (music) card has its own blur and opacity. A phone or backup saved before this
      * existed starts from the shared values above (see the loaders), so nothing changes until the owner moves them.
      */
     val mediaBlurEnabled: Boolean = false,
     val mediaBlurRadius: Float = 24f,
-    val mediaBlurBehind: Boolean = false,
     val mediaOpacity: Float = 1f,
     val expandedGradientEnabled: Boolean = false,
     val expandedGradientColor: Long = 0xFF2563EBL,
@@ -101,6 +104,12 @@ data class SmartIslandSettings(
     val recordLogs: Boolean = false,
     /** App theme: "system" (follow the phone), "light" or "dark". */
     val themeMode: String = "system",
+    /** App theme: the liquid glass look (translucent glass panels over a soft colour backdrop). Off gives the flat Material 3 look. */
+    val liquidGlassTheme: Boolean = true,
+    /** App theme: take the colours from the phone's wallpaper (Material You, Android 12+). Off uses [accentColor]. */
+    val materialYou: Boolean = false,
+    /** App theme: the accent colour (ARGB) the whole palette is built from when Material You is off. */
+    val accentColor: Long = DEFAULT_ACCENT_COLOR,
     /** Look of the expanded island: "dark" (the original look), "light", or "system" (follows the phone's light / dark setting). */
     val expandedTheme: String = EXPANDED_THEME_DARK,
     /** Font of the island's text: one of [VALID_FONTS] ("serif" is the phone's serif font) or a custom font id (`custom:<file name>`). */
@@ -138,6 +147,21 @@ data class SmartIslandSettings(
     // Long press on the collapsed pill. One real action (hide / show the pill) or "None" to turn it off.
     val longPressAction: String = "TogglePill",
     val circlePosition: String = CIRCLE_POSITION_RIGHT,
+    /**
+     * Portrait collapsed cutout with content (a card on the pill): true keeps the idle cutout's size; false stretches the pill to
+     * [contentPillWidthPercent] of its idle width when a card arrives and shrinks it back when the card is put away.
+     */
+    val contentPillSameAsIdle: Boolean = false,
+    val contentPillWidthPercent: Float = DEFAULT_CONTENT_PILL_PERCENT,
+    /**
+     * Landscape: the pill with a card on it against the pill that only carries the idle widgets (the landscape width). On by default,
+     * so the pill the user tuned keeps its size.
+     */
+    val contentPillSameAsIdleLandscape: Boolean = true,
+    /** Apps that switch the island totally off while they are in the foreground, per orientation (see model/IslandExemption). */
+    val islandExemptApps: Set<String> = emptySet(),
+    val islandExemptAppsLandscape: Set<String> = emptySet(),
+    val contentPillWidthPercentLandscape: Float = DEFAULT_CONTENT_PILL_PERCENT,
     // ---- Landscape profile (independent of the portrait fields above) ----
     // Legacy since LR4 (idle landscape cutout is always the camera circle); kept for old backups.
     val landscapeShape: String = LANDSCAPE_SHAPE_PILL,
@@ -148,7 +172,8 @@ data class SmartIslandSettings(
     val landscapeCornerRadius: Float = 22f,
     val landscapeOpacity: Float = 1f,
     val landscapeCircleSize: Float = 26f,
-    val landscapeCircleOpacity: Float = 0.6f,
+    /** Landscape idle circle (camera cutout circle) opacity. 0 = invisible (it still takes taps); starts at 0. */
+    val landscapeCircleOpacity: Float = 0f,
     val landscapeCircleEdgeInset: Float = 16f,
     val landscapeCircleYOffset: Float = 12f,
     val landscapeCirclePosition: String = LANDSCAPE_POSITION_AUTO,
@@ -180,6 +205,9 @@ data class SmartIslandSettings(
     /** Idle widgets go off while a long press has the pill hidden, per orientation. */
     val idleOffAfterLongPress: Boolean = false,
     val idleOffAfterLongPressLandscape: Boolean = false,
+    /** Idle widgets go off while any notification is stored on the island, per orientation. */
+    val idleOffWhenStored: Boolean = false,
+    val idleOffWhenStoredLandscape: Boolean = false,
     /** Seconds between the sideways ticks of the idle glyphs; shared by portrait and landscape. */
     val idleGlyphTickSeconds: Float = com.agupta07505.smartisland.model.IdleSlots.DEFAULT_TICK_SECONDS,
     /** Comma list of widget ids ([com.agupta07505.smartisland.model.IdleWidgetKind.id]); several take turns. */
@@ -190,15 +218,30 @@ data class SmartIslandSettings(
     val widgetIslandCloseSeconds: Int = com.agupta07505.smartisland.model.WidgetIslandTimer.DEFAULT_SECONDS,
     /** What the charging battery island shows besides percent, time to full and temperature: WATT or VOLT ([com.agupta07505.smartisland.model.WidgetIslandContent.BATTERY_WATT]). */
     val widgetIslandBatteryMetric: String = com.agupta07505.smartisland.model.WidgetIslandContent.BATTERY_WATT,
+    /** The next-alarm widget stays off the pill while the alarm is more than 12 hours away. */
+    val idleAlarmHideBeyond12h: Boolean = false,
     /** Font of the collapsed pill's idle glyphs: empty = the island font, else a [VALID_FONTS] id or a custom font id. */
     val idleGlyphFont: String = "",
     /** Size of the idle glyphs in percent of the normal size (see model/IdleSlots). */
     val idleGlyphScale: Int = com.agupta07505.smartisland.model.IdleSlots.DEFAULT_GLYPH_SCALE,
     /** AUTO (device region), C or F. */
     val idleWidgetTempUnit: String = com.agupta07505.smartisland.model.IdleWidgets.UNIT_AUTO,
+    val idleWidgetWindUnit: String = com.agupta07505.smartisland.model.IdleWidgets.UNIT_AUTO,
+    /** How the idle glyphs change: [com.agupta07505.smartisland.model.LedTick.STYLE_SMOOTH] (the heavy tick) or [com.agupta07505.smartisland.model.LedTick.STYLE_LED] (footsteps on an LED grid). */
+    val idleTickStyle: String = com.agupta07505.smartisland.model.LedTick.STYLE_SMOOTH,
+    /** Hops per change for the LED style, repeated in turn: "1, 2, 3, 2, 5" (see [com.agupta07505.smartisland.model.LedTick.parsePattern]). */
+    val ledTickPattern: String = com.agupta07505.smartisland.model.LedTick.DEFAULT_PATTERN,
+    /** Milliseconds between the hops of the LED style. */
+    val ledTickPaceMs: Int = com.agupta07505.smartisland.model.LedTick.DEFAULT_PACE_MS,
+    /** Font of the LED text: empty = the built-in dot font, else any island font id (drawn as dots). */
+    val ledTickFont: String = com.agupta07505.smartisland.model.LedTick.FONT_BUILTIN,
+    /** Colour of the LEDs: red, amber, green or white. */
+    val ledTickColor: String = com.agupta07505.smartisland.model.LedTick.COLOR_RED,
+    /** The value slot steps half a pace after the glyph slot (footsteps) instead of both together. */
+    val ledTickStagger: Boolean = true,
     // ---- Animation speed per orientation (Layout tab): relaxed / normal / snappy. ----
-    val animSpeedPortrait: String = AnimationSpeed.ID_NORMAL,
-    val animSpeedLandscape: String = AnimationSpeed.ID_NORMAL,
+    val animSpeedPortrait: String = AnimationSpeed.ID_RELAXED,
+    val animSpeedLandscape: String = AnimationSpeed.ID_RELAXED,
     /** How the secondary round cutout merges into the primary one: "slide" (original) or "bubble". */
     val mergeStyle: String = MergeStyle.ID_SLIDE,
     /** Same choice for landscape. Old backups and old installs start from the shared [mergeStyle] they had. */
@@ -342,6 +385,7 @@ data class SmartIslandSettings(
         settingsObj.put("utilityCalculatorFloating", utilityCalculatorFloating)
         settingsObj.put("welcomeDialogShown", welcomeDialogShown)
         settingsObj.put("showOnLockScreen", showOnLockScreen)
+        settingsObj.put("showLiveEventsInForeground", showLiveEventsInForeground)
         settingsObj.put("lockScreenPrivacy", lockScreenPrivacy)
         settingsObj.put("showNotificationActions", showNotificationActions)
         settingsObj.put("hideFromNotificationShade", hideFromNotificationShade)
@@ -368,10 +412,8 @@ data class SmartIslandSettings(
         settingsObj.put("enableShadow", enableShadow)
         settingsObj.put("expandedBlurEnabled", expandedBlurEnabled)
         settingsObj.put("expandedBlurRadius", expandedBlurRadius.toDouble())
-        settingsObj.put("expandedBlurBehind", expandedBlurBehind)
         settingsObj.put("mediaBlurEnabled", mediaBlurEnabled)
         settingsObj.put("mediaBlurRadius", mediaBlurRadius.toDouble())
-        settingsObj.put("mediaBlurBehind", mediaBlurBehind)
         settingsObj.put("mediaOpacity", mediaOpacity.toDouble())
         settingsObj.put("expandedGradientEnabled", expandedGradientEnabled)
         settingsObj.put("expandedGradientColor", expandedGradientColor)
@@ -400,6 +442,9 @@ data class SmartIslandSettings(
         settingsObj.put("developerModeEnabled", developerModeEnabled)
         settingsObj.put("recordLogs", recordLogs)
         settingsObj.put("themeMode", themeMode)
+        settingsObj.put("liquidGlassTheme", liquidGlassTheme)
+        settingsObj.put("materialYou", materialYou)
+        settingsObj.put("accentColor", accentColor)
         settingsObj.put("expandedTheme", expandedTheme)
         settingsObj.put("islandFont", islandFont)
         settingsObj.put("enableNotchMode", enableNotchMode)
@@ -454,11 +499,27 @@ data class SmartIslandSettings(
         settingsObj.put("idleOffAfterTapCloseLandscape", idleOffAfterTapCloseLandscape)
         settingsObj.put("idleOffAfterLongPress", idleOffAfterLongPress)
         settingsObj.put("idleOffAfterLongPressLandscape", idleOffAfterLongPressLandscape)
+        settingsObj.put("idleOffWhenStored", idleOffWhenStored)
+        settingsObj.put("contentPillSameAsIdle", contentPillSameAsIdle)
+        settingsObj.put("islandExemptApps", JSONArray().also { a -> islandExemptApps.forEach { a.put(it) } })
+        settingsObj.put("islandExemptAppsLandscape", JSONArray().also { a -> islandExemptAppsLandscape.forEach { a.put(it) } })
+        settingsObj.put("contentPillSameAsIdleLandscape", contentPillSameAsIdleLandscape)
+        settingsObj.put("contentPillWidthPercentLandscape", contentPillWidthPercentLandscape.toDouble())
+        settingsObj.put("contentPillWidthPercent", contentPillWidthPercent.toDouble())
+        settingsObj.put("idleOffWhenStoredLandscape", idleOffWhenStoredLandscape)
         settingsObj.put("idleGlyphTickSeconds", idleGlyphTickSeconds.toDouble())
         settingsObj.put("idleWidgetIds", idleWidgetIds)
         settingsObj.put("idleWidgetCycleSeconds", idleWidgetCycleSeconds)
         settingsObj.put("widgetIslandCloseSeconds", widgetIslandCloseSeconds)
+        settingsObj.put("idleAlarmHideBeyond12h", idleAlarmHideBeyond12h)
         settingsObj.put("idleWidgetTempUnit", idleWidgetTempUnit)
+        settingsObj.put("idleWidgetWindUnit", idleWidgetWindUnit)
+        settingsObj.put("idleTickStyle", idleTickStyle)
+        settingsObj.put("ledTickPattern", ledTickPattern)
+        settingsObj.put("ledTickPaceMs", ledTickPaceMs)
+        settingsObj.put("ledTickFont", ledTickFont)
+        settingsObj.put("ledTickColor", ledTickColor)
+        settingsObj.put("ledTickStagger", ledTickStagger)
         settingsObj.put("idleGlyphFont", idleGlyphFont)
         settingsObj.put("fontMixEnabled", fontMixEnabled)
         settingsObj.put("fontMixLight", fontMixLight)
@@ -516,14 +577,16 @@ data class SmartIslandSettings(
     fun forMedia(): SmartIslandSettings = copy(
         opacity = mediaOpacity,
         expandedBlurEnabled = mediaBlurEnabled,
-        expandedBlurRadius = mediaBlurRadius,
-        expandedBlurBehind = mediaBlurBehind
+        expandedBlurRadius = mediaBlurRadius
     )
 
     /** [forMedia] when [media] is true (the shown card is a music card), else these settings. */
     fun forCard(media: Boolean): SmartIslandSettings = if (media) forMedia() else this
 
     companion object {
+        /** Default accent of the app theme: a soft azure that suits the glass look. */
+        const val DEFAULT_ACCENT_COLOR = 0xFF4A8CFFL
+
         const val EXPANDED_THEME_DARK = "dark"
         const val EXPANDED_THEME_LIGHT = "light"
         const val EXPANDED_THEME_SYSTEM = "system"
@@ -561,6 +624,9 @@ data class SmartIslandSettings(
 
         const val BACKUP_FORMAT_VERSION = 1
 
+        const val MIN_CONTENT_PILL_PERCENT = 100f
+        const val MAX_CONTENT_PILL_PERCENT = 250f
+        const val DEFAULT_CONTENT_PILL_PERCENT = 110f
         const val MIN_WIDTH = 76f
         const val MAX_WIDTH = 180f
         const val MIN_HEIGHT = 24f
@@ -576,6 +642,8 @@ data class SmartIslandSettings(
         const val MIN_CORNER_RADIUS = 8f
         const val MAX_CORNER_RADIUS = 40f
         const val MIN_OPACITY = 0.2f
+        /** The landscape idle circle may go all the way to invisible; every other opacity keeps [MIN_OPACITY]. */
+        const val MIN_CIRCLE_OPACITY = 0f
         const val MIN_EXPANDED_BLUR = 4f
         const val MAX_EXPANDED_BLUR = 60f
         const val MIN_GRADIENT_STRENGTH = 0.1f
@@ -680,6 +748,7 @@ data class SmartIslandSettings(
                 utilityCalculatorFloating = obj.optBoolean("utilityCalculatorFloating", defaults.utilityCalculatorFloating),
                 welcomeDialogShown = obj.optBoolean("welcomeDialogShown", defaults.welcomeDialogShown),
                 showOnLockScreen = obj.optBoolean("showOnLockScreen", defaults.showOnLockScreen),
+                showLiveEventsInForeground = obj.optBoolean("showLiveEventsInForeground", defaults.showLiveEventsInForeground),
                 lockScreenPrivacy = obj.optString("lockScreenPrivacy", defaults.lockScreenPrivacy).let {
                     if (it == "AppIconOnly" || it == "FullContent") it else defaults.lockScreenPrivacy
                 },
@@ -698,7 +767,6 @@ data class SmartIslandSettings(
                 enableShadow = obj.optBoolean("enableShadow", defaults.enableShadow),
                 expandedBlurEnabled = obj.optBoolean("expandedBlurEnabled", defaults.expandedBlurEnabled),
                 expandedBlurRadius = safeFloat("expandedBlurRadius", defaults.expandedBlurRadius, MIN_EXPANDED_BLUR, MAX_EXPANDED_BLUR),
-                expandedBlurBehind = obj.optBoolean("expandedBlurBehind", defaults.expandedBlurBehind),
                 // Old backups have no media keys: the media card starts from the shared blur and opacity.
                 mediaBlurEnabled = obj.optBoolean("mediaBlurEnabled", obj.optBoolean("expandedBlurEnabled", defaults.mediaBlurEnabled)),
                 mediaBlurRadius = safeFloat(
@@ -706,7 +774,6 @@ data class SmartIslandSettings(
                     safeFloat("expandedBlurRadius", defaults.mediaBlurRadius, MIN_EXPANDED_BLUR, MAX_EXPANDED_BLUR),
                     MIN_EXPANDED_BLUR, MAX_EXPANDED_BLUR
                 ),
-                mediaBlurBehind = obj.optBoolean("mediaBlurBehind", obj.optBoolean("expandedBlurBehind", defaults.mediaBlurBehind)),
                 mediaOpacity = safeFloat(
                     "mediaOpacity",
                     safeFloat("opacity", defaults.mediaOpacity, MIN_OPACITY, MAX_OPACITY),
@@ -733,6 +800,9 @@ data class SmartIslandSettings(
                 developerModeEnabled = obj.optBoolean("developerModeEnabled", defaults.developerModeEnabled),
                 recordLogs = obj.optBoolean("recordLogs", defaults.recordLogs),
                 themeMode = obj.optString("themeMode", defaults.themeMode).takeIf { it in setOf("system", "light", "dark") } ?: defaults.themeMode,
+                liquidGlassTheme = obj.optBoolean("liquidGlassTheme", defaults.liquidGlassTheme),
+                materialYou = obj.optBoolean("materialYou", defaults.materialYou),
+                accentColor = safeColor("accentColor", defaults.accentColor),
                 expandedTheme = obj.optString("expandedTheme", defaults.expandedTheme).takeIf { it in VALID_EXPANDED_THEMES } ?: defaults.expandedTheme,
                 islandFont = obj.optString("islandFont", defaults.islandFont).takeIf { isValidFont(it) } ?: defaults.islandFont,
                 enableNotchMode = obj.optBoolean("enableNotchMode", defaults.enableNotchMode),
@@ -768,7 +838,7 @@ data class SmartIslandSettings(
                 landscapeCornerRadius = safeFloat("landscapeCornerRadius", defaults.landscapeCornerRadius, MIN_CORNER_RADIUS, MAX_CORNER_RADIUS),
                 landscapeOpacity = safeFloat("landscapeOpacity", defaults.landscapeOpacity, MIN_OPACITY, MAX_OPACITY),
                 landscapeCircleSize = safeFloat("landscapeCircleSize", defaults.landscapeCircleSize, MIN_CIRCLE_SIZE, MAX_CIRCLE_SIZE),
-                landscapeCircleOpacity = safeFloat("landscapeCircleOpacity", defaults.landscapeCircleOpacity, MIN_OPACITY, MAX_OPACITY),
+                landscapeCircleOpacity = safeFloat("landscapeCircleOpacity", defaults.landscapeCircleOpacity, MIN_CIRCLE_OPACITY, MAX_OPACITY),
                 landscapeCircleEdgeInset = safeFloat("landscapeCircleEdgeInset", defaults.landscapeCircleEdgeInset, MIN_CIRCLE_EDGE_INSET, MAX_CIRCLE_EDGE_INSET),
                 landscapeCircleYOffset = safeFloat("landscapeCircleYOffset", defaults.landscapeCircleYOffset, MIN_Y_OFFSET, MAX_LANDSCAPE_Y_OFFSET),
                 landscapeCirclePosition = obj.optString("landscapeCirclePosition", defaults.landscapeCirclePosition).let {
@@ -799,6 +869,19 @@ data class SmartIslandSettings(
                 idleOffAfterTapCloseLandscape = obj.optBoolean("idleOffAfterTapCloseLandscape", defaults.idleOffAfterTapCloseLandscape),
                 idleOffAfterLongPress = obj.optBoolean("idleOffAfterLongPress", defaults.idleOffAfterLongPress),
                 idleOffAfterLongPressLandscape = obj.optBoolean("idleOffAfterLongPressLandscape", defaults.idleOffAfterLongPressLandscape),
+                idleOffWhenStored = obj.optBoolean("idleOffWhenStored", defaults.idleOffWhenStored),
+                contentPillSameAsIdle = obj.optBoolean("contentPillSameAsIdle", defaults.contentPillSameAsIdle),
+                islandExemptApps = safeStringSet("islandExemptApps", defaults.islandExemptApps),
+                islandExemptAppsLandscape = safeStringSet("islandExemptAppsLandscape", defaults.islandExemptAppsLandscape),
+                contentPillSameAsIdleLandscape = obj.optBoolean("contentPillSameAsIdleLandscape", defaults.contentPillSameAsIdleLandscape),
+                contentPillWidthPercentLandscape = safeFloat(
+                    "contentPillWidthPercentLandscape", defaults.contentPillWidthPercentLandscape,
+                    MIN_CONTENT_PILL_PERCENT, MAX_CONTENT_PILL_PERCENT
+                ),
+                contentPillWidthPercent = safeFloat(
+                    "contentPillWidthPercent", defaults.contentPillWidthPercent, MIN_CONTENT_PILL_PERCENT, MAX_CONTENT_PILL_PERCENT
+                ),
+                idleOffWhenStoredLandscape = obj.optBoolean("idleOffWhenStoredLandscape", defaults.idleOffWhenStoredLandscape),
                 idleGlyphTickSeconds = com.agupta07505.smartisland.model.IdleSlots.normalizeTickSeconds(
                     obj.optDouble("idleGlyphTickSeconds", defaults.idleGlyphTickSeconds.toDouble()).toFloat()
                 ),
@@ -810,6 +893,7 @@ data class SmartIslandSettings(
                         com.agupta07505.smartisland.model.IdleWidgets.MIN_CYCLE_SECONDS,
                         com.agupta07505.smartisland.model.IdleWidgets.MAX_CYCLE_SECONDS
                     ),
+                idleAlarmHideBeyond12h = obj.optBoolean("idleAlarmHideBeyond12h", defaults.idleAlarmHideBeyond12h),
                 widgetIslandCloseSeconds = com.agupta07505.smartisland.model.WidgetIslandTimer.normalize(
                     obj.optInt("widgetIslandCloseSeconds", defaults.widgetIslandCloseSeconds)
                 ),
@@ -829,6 +913,15 @@ data class SmartIslandSettings(
                 ),
                 idleWidgetTempUnit = obj.optString("idleWidgetTempUnit", defaults.idleWidgetTempUnit)
                     .takeIf { it in com.agupta07505.smartisland.model.IdleWidgets.VALID_UNITS } ?: defaults.idleWidgetTempUnit,
+                idleWidgetWindUnit = obj.optString("idleWidgetWindUnit", defaults.idleWidgetWindUnit)
+                    .takeIf { it in com.agupta07505.smartisland.model.IdleWidgets.VALID_WIND_UNITS } ?: defaults.idleWidgetWindUnit,
+                idleTickStyle = com.agupta07505.smartisland.model.LedTick.normalizeStyle(obj.optString("idleTickStyle", defaults.idleTickStyle)),
+                ledTickPattern = com.agupta07505.smartisland.model.LedTick.normalizePattern(obj.optString("ledTickPattern", defaults.ledTickPattern)),
+                ledTickPaceMs = com.agupta07505.smartisland.model.LedTick.normalizePace(obj.optInt("ledTickPaceMs", defaults.ledTickPaceMs)),
+                ledTickFont = obj.optString("ledTickFont", defaults.ledTickFont)
+                    .takeIf { it.isEmpty() || isValidFont(it) } ?: defaults.ledTickFont,
+                ledTickColor = com.agupta07505.smartisland.model.LedTick.normalizeColor(obj.optString("ledTickColor", defaults.ledTickColor)),
+                ledTickStagger = obj.optBoolean("ledTickStagger", defaults.ledTickStagger),
                 secondaryMergeMs = obj.optInt("secondaryMergeMs", defaults.secondaryMergeMs)
                     .coerceIn(MIN_SECONDARY_MERGE_MS, MAX_SECONDARY_MERGE_MS),
                 animSpeedPortrait = obj.optString("animSpeedPortrait", defaults.animSpeedPortrait)

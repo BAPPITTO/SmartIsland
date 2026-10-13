@@ -348,8 +348,8 @@ class SmartIslandSettingsTest {
     @Test
     fun animationSpeedDndAndAppRulesDefaultToToday() {
         val d = SmartIslandSettings.Default
-        assertEquals("normal", d.animSpeedPortrait)
-        assertEquals("normal", d.animSpeedLandscape)
+        assertEquals("relaxed", d.animSpeedPortrait)
+        assertEquals("relaxed", d.animSpeedLandscape)
         assertEquals(false, d.showDuringDnd)
         assertEquals(emptySet<String>(), d.noExpandPackages)
         assertEquals(emptySet<String>(), d.noAutoExpandPackages)
@@ -443,8 +443,8 @@ class SmartIslandSettingsTest {
     fun badAnimationSpeedFallsBackAndOldBackupsKeepDefaults() {
         val bad = """{"settings": {"animSpeedPortrait": "warp", "animSpeedLandscape": ""}}"""
         val parsed = SmartIslandSettings.fromJson(bad)
-        assertEquals("normal", parsed.animSpeedPortrait)
-        assertEquals("normal", parsed.animSpeedLandscape)
+        assertEquals("relaxed", parsed.animSpeedPortrait)
+        assertEquals("relaxed", parsed.animSpeedLandscape)
         val old = SmartIslandSettings.fromJson("""{"settings": {"width": 100}}""")
         assertEquals(false, old.showDuringDnd)
         assertEquals(emptySet<String>(), old.noExpandPackages)
@@ -470,12 +470,11 @@ class SmartIslandSettingsTest {
     // The media card's own blur and opacity.
     @Test
     fun oldBackupStartsMediaFromTheSharedBlurAndOpacity() {
-        val json = """{"opacity": 0.7, "expandedBlurEnabled": true, "expandedBlurRadius": 30.0, "expandedBlurBehind": true}"""
+        val json = """{"opacity": 0.7, "expandedBlurEnabled": true, "expandedBlurRadius": 30.0}"""
         val settings = SmartIslandSettings.fromJson(json)
         assertEquals(0.7f, settings.mediaOpacity, 0.001f)
         assertEquals(true, settings.mediaBlurEnabled)
         assertEquals(30f, settings.mediaBlurRadius, 0.001f)
-        assertEquals(true, settings.mediaBlurBehind)
     }
 
     @Test
@@ -483,8 +482,7 @@ class SmartIslandSettingsTest {
         val original = SmartIslandSettings.Default.copy(
             opacity = 0.9f, mediaOpacity = 0.5f,
             expandedBlurEnabled = false, mediaBlurEnabled = true,
-            expandedBlurRadius = 10f, mediaBlurRadius = 40f,
-            expandedBlurBehind = true, mediaBlurBehind = false
+            expandedBlurRadius = 10f, mediaBlurRadius = 40f
         )
         val restored = SmartIslandSettings.fromJson(original.toJson(appVersion = "1"))
         assertEquals(0.5f, restored.mediaOpacity, 0.001f)
@@ -492,8 +490,6 @@ class SmartIslandSettingsTest {
         assertEquals(true, restored.mediaBlurEnabled)
         assertEquals(false, restored.expandedBlurEnabled)
         assertEquals(40f, restored.mediaBlurRadius, 0.001f)
-        assertEquals(false, restored.mediaBlurBehind)
-        assertEquals(true, restored.expandedBlurBehind)
     }
 
     @Test
@@ -612,6 +608,33 @@ class SmartIslandSettingsTest {
         assertEquals(false, restored.hideAllOnLockScreen)
         assertEquals(emptySet<String>(), restored.hideOnLockScreenEvents)
         assertEquals(true, restored.notificationsEnabled)
+    }
+
+    @Test
+    fun liveEventsInForegroundIsOffByDefaultAndSurvivesRoundTrip() {
+        assertEquals(false, SmartIslandSettings.Default.showLiveEventsInForeground)
+        val custom = SmartIslandSettings.Default.copy(showLiveEventsInForeground = true)
+        assertEquals(true, SmartIslandSettings.fromJson(custom.toJson()).showLiveEventsInForeground)
+        val old = org.json.JSONObject(custom.toJson())
+        (old.optJSONObject("settings") ?: old).remove("showLiveEventsInForeground")
+        assertEquals(false, SmartIslandSettings.fromJson(old.toString()).showLiveEventsInForeground)
+    }
+
+    @Test
+    fun landscapeCircleStartsInvisibleAndMayBeSetToZero() {
+        assertEquals(0f, SmartIslandSettings.Default.landscapeCircleOpacity, 0f)
+        assertEquals(0f, SmartIslandSettings.MIN_CIRCLE_OPACITY, 0f)
+        val faded = SmartIslandSettings.Default.copy(landscapeCircleOpacity = 0.6f)
+        assertEquals(0.6f, SmartIslandSettings.fromJson(faded.toJson()).landscapeCircleOpacity, 0.001f)
+        // A backup that says 0 keeps 0 (it used to be lifted to the 20 % floor).
+        val zero = SmartIslandSettings.Default.copy(landscapeCircleOpacity = 0f)
+        assertEquals(0f, SmartIslandSettings.fromJson(zero.toJson()).landscapeCircleOpacity, 0f)
+    }
+
+    @Test
+    fun mergeStyleDefaultsToSlideInBothOrientations() {
+        assertEquals("slide", SmartIslandSettings.Default.mergeStyle)
+        assertEquals("slide", SmartIslandSettings.Default.mergeStyleLandscape)
     }
 
     @Test

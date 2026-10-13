@@ -16,7 +16,7 @@ import java.util.Locale
  * The clock is not here on purpose: its job is the hourly tick (HourChimeLayer), it never sits on the pill and has no island.
  */
 object WidgetIslandContent {
-    /** The next alarm is only worth an island when it rings within this many ms (12 h). */
+    /** Kept for [alarmInWindow]; the alarm's island itself no longer waits for this window (see [hasContent]). */
     const val ALARM_WINDOW_MS = 12 * 60 * 60 * 1000L
 
     /** Battery island line: watts or volts, chosen in settings. */
@@ -28,9 +28,9 @@ object WidgetIslandContent {
      * Whether [kind] has anything to show in its island right now. A pill glyph tap on a widget without content does nothing, and an open
      * island whose content goes away (charger unplugged, alarm rang) closes.
      *  - Date, net speed: always.
-     *  - Weather: once a reading is there.
+     *  - Weather and wind: once a reading is there.
      *  - Battery: only while charging (the status bar has the level).
-     *  - Next alarm: only when it rings within [ALARM_WINDOW_MS].
+     *  - Next alarm: whenever an alarm is still to come, however far away.
      *  - Notifications: while at least one message or mail is waiting.
      *  - Modes: while a mode or Do Not Disturb is on.
      *  - Clock: never.
@@ -46,9 +46,9 @@ object WidgetIslandContent {
     ): Boolean = when (kind) {
         IdleWidgetKind.Clock, IdleWidgetKind.DayMoments -> false
         IdleWidgetKind.Date, IdleWidgetKind.NetSpeed -> true
-        IdleWidgetKind.Weather -> hasWeather
+        IdleWidgetKind.Weather, IdleWidgetKind.Wind -> hasWeather
         IdleWidgetKind.Battery -> charging
-        IdleWidgetKind.NextAlarm -> alarmInWindow(nextAlarmMs, nowMs)
+        IdleWidgetKind.NextAlarm -> nextAlarmMs > nowMs
         IdleWidgetKind.Notifications -> notificationCount > 0
         IdleWidgetKind.Modes -> modeActive
     }

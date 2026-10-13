@@ -18,12 +18,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
+import com.agupta07505.smartisland.ui.glass.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Switch
+import com.agupta07505.smartisland.ui.glass.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableFloatStateOf
@@ -72,6 +72,7 @@ fun LandscapeSection(
     var circleYAdjust by remember(settings.landscapeCircleYAdjust) { mutableFloatStateOf(settings.landscapeCircleYAdjust) }
 
     var pillWidth by remember(settings.landscapeWidth) { mutableFloatStateOf(settings.landscapeWidth) }
+    var contentPercent by remember(settings.contentPillWidthPercentLandscape) { mutableFloatStateOf(settings.contentPillWidthPercentLandscape) }
     var pillHeight by remember(settings.landscapeHeight) { mutableFloatStateOf(settings.landscapeHeight) }
     var pillX by remember(settings.landscapeXOffset) { mutableFloatStateOf(settings.landscapeXOffset) }
     var pillY by remember(settings.landscapeYOffset) { mutableFloatStateOf(settings.landscapeYOffset) }
@@ -132,7 +133,7 @@ fun LandscapeSection(
             title = "Idle cutout",
             stateKey = "land_idle",
             summary = "The small circle shown when nothing is on the island",
-            initiallyExpanded = false
+            initiallyExpanded = true
         ) {
             GroupLabel("Position")
             ChoiceRow(
@@ -159,11 +160,11 @@ fun LandscapeSection(
             SliderSettingItem(
                 label = "Opacity",
                 value = circleOpacity * 100f,
-                range = (SmartIslandSettings.MIN_OPACITY * 100f)..(SmartIslandSettings.MAX_OPACITY * 100f),
+                range = (SmartIslandSettings.MIN_CIRCLE_OPACITY * 100f)..(SmartIslandSettings.MAX_OPACITY * 100f),
                 suffix = "%",
                 step = 5f,
                 onValueChange = {
-                    circleOpacity = (it / 100f).coerceIn(SmartIslandSettings.MIN_OPACITY, SmartIslandSettings.MAX_OPACITY)
+                    circleOpacity = (it / 100f).coerceIn(SmartIslandSettings.MIN_CIRCLE_OPACITY, SmartIslandSettings.MAX_OPACITY)
                 },
                 onValueChangeFinished = { scope.launch { repository.setLandscapeCircleOpacity(circleOpacity) } }
             )
@@ -246,6 +247,32 @@ fun LandscapeSection(
             )
 
             GroupDivider()
+            GroupLabel("Size with a card")
+            HintText("The pill that only carries the idle widgets has the width above. With a card on it, it can stretch wider and shrinks back when the card is put away.")
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text("Same size as idle cutout", modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                Switch(
+                    checked = settings.contentPillSameAsIdleLandscape,
+                    onCheckedChange = { scope.launch { repository.setContentPillSameAsIdle(true, it) } }
+                )
+            }
+            if (!settings.contentPillSameAsIdleLandscape) {
+                SliderSettingItem(
+                    label = "Cutout width with content",
+                    value = contentPercent,
+                    range = SmartIslandSettings.MIN_CONTENT_PILL_PERCENT..SmartIslandSettings.MAX_CONTENT_PILL_PERCENT,
+                    suffix = "%",
+                    step = 5f,
+                    onValueChange = { contentPercent = it },
+                    onValueChangeFinished = { scope.launch { repository.setContentPillWidthPercent(true, contentPercent) } }
+                )
+            }
+
+            GroupDivider()
             GroupLabel("Fine tuning")
             SliderSettingItem(
                 label = "Horizontal offset",
@@ -284,6 +311,15 @@ fun LandscapeSection(
                 },
                 onValueChangeFinished = { scope.launch { repository.setLandscapeOpacity(pillOpacity) } }
             )
+        }
+
+        CollapsibleCard(
+            title = "Exempt apps",
+            stateKey = "land_exempt_apps",
+            summary = "Apps that switch the island totally off in landscape",
+            initiallyExpanded = false
+        ) {
+            ExemptAppsCard(settings = settings, repository = repository, landscape = true)
         }
     }
 }

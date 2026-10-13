@@ -172,7 +172,14 @@ class OrientationProfileTest {
 
     @Test
     fun portraitNeverBecomesALandscapePill() {
-        assertEquals(portrait, portrait.forOrientation(OrientationState(isLandscape = false), hasContent = true))
+        val state = OrientationState(isLandscape = false)
+        // Portrait only ever stretches the pill's width for content (the content pill width setting); nothing else moves.
+        val out = portrait.forOrientation(state, hasContent = true)
+        assertEquals(portrait.withContentPillWidth(state.screenWidthDp), out)
+        assertEquals(portrait, out.copy(width = portrait.width))
+        // With the content pill set to match the idle one, portrait is returned untouched.
+        val same = portrait.copy(contentPillSameAsIdle = true)
+        assertEquals(same, same.forOrientation(state, hasContent = true))
     }
 
     @Test

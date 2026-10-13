@@ -35,7 +35,7 @@ import androidx.compose.material.icons.rounded.Swipe
 import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import com.agupta07505.smartisland.ui.glass.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -82,30 +82,73 @@ private fun gestureGroups(settings: SmartIslandSettings): List<GestureGroup> {
     val longPress = SwipeAction.fromId(settings.longPressAction, SwipeAction.TogglePill)
     val longPressTitle = getSwipeActionTitle(longPress)
     val longPressText = if (settings.enableAppShortcuts) {
-        "$longPressTitle. With App Shortcuts on, it opens your quick-launch apps instead (see Quick-launch window below)."
+        "On a glyph: opens your quick-launch apps (see Quick-launch window below). In the middle band: $longPressTitle. " +
+            "If the middle band is clear of the camera hole, a long press anywhere on the pill opens the apps. In landscape the pill always opens them."
     } else {
-        longPressTitle
+        "$longPressTitle, anywhere on the pill."
     }
     return listOf(
         GestureGroup(
             title = "Collapsed island (the pill)",
-            note = "Swipes follow your finger. Pull back before letting go to cancel.",
+            note = "Three touch areas: the glyph on the left, the glyph-free middle band over the camera spot, and the glyph or value on the right. Swipes follow your finger. Pull back before letting go to cancel.",
             lines = listOf(
-                GestureLine(Icons.Rounded.TouchApp, "Tap", "Expands the island. On an idle, hidden pill it brings the pill back."),
+                GestureLine(Icons.Rounded.TouchApp, "Tap a glyph (left or right)", "Expands that event. On an auto-hidden pill it brings the pill back."),
+                GestureLine(
+                    Icons.Rounded.TouchApp, "Tap the middle band",
+                    "Portrait, with cards on the island: puts every card away at once (the close with its first step skipped). " +
+                        "With only an idle widget or nothing on the pill: brings back cards the idle timeout put away, when there are any. " +
+                        "Landscape: the pill is not over the camera, so the whole pill expands."
+                ),
                 GestureLine(Icons.Rounded.Swipe, "Swipe left", actionText(settings.pillSwipeLeftAction, SwipeAction.PreviousNotification, pill)),
                 GestureLine(Icons.Rounded.Swipe, "Swipe right", actionText(settings.pillSwipeRightAction, SwipeAction.NextNotification, pill)),
                 GestureLine(Icons.Rounded.ArrowUpward, "Swipe up", actionText(settings.pillSwipeUpAction, SwipeAction.DismissCurrent, pill)),
                 GestureLine(Icons.Rounded.ArrowDownward, "Swipe down", "Expands the island (fixed, cannot be changed)."),
                 GestureLine(Icons.Rounded.TouchApp, "Long press", longPressText),
-                GestureLine(Icons.Rounded.TouchApp, "Tap a privacy dot", "Lists the apps using the camera, microphone, location or screen sharing (app names need Shizuku)."),
+                GestureLine(Icons.Rounded.TouchApp, "Tap a privacy dot", "Lists the apps using the camera, microphone, location or screen sharing (app names need Shizuku). Not on an auto-hidden pill: that tap only brings it back."),
+            )
+        ),
+        GestureGroup(
+            title = "Camera hole",
+            note = "Where the pill's middle band does not reach the real camera hole, the hole sits outside the pill and gets its own touch target (at least finger-sized). If the band covers the hole, the band rules above apply. Notch mode counts as covering: the pill is the notch.",
+            lines = listOf(
+                GestureLine(Icons.Rounded.TouchApp, "Tap the camera hole", "Nothing. Only a long press is handled there, so a stray tap on the hole never expands or closes anything."),
+                GestureLine(Icons.Rounded.TouchApp, "Long press the camera hole", "$longPressTitle. It never opens the quick-launch apps; that is the pill's own long press."),
+                GestureLine(Icons.Rounded.TouchApp, "Tap or hold the middle band (hole covered)", "Same as the middle band above: tap puts the cards away, long press runs $longPressTitle, and the glyphs on either side open the apps."),
+            )
+        ),
+        GestureGroup(
+            title = "Second and third pill",
+            note = "The smaller pills beside the main one that show other events. Expanded, the second pill sits on the camera spot.",
+            lines = listOf(
+                GestureLine(Icons.Rounded.TouchApp, "Tap the second pill", "Brings that event to the main pill and expands the island if it was collapsed. A privacy cutout (camera, microphone, location, screen sharing) lists the apps using it instead."),
+                GestureLine(Icons.Rounded.TouchApp, "Tap the second pill, expanded, card has siblings", "It shows three lines and opens the list of that app's other cards. A second tap closes the list."),
+                GestureLine(Icons.Rounded.TouchApp, "Tap the third pill", "Switches to that event, and expands the island if it was collapsed."),
+                GestureLine(Icons.Rounded.TouchApp, "Landscape: the pill beside an open card", "Tap swaps to the other stored card. It takes the pill swipes and the long press just like the main pill."),
             )
         ),
         GestureGroup(
             title = "Idle circle",
-            note = "The small circle that stays when there are no cards, mostly seen in landscape.",
+            note = "The small circle that stays when there are no cards, mostly seen in landscape. Portrait has no separate circle: the middle band of the pill does its job.",
             lines = listOf(
-                GestureLine(Icons.Rounded.TouchApp, "Tap", "Brings back cards that the idle timeout put away. In landscape it closes the island in two steps."),
-                GestureLine(Icons.Rounded.TouchApp, "Long press", "Hides or shows the pill."),
+                GestureLine(Icons.Rounded.TouchApp, "Tap", "Brings back cards that the idle timeout put away. Landscape, while a card is on the island, the circle stays as a small control: one tap puts every card away at once and the circle swells, then settles."),
+                GestureLine(Icons.Rounded.TouchApp, "Long press", "$longPressTitle (hides or shows the pill by default). It never opens the quick-launch apps."),
+            )
+        ),
+        GestureGroup(
+            title = "Idle widgets (clock, weather and the rest)",
+            note = "Shown on the pill when no card is.",
+            lines = listOf(
+                GestureLine(Icons.Rounded.TouchApp, "Tap the glyph or the value", "Grows the pill into the small widget island. Tap again to close it."),
+                GestureLine(Icons.Rounded.TouchApp, "Tap the middle band", "Brings back the stored cards, when there are any; otherwise nothing."),
+                GestureLine(Icons.Rounded.TouchApp, "Tap outside the widget island", "Closes it. Taps on the island itself stay on it."),
+                GestureLine(Icons.Rounded.Swipe, "Swipe the widget pill", "Works even when the pill swipe actions are switched off. The small round circle keeps its own behaviour."),
+            )
+        ),
+        GestureGroup(
+            title = "Hidden pill",
+            note = "After a long press hides it, or when Auto-hide has tucked it away. Its spot stays touchable.",
+            lines = listOf(
+                GestureLine(Icons.Rounded.TouchApp, "Tap its spot", "Auto-hidden: brings the pill back. Idle with cards put away: brings them back. Cards on the island: expands."),
             )
         ),
         GestureGroup(
@@ -113,7 +156,8 @@ private fun gestureGroups(settings: SmartIslandSettings): List<GestureGroup> {
             note = "Touch anywhere on the open card.",
             lines = listOf(
                 GestureLine(Icons.Rounded.TouchApp, "Tap the card", "Opens the app the card came from."),
-                GestureLine(Icons.Rounded.TouchApp, "Tap outside the card", "Collapses it back into the pill."),
+                GestureLine(Icons.Rounded.TouchApp, "Tap the middle of the top edge", "Portrait: that is the camera spot. It closes the island with the second pill's merge, then puts the cards away. A long press there runs $longPressTitle. The glyphs on either side keep switching cards."),
+                GestureLine(Icons.Rounded.TouchApp, "Tap outside the card", "Closes things in order: an open picture first, then an open sibling list, then the island collapses back into the pill."),
                 GestureLine(Icons.Rounded.ArrowUpward, "Swipe up", actionText(settings.swipeUpAction, SwipeAction.DismissCurrent, card) + ". Inside a card with several steps it goes back one step first."),
                 GestureLine(Icons.Rounded.DeleteSweep, "Hold, then swipe up", actionText(settings.swipeHoldUpAction, SwipeAction.DismissAll, card) + ". Hold about 300 ms until you feel the pulse, then swipe."),
                 GestureLine(Icons.Rounded.ArrowDownward, "Swipe down", "Opens expandable text, a picture or a sticker when the card has one; otherwise nothing (fixed)."),
@@ -123,13 +167,35 @@ private fun gestureGroups(settings: SmartIslandSettings): List<GestureGroup> {
             )
         ),
         GestureGroup(
+            title = "Card steps: long text, pictures, stickers",
+            note = "Step by step: text, preview (last text and last picture), reader (all text and thumbnails), then the picture. Stickers have no steps. In these steps the normal swipe actions are off.",
+            lines = listOf(
+                GestureLine(Icons.Rounded.TouchApp, "Tap the arrow", "Opens the next step. The arrow beside a thumbnail opens that picture at full size."),
+                GestureLine(Icons.Rounded.ArrowDownward, "Swipe down", "One step deeper. The island follows your finger and finishes the step when you pass the halfway point."),
+                GestureLine(Icons.Rounded.ArrowUpward, "Swipe up", "One step back, and it never dismisses the card. The island stays in place."),
+                GestureLine(Icons.Rounded.Swipe, "Swipe left or right", "Nothing, and not mistaken for a tap either."),
+                GestureLine(Icons.Rounded.TouchApp, "Tap a picture in the picker", "Opens it. With two or more pictures the picker's own taps stay with it; the card's tap does not open the app there."),
+                GestureLine(Icons.Rounded.ArrowUpward, "Scroll the reader text", "A drag the text consumes is its own and fires nothing else. Stopping a flinging reader with a touch is never a tap."),
+            )
+        ),
+        GestureGroup(
+            title = "Sibling list (cards from the same app)",
+            note = "Opened by the second pill while the card has siblings.",
+            lines = listOf(
+                GestureLine(Icons.Rounded.TouchApp, "Tap a row", "Shows that card."),
+                GestureLine(Icons.Rounded.Swipe, "Drag on the rows", "Scrolls the list. A drag that starts on its header is an island swipe."),
+                GestureLine(Icons.Rounded.TouchApp, "Tap the second pill again, or outside", "Closes the list."),
+            )
+        ),
+        GestureGroup(
             title = "Quick-launch window",
-            note = "Opened by the long press above (App Shortcuts must be on).",
+            note = "Opened by the long press above (App Shortcuts must be on). With no cards on the island, any drag in it belongs to the window.",
             lines = listOf(
                 GestureLine(Icons.Rounded.ArrowUpward, "Swipe up or down", "Switches between your apps and the Utilities page, and loops."),
                 GestureLine(Icons.Rounded.Swipe, "Swipe left or right", "Switches between Apps and Recents (when Recents is on)."),
                 GestureLine(Icons.Rounded.TouchApp, "Tap an app", "Opens it full screen."),
                 GestureLine(Icons.Rounded.TouchApp, "Long press an app", "App info, Floating window or Split screen. Keep dragging to move it or drop it on another app to make a folder."),
+                GestureLine(Icons.Rounded.TouchApp, "Tap outside", "Closes the window."),
             )
         ),
         GestureGroup(
@@ -225,11 +291,13 @@ private fun tourSteps(settings: SmartIslandSettings): List<TourStep> {
         TourStep(
             Icons.Rounded.TouchApp, "Tap to open",
             listOf(
-                "Tap the pill once to expand it into a full card with its buttons.",
+                "Tap a glyph on the pill once to expand it into a full card with its buttons.",
+                "Tap the empty middle of the pill, over the camera spot, to put the cards away. Open, the same spot at the top closes the island.",
                 "Tap the card to open the app it came from.",
-                "Tap anywhere outside the card to close it again."
+                "Tap anywhere outside the card to close it again.",
+                "Tap a smaller pill beside the main one to bring that event forward."
             ),
-            "On a hidden pill, one tap brings it back."
+            "On a hidden pill, one tap brings it back. Tapping the bare camera hole itself does nothing."
         ),
         TourStep(
             Icons.Rounded.Swipe, "Swipe the pill",
@@ -249,6 +317,7 @@ private fun tourSteps(settings: SmartIslandSettings): List<TourStep> {
                 } else {
                     "Long press the pill to hide or show it."
                 },
+                "Long press the camera hole itself, when it sits outside the pill, or the middle band: the normal long press action, so hide or show by default.",
                 "On the small idle circle, a long press hides or shows the pill."
             ),
             "Prefer hide / show on the pill? Turn App Shortcuts off, or change the long press action."
@@ -258,7 +327,7 @@ private fun tourSteps(settings: SmartIslandSettings): List<TourStep> {
             listOf(
                 "Swipe up: $cardUp.",
                 "Hold for a moment until you feel a pulse, then swipe up: $cardHold.",
-                "Swipe down opens long text, pictures and stickers when the card has them.",
+                "Swipe down opens long text, pictures and stickers when the card has them, one step at a time. Swipe up goes one step back.",
                 "Pull the handle at the card's bottom edge to open the app in a floating window."
             ),
             "Buttons on a card are the app's own, so Reply, Pause or Stop work just like in the shade."
@@ -301,7 +370,7 @@ fun NewUserTour(settings: SmartIslandSettings, onFinish: () -> Unit) {
                 .fillMaxWidth(0.92f)
                 .padding(12.dp),
             shape = RoundedCornerShape(26.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
             elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
         ) {
             Column(modifier = Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {

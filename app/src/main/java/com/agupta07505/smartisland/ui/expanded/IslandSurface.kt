@@ -43,7 +43,10 @@ internal fun expandedSurfaceColor(settings: SmartIslandSettings, palette: Island
     if (palette.isLight) palette.surface else Color(settings.pillColor)
 
 /** How far the gradient colour reaches into the light surface; a full-strength blue slab would take the pale look away. */
-private const val LIGHT_GRADIENT_REACH = 0.35f
+private const val LIGHT_GRADIENT_REACH = 0.65f
+
+/** The share of the gradient strength that already shows at the top left corner. */
+private const val GRADIENT_NEAR_SHARE = 0.35f
 
 /**
  * Brush for an expanded island: the pill colour blends toward the gradient colour from the top
@@ -53,12 +56,13 @@ private const val LIGHT_GRADIENT_REACH = 0.35f
 internal fun expandedGradientBrush(settings: SmartIslandSettings, palette: IslandPalette = IslandPalette.Dark): Brush? {
     if (!settings.expandedGradientEnabled) return null
     val start = expandedSurfaceColor(settings, palette)
-    val end = androidx.compose.ui.graphics.lerp(
-        start,
-        Color(settings.expandedGradientColor),
-        settings.expandedGradientStrength.coerceIn(0f, 1f) * (if (palette.isLight) LIGHT_GRADIENT_REACH else 1f)
-    )
-    return Brush.linearGradient(listOf(start, end))
+    val gradientColor = Color(settings.expandedGradientColor)
+    val strength = settings.expandedGradientStrength.coerceIn(0f, 1f) * (if (palette.isLight) LIGHT_GRADIENT_REACH else 1f)
+    // The far corner takes the full strength; the near corner already carries a third of it, so the colour is spread over the
+    // whole card and every step of the slider shows, instead of only a tint at one corner.
+    val from = androidx.compose.ui.graphics.lerp(start, gradientColor, strength * GRADIENT_NEAR_SHARE)
+    val to = androidx.compose.ui.graphics.lerp(start, gradientColor, strength)
+    return Brush.linearGradient(listOf(from, to))
 }
 
 /**

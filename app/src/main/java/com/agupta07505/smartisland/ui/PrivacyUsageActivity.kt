@@ -21,6 +21,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -54,7 +59,7 @@ class PrivacyUsageActivity : ComponentActivity() {
         val kind = PrivacyKind.entries.firstOrNull { it.name == intent.getStringExtra(EXTRA_KIND) }
         if (kind == null) { finish(); return }
         setContent {
-            SmartIslandTheme(themeMode = "system") {
+            SmartIslandTheme(themeMode = "system", liquidGlass = false) {
                 PrivacyUsageDialog(kind = kind, onClose = { finish() }, onMore = { openPrivacyUsage(kind); finish() })
             }
         }
@@ -100,7 +105,15 @@ private fun PrivacyUsageDialog(kind: PrivacyKind, onClose: () -> Unit, onMore: (
             )
         ) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(titleRes(kind)), fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Box(
+                        Modifier.size(36.dp).clip(CircleShape).background(privacyColor(kind).copy(alpha = 0.30f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(privacyIcon(kind), contentDescription = null, tint = privacyColor(kind), modifier = Modifier.size(20.dp))
+                    }
+                    Text(stringResource(titleRes(kind)), fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                }
                 val list = apps
                 when {
                     list == null -> Text(stringResource(R.string.privacy_usage_loading), fontSize = 14.sp)

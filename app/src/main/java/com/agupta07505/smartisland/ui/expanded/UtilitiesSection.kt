@@ -243,7 +243,7 @@ internal fun UtilitiesContainer(settings: SmartIslandSettings, modifier: Modifie
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier
                         .padding(top = 12.dp)
-                        .clickable { UtilityActions.openShortcutSettings(context, com.agupta07505.smartisland.util.PickerRequest.UTILITY) }
+                        .clickable { UtilityActions.openPicker(context, com.agupta07505.smartisland.util.PickerRequest.UTILITY) }
                 )
             }
             choices != null -> CalculatorPicker(
@@ -340,7 +340,7 @@ internal fun UtilitiesContainer(settings: SmartIslandSettings, modifier: Modifie
                             .size(cellWidth, UTILITY_CELL_HEIGHT)
                             .clip(RoundedCornerShape(14.dp))
                             .background(palette.text.copy(alpha = 0.06f))
-                            .clickable { UtilityActions.openShortcutSettings(context, com.agupta07505.smartisland.util.PickerRequest.UTILITY) },
+                            .clickable { UtilityActions.openPicker(context, com.agupta07505.smartisland.util.PickerRequest.UTILITY) },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(

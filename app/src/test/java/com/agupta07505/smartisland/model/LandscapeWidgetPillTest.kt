@@ -20,8 +20,23 @@ class LandscapeWidgetPillTest {
         ids: String = "clock",
         pillHidden: Boolean = false,
         shadeOpen: Boolean = false,
-        suppressed: Boolean = false
-    ) = landscapeWidgetPillWanted(landscape, enabled, ids, pillHidden, shadeOpen, suppressed)
+        suppressed: Boolean = false,
+        tickHold: Boolean = false
+    ) = landscapeWidgetPillWanted(landscape, enabled, ids, pillHidden, shadeOpen, suppressed, tickHold)
+
+    @Test
+    fun aTickBringsThePillInWhileItIsHiddenOrTheWidgetsAreHeldOff() {
+        assertFalse(wanted(pillHidden = true))
+        assertTrue(wanted(pillHidden = true, tickHold = true))
+        assertTrue(wanted(suppressed = true, tickHold = true))
+    }
+
+    @Test
+    fun aTickNeverBringsThePillInWhereTicksCannotPlay() {
+        assertFalse(wanted(landscape = false, tickHold = true))
+        assertFalse(wanted(enabled = false, pillHidden = true, tickHold = true))
+        assertFalse(wanted(shadeOpen = true, pillHidden = true, tickHold = true))
+    }
 
     @Test
     fun landscapeWithWidgetsOnWantsThePill() {

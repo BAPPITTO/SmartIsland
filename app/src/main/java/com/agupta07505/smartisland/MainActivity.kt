@@ -35,15 +35,18 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestedSection = intent?.getStringExtra(com.agupta07505.smartisland.util.UtilityActions.EXTRA_OPEN_SECTION)
-        com.agupta07505.smartisland.util.PickerRequest.pending =
-            intent?.getStringExtra(com.agupta07505.smartisland.util.PickerRequest.EXTRA_OPEN_PICKER)
         SystemServiceRecovery.requestRecovery(this)
 
         setContent {
             val themeSettings by settingsRepository.settings.collectAsStateWithLifecycle(
                 initialValue = SmartIslandSettings.Default
             )
-            SmartIslandTheme(themeMode = themeSettings.themeMode) {
+            SmartIslandTheme(
+                themeMode = themeSettings.themeMode,
+                liquidGlass = themeSettings.liquidGlassTheme,
+                materialYou = themeSettings.materialYou,
+                accentColor = themeSettings.accentColor
+            ) {
                 SmartIslandHomeScreen(
                     repository = settingsRepository,
                     notificationRepository = notificationRepository,
@@ -58,8 +61,6 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         requestedSection = intent.getStringExtra(com.agupta07505.smartisland.util.UtilityActions.EXTRA_OPEN_SECTION)
-        com.agupta07505.smartisland.util.PickerRequest.pending =
-            intent.getStringExtra(com.agupta07505.smartisland.util.PickerRequest.EXTRA_OPEN_PICKER)
     }
 
     @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")

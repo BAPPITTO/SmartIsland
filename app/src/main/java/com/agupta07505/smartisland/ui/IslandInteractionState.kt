@@ -49,6 +49,10 @@ internal class IslandInteractionState {
     val deadZone = Animatable(0f)
     /** 0..1: the clock widget's hourly tick (ui/HourChime.kt) covers the pill's own content. The pill's content layer fades out by it. */
     val chimeShow = Animatable(0f)
+    /** Landscape: asks the view model to put the wide pill on the island for a tick while the pill is hidden ([withTickPill]). Set by the overlay. */
+    var onTickHold: (Boolean) -> Unit = {}
+    /** How many ticks hold the pill right now ([withTickPill]); the pill is released when it is back to 0. */
+    var tickHolds = 0
     /** Same for the landscape corner pill, which is a separate touch target. */
     val cornerDeadZone = Animatable(0f)
     /** The short swipe lock (an armed swipe was pulled back). Shared by every touch on the island, so it outlives a lift. */

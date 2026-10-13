@@ -7,12 +7,6 @@
 
 package com.agupta07505.smartisland.ui.sections
 
-import android.app.Activity
-import android.appwidget.AppWidgetProviderInfo
-import android.content.Context
-import android.content.ContextWrapper
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -26,35 +20,28 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Remove
-import androidx.compose.material.icons.rounded.Widgets
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
+import com.agupta07505.smartisland.ui.glass.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Switch
+import com.agupta07505.smartisland.ui.glass.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
@@ -72,10 +59,8 @@ import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.agupta07505.smartisland.R
-import com.agupta07505.smartisland.data.LaunchableApp
 import com.agupta07505.smartisland.data.SmartIslandSettings
 import com.agupta07505.smartisland.data.SmartIslandSettingsRepository
 import com.agupta07505.smartisland.model.FloatingWindowRoute
@@ -85,24 +70,14 @@ import com.agupta07505.smartisland.model.UtilityPlacement
 import com.agupta07505.smartisland.model.UtilityType
 import com.agupta07505.smartisland.model.floatingWindowRoute
 import com.agupta07505.smartisland.ui.expanded.utilityIcon
+import com.agupta07505.smartisland.ui.pickers.CalculatorAppDialog
+import com.agupta07505.smartisland.ui.pickers.UtilityAddFlow
 import com.agupta07505.smartisland.ui.expanded.utilityLabelRes
-import com.agupta07505.smartisland.util.UtilityActions
 import com.agupta07505.smartisland.util.UtilityWidgets
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 private val EDITOR_CELL_HEIGHT = 56.dp
 private val EDITOR_CELL_GAP = 8.dp
-
-/** A widget that is being added: its id is made and bound, and it still needs its setup screen (if it has one) and a spot. */
-private class PendingWidget(val id: Int, val info: AppWidgetProviderInfo, val row: Int, val col: Int)
-
-private tailrec fun Context.findActivity(): Activity? = when (this) {
-    is Activity -> this
-    is ContextWrapper -> baseContext.findActivity()
-    else -> null
-}
 
 /**
  * The Utilities page editor: a picture of the grid, one tab at a time (Tab 1 / Tab 2). Tap an empty cell to add a utility or an app widget there,
@@ -114,30 +89,12 @@ internal fun UtilitiesEditorCard(settings: SmartIslandSettings, repository: Smar
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val layout = remember(settings.utilityLayout) { UtilityLayout.decode(settings.utilityLayout) }
-    // The widget setup screen answers later, so finishing reads the layout as it is then, not as it was when the add began.
-    val latestLayout by rememberUpdatedState(layout)
     var selectedKey by remember { mutableStateOf<String?>(null) }
     // The tab the picture shows. Selecting an item and tapping an empty cell of the other tab moves it there.
     var editorTab by remember { mutableIntStateOf(0) }
     val tabBase = editorTab * UtilityGrid.ROWS
     var addAt by remember { mutableStateOf<Pair<Int, Int>?>(null) }
-    // The island's plus tile asks for the "add a utility" dialog: it opens on the first empty cell.
-    val requestedPicker = com.agupta07505.smartisland.util.PickerRequest.pending
-    LaunchedEffect(requestedPicker) {
-        if (requestedPicker == com.agupta07505.smartisland.util.PickerRequest.UTILITY) {
-            val cell = (0 until UtilityGrid.TOTAL_ROWS).firstNotNullOfOrNull { r ->
-                (0 until UtilityGrid.COLUMNS).firstOrNull { c -> UtilityLayout.itemAt(latestLayout, r, c) == null }?.let { c -> r to c }
-            }
-            if (cell != null) {
-                editorTab = UtilityGrid.tabOfRow(cell.first)
-                addAt = cell
-            }
-            com.agupta07505.smartisland.util.PickerRequest.pending = null
-        }
-    }
-    var pickingWidgetAt by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     var pickingCalculator by remember { mutableStateOf(false) }
-    var pending by remember { mutableStateOf<PendingWidget?>(null) }
     // Rearranging: a long press on an item lifts it, it follows the finger, and letting go drops it on the nearest cell (or
     // trades places with the item it lands on).
     var draggedKey by remember { mutableStateOf<String?>(null) }
@@ -146,48 +103,6 @@ internal fun UtilitiesEditorCard(settings: SmartIslandSettings, repository: Smar
 
     fun save(newLayout: List<UtilityPlacement>) {
         scope.launch { repository.setUtilityLayout(newLayout) }
-    }
-
-    fun finishWidget(p: PendingWidget) {
-        pending = null
-        // The tapped cell if a 1x1 widget fits there, else the first free cell; with no room at all the widget id is released.
-        val current = latestLayout
-        val here = UtilityPlacement(UtilityType.AppWidget, p.row, p.col, widgetId = p.id)
-        val spot = if (UtilityLayout.canPlace(current, here)) p.row to p.col else UtilityLayout.firstFreeSpot(current)
-        if (spot == null) {
-            UtilityWidgets.deleteId(context, p.id)
-            return
-        }
-        val placed = UtilityPlacement(UtilityType.AppWidget, spot.first, spot.second, widgetId = p.id)
-        save(UtilityLayout.add(current, placed))
-        selectedKey = placed.key
-    }
-
-    fun cancelWidget(p: PendingWidget) {
-        pending = null
-        UtilityWidgets.deleteId(context, p.id)
-    }
-
-    fun afterBound(p: PendingWidget) {
-        val activity = context.findActivity()
-        if (p.info.configure != null && activity != null) {
-            UtilityWidgets.configure(activity, p.id) { ok -> if (ok) finishWidget(p) else cancelWidget(p) }
-        } else {
-            finishWidget(p)
-        }
-    }
-
-    val bindLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val p = pending ?: return@rememberLauncherForActivityResult
-        if (result.resultCode == Activity.RESULT_OK) afterBound(p) else cancelWidget(p)
-    }
-
-    fun startAddingWidget(info: AppWidgetProviderInfo, row: Int, col: Int) {
-        val id = UtilityWidgets.allocateId(context)
-        val p = PendingWidget(id, info, row, col)
-        pending = p
-        if (UtilityWidgets.bindIfAllowed(context, id, info.provider)) afterBound(p)
-        else bindLauncher.launch(UtilityWidgets.bindIntent(id, info.provider))
     }
 
     val selected = layout.firstOrNull { it.key == selectedKey }
@@ -373,111 +288,17 @@ internal fun UtilitiesEditorCard(settings: SmartIslandSettings, repository: Smar
     }
 
     addAt?.let { (row, col) ->
-        AlertDialog(
-            onDismissRequest = { addAt = null },
-            title = { Text(stringResource(R.string.utilities_editor_add_title)) },
-            text = {
-                Column(Modifier.verticalScroll(rememberScrollState())) {
-                    UtilityLayout.addable(layout).forEach { type ->
-                        AddRow(utilityLabelRes(type), onClick = {
-                            addAt = null
-                            val placed = UtilityPlacement(type, row, col)
-                            save(UtilityLayout.add(layout, placed))
-                            selectedKey = placed.key
-                        }, icon = { Icon(utilityIcon(type), contentDescription = null) })
-                    }
-                    AddRow(R.string.utilities_editor_add_widget, onClick = {
-                        addAt = null
-                        pickingWidgetAt = row to col
-                    }, icon = { Icon(Icons.Rounded.Widgets, contentDescription = null) })
-                }
-            },
-            confirmButton = {},
-            dismissButton = { TextButton(onClick = { addAt = null }) { Text(stringResource(R.string.utilities_editor_cancel)) } }
+        UtilityAddFlow(
+            settings = settings,
+            repository = repository,
+            row = row,
+            col = col,
+            onPlaced = { selectedKey = it },
+            onClose = { addAt = null }
         )
     }
 
-    pickingWidgetAt?.let { (row, col) ->
-        val providers by produceState(emptyList<AppWidgetProviderInfo>(), context) {
-            value = withContext(Dispatchers.IO) { UtilityWidgets.installedProviders(context) }
-        }
-        AlertDialog(
-            onDismissRequest = { pickingWidgetAt = null },
-            title = { Text(stringResource(R.string.utilities_editor_widget_pick)) },
-            text = {
-                Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
-                    if (providers.isEmpty()) {
-                        Text(stringResource(R.string.utilities_editor_widget_none), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    providers.forEach { info ->
-                        val pm = context.packageManager
-                        val appLabel = remember(info) {
-                            runCatching { pm.getApplicationLabel(pm.getApplicationInfo(info.provider.packageName, 0)).toString() }.getOrDefault("")
-                        }
-                        Column(
-                            Modifier
-                                .fillMaxWidth()
-                                .clickable { pickingWidgetAt = null; startAddingWidget(info, row, col) }
-                                .padding(vertical = 8.dp)
-                        ) {
-                            Text(info.loadLabel(pm) ?: "", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(
-                                appLabel,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {},
-            dismissButton = { TextButton(onClick = { pickingWidgetAt = null }) { Text(stringResource(R.string.utilities_editor_cancel)) } }
-        )
-    }
-
-    if (pickingCalculator) {
-        val choices = remember { UtilityActions.calculatorApps(context) }
-        AlertDialog(
-            onDismissRequest = { pickingCalculator = false },
-            title = { Text(stringResource(R.string.utilities_editor_calculator_app)) },
-            text = {
-                Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
-                    if (choices.isEmpty()) {
-                        Text(stringResource(R.string.utility_no_calculator), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    choices.forEach { app: LaunchableApp ->
-                        Text(
-                            app.label,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    pickingCalculator = false
-                                    scope.launch { repository.setUtilityCalculatorPackage(app.packageName) }
-                                }
-                                .padding(vertical = 10.dp)
-                        )
-                    }
-                }
-            },
-            confirmButton = {},
-            dismissButton = { TextButton(onClick = { pickingCalculator = false }) { Text(stringResource(R.string.utilities_editor_cancel)) } }
-        )
-    }
-}
-
-@Composable
-private fun AddRow(labelRes: Int, onClick: () -> Unit, icon: @Composable () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        icon()
-        Text(stringResource(labelRes))
-    }
+    if (pickingCalculator) CalculatorAppDialog(repository = repository, onClose = { pickingCalculator = false })
 }
 
 @Composable

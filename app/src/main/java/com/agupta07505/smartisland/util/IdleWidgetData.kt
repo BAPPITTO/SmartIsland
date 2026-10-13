@@ -121,7 +121,8 @@ fun rememberIdleWidgetData(kinds: List<IdleWidgetKind>, active: Boolean, allowNe
     val wantsAlarm = active && IdleWidgetKind.NextAlarm in kinds
     val wantsTime = active && (IdleWidgetKind.Clock in kinds || IdleWidgetKind.Date in kinds || wantsAlarm)
     val wantsSpeed = active && IdleWidgetKind.NetSpeed in kinds
-    val wantsWeather = active && allowNetwork && IdleWidgetKind.Weather in kinds
+    val wantsWind = IdleWidgetKind.Wind in kinds
+    val wantsWeather = active && allowNetwork && (IdleWidgetKind.Weather in kinds || wantsWind)
     val wantsNotifications = active && IdleWidgetKind.Notifications in kinds
     val wantsMode = active && IdleWidgetKind.Modes in kinds
 
@@ -225,12 +226,14 @@ fun rememberIdleWidgetData(kinds: List<IdleWidgetKind>, active: Boolean, allowNe
         }
     }
 
-    LaunchedEffect(wantsWeather) {
+    LaunchedEffect(wantsWeather, wantsWind) {
         if (!wantsWeather) return@LaunchedEffect
         IdleWeather.cached(context)?.let { data.weather = it }
         while (true) {
             val age = System.currentTimeMillis() - (data.weather?.fetchedAtMs ?: 0L)
-            if (data.weather == null || age >= IdleWeather.REFRESH_MS) {
+            // A reading stored before the wind was kept has no wind: with the wind widget on it is asked again at once (not more than every retry period).
+            val missingWind = wantsWind && (data.weather?.windKmh ?: -1f) < 0f && age >= IdleWeather.RETRY_MS
+            if (data.weather == null || age >= IdleWeather.REFRESH_MS || missingWind) {
                 val fresh = IdleWeather.fetch(context)
                 if (fresh != null) data.weather = fresh
             }
@@ -302,7 +305,9 @@ object IdleWeather {
             temperatureC = p.getFloat("t", 0f),
             weatherCode = p.getInt("c", 3),
             isDay = p.getBoolean("d", true),
-            fetchedAtMs = p.getLong("at", 0L)
+            fetchedAtMs = p.getLong("at", 0L),
+            windKmh = p.getFloat("w", -1f),
+            windDirectionDeg = p.getInt("wd", -1)
         )
     }
 
@@ -333,7 +338,7 @@ object IdleWeather {
             }
             val url = String.format(
                 Locale.US,
-                "https://api.open-meteo.com/v1/forecast?latitude=%.1f&longitude=%.1f&current=temperature_2m,weather_code,is_day&timezone=auto",
+                "https://api.open-meteo.com/v1/forecast?latitude=%.1f&longitude=%.1f&current=temperature_2m,weather_code,is_day,wind_speed_10m,wind_direction_10m&timezone=auto",
                 place.first, place.second
             )
             val json = httpGet(url) ?: return@runCatching null
@@ -343,13 +348,17 @@ object IdleWeather {
                 temperatureC = current.optDouble("temperature_2m", 0.0).toFloat(),
                 weatherCode = current.optInt("weather_code", 3),
                 isDay = current.optInt("is_day", 1) != 0,
-                fetchedAtMs = System.currentTimeMillis()
+                fetchedAtMs = System.currentTimeMillis(),
+                windKmh = if (current.has("wind_speed_10m")) current.optDouble("wind_speed_10m", -1.0).toFloat() else -1f,
+                windDirectionDeg = if (current.has("wind_direction_10m")) current.optInt("wind_direction_10m", -1) else -1
             )
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
                 .putFloat("t", snapshot.temperatureC)
                 .putInt("c", snapshot.weatherCode)
                 .putBoolean("d", snapshot.isDay)
                 .putLong("at", snapshot.fetchedAtMs)
+                .putFloat("w", snapshot.windKmh)
+                .putInt("wd", snapshot.windDirectionDeg)
                 .apply()
             snapshot
         }.getOrElse {

@@ -29,9 +29,9 @@ object IdleSlots {
 
     fun normalizeGlyphScale(percent: Int): Int = percent.coerceIn(MIN_GLYPH_SCALE, MAX_GLYPH_SCALE)
 
-    /** The day and the month of the date widget are both numbers with two digits ("05" / "02"), day on the left, month on the right. */
+    /** The date widget's day is a number with two digits ("05") on the left; the month is its standard abbreviation ("Feb") on the right. */
     const val DAY_PATTERN = "dd"
-    const val MONTH_PATTERN = "MM"
+    const val MONTH_PATTERN = "MMM"
 
     /** The alarm glyph shows on even ticks, the alarm hour on odd ones (one tick per second). */
     fun alarmShowsHour(tick: Int): Boolean = Math.floorMod(tick, 2) == 1
@@ -100,7 +100,8 @@ object IdleSlots {
     fun takesSideTick(kind: IdleWidgetKind, right: Boolean, ownTickRunning: Boolean, lead: SpeedLead): Boolean = when {
         ownTickRunning -> false
         kind == IdleWidgetKind.Clock || kind == IdleWidgetKind.DayMoments -> false
-        // The count and the mode glyph only use the left slot; the right one is empty.
+        // Notifications and modes use the left slot for their glyph; neither should run a sideways tick in the right slot.
+        // The notification count is shown on the right, but stays static while the app glyph takes its tick.
         (kind == IdleWidgetKind.Notifications || kind == IdleWidgetKind.Modes) && right -> false
         kind == IdleWidgetKind.NextAlarm && !right -> false
         kind == IdleWidgetKind.NetSpeed && speedLeadOwnsSlot(lead, right) -> false

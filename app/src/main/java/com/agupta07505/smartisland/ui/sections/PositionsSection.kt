@@ -32,13 +32,13 @@ import androidx.compose.material.icons.rounded.CenterFocusStrong
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.FitScreen
 import androidx.compose.material.icons.rounded.Smartphone
-import androidx.compose.material3.Card
+import com.agupta07505.smartisland.ui.glass.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
+import com.agupta07505.smartisland.ui.glass.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableFloatStateOf
@@ -77,6 +77,7 @@ fun PositionsSection(
     val configuration = LocalConfiguration.current
 
     var localWidth by remember(settings.width) { mutableFloatStateOf(settings.width) }
+    var localContentPercent by remember(settings.contentPillWidthPercent) { mutableFloatStateOf(settings.contentPillWidthPercent) }
     var localHeight by remember(settings.height) { mutableFloatStateOf(settings.height) }
     var localXOffset by remember(settings.xOffset) { mutableFloatStateOf(settings.xOffset) }
     var localYOffset by remember(settings.yOffset) { mutableFloatStateOf(settings.yOffset) }
@@ -205,7 +206,7 @@ fun PositionsSection(
             title = "Quick presets",
             stateKey = "pos_presets_${if (settings.enableNotchMode) "notch" else "pill"}",
             summary = "One-tap layouts for common camera cutouts",
-            initiallyExpanded = false,
+            initiallyExpanded = true,
             framed = false
         ) {
         Card(
@@ -332,79 +333,93 @@ fun PositionsSection(
                         modifier = Modifier.weight(1f)
                     )
                 }
+            }
+        }
+        }
 
-                // Companion Circle Position (Pill Mode only)
-                if (!settings.enableNotchMode) {
-                    HorizontalDivider(
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
-                        modifier = Modifier.padding(vertical = 4.dp)
-                    )
+        // 3. Companion Circle Position (Pill Mode only)
+        if (!settings.enableNotchMode) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.circle_position_card_title),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = stringResource(R.string.circle_position_card_desc),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
 
+                    val isLeft = settings.circlePosition == SmartIslandSettings.CIRCLE_POSITION_LEFT
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                            .padding(2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (isLeft) MaterialTheme.colorScheme.primary else Color.Transparent)
+                                .bounceClick {
+                                    scope.launch { repository.setCirclePosition(SmartIslandSettings.CIRCLE_POSITION_LEFT) }
+                                }
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
                             Text(
-                                text = stringResource(R.string.circle_position_card_title),
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = stringResource(R.string.circle_position_card_desc),
+                                text = stringResource(R.string.circle_position_left),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                fontWeight = FontWeight.Bold,
+                                color = if (isLeft) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
 
-                        val isLeft = settings.circlePosition == SmartIslandSettings.CIRCLE_POSITION_LEFT
-                        Row(
+                        Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                .padding(2.dp),
-                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (!isLeft) MaterialTheme.colorScheme.primary else Color.Transparent)
+                                .bounceClick {
+                                    scope.launch { repository.setCirclePosition(SmartIslandSettings.CIRCLE_POSITION_RIGHT) }
+                                }
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(if (isLeft) MaterialTheme.colorScheme.primary else Color.Transparent)
-                                    .bounceClick {
-                                        scope.launch { repository.setCirclePosition(SmartIslandSettings.CIRCLE_POSITION_LEFT) }
-                                    }
-                                    .padding(horizontal = 10.dp, vertical = 6.dp)
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.circle_position_left),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isLeft) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(if (!isLeft) MaterialTheme.colorScheme.primary else Color.Transparent)
-                                    .bounceClick {
-                                        scope.launch { repository.setCirclePosition(SmartIslandSettings.CIRCLE_POSITION_RIGHT) }
-                                    }
-                                    .padding(horizontal = 10.dp, vertical = 6.dp)
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.circle_position_right),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (!isLeft) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
+                            Text(
+                                text = stringResource(R.string.circle_position_right),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (!isLeft) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
             }
         }
+
+        CollapsibleCard(
+            title = "Exempt apps",
+            stateKey = "pos_exempt_apps",
+            summary = "Apps that switch the island totally off in portrait",
+            initiallyExpanded = false
+        ) {
+            ExemptAppsCard(settings = settings, repository = repository, landscape = false)
         }
 
         // 4. Precision Tuning Sliders Card
@@ -412,7 +427,7 @@ fun PositionsSection(
             title = "Size and position",
             stateKey = "pos_tuning_${if (settings.enableNotchMode) "notch" else "pill"}",
             summary = "Width, height, offsets and corner radius",
-            initiallyExpanded = false,
+            initiallyExpanded = true,
             framed = false
         ) {
         Card(
@@ -452,6 +467,42 @@ fun PositionsSection(
                     onValueChange = { localHeight = it },
                     onValueChangeFinished = { scope.launch { repository.setHeight(localHeight) } }
                 )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+
+                // Collapsed cutout with content: how wide the pill stretches to when a card is on it.
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.content_pill_same_title),
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = stringResource(R.string.content_pill_same_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = settings.contentPillSameAsIdle,
+                        onCheckedChange = { scope.launch { repository.setContentPillSameAsIdle(false, it) } }
+                    )
+                }
+                if (!settings.contentPillSameAsIdle) {
+                    SliderSettingItem(
+                        label = stringResource(R.string.slider_content_pill_width),
+                        value = localContentPercent,
+                        range = SmartIslandSettings.MIN_CONTENT_PILL_PERCENT..SmartIslandSettings.MAX_CONTENT_PILL_PERCENT,
+                        suffix = "%",
+                        step = 5f,
+                        onValueChange = { localContentPercent = it },
+                        onValueChangeFinished = { scope.launch { repository.setContentPillWidthPercent(false, localContentPercent) } }
+                    )
+                }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
 
                 SliderSettingItem(
@@ -525,7 +576,7 @@ fun PositionsSection(
             title = stringResource(R.string.camera_cutout_title),
             stateKey = "pos_camera_cutout",
             summary = stringResource(R.string.camera_cutout_summary),
-            initiallyExpanded = false,
+            initiallyExpanded = settings.cameraCutoutManual,
             framed = false
         ) {
             Card(

@@ -28,7 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
+import com.agupta07505.smartisland.ui.glass.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilledTonalButton
@@ -37,7 +37,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
+import com.agupta07505.smartisland.ui.glass.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -90,6 +90,7 @@ fun IdleWidgetsSettingsSection(
     val enabled = if (landscape) settings.idleWidgetsEnabledLandscape else settings.idleWidgetsEnabled
     val offAfterTap = if (landscape) settings.idleOffAfterTapCloseLandscape else settings.idleOffAfterTapClose
     val offAfterLongPress = if (landscape) settings.idleOffAfterLongPressLandscape else settings.idleOffAfterLongPress
+    val offWhenStored = if (landscape) settings.idleOffWhenStoredLandscape else settings.idleOffWhenStored
     val selected = remember(settings.idleWidgetIds) { IdleWidgets.parse(settings.idleWidgetIds) }
 
     // The mode widget can only tell Bedtime / Driving / ... apart with Do Not Disturb access; the answer is read again when the user comes back from the system page.
@@ -141,6 +142,13 @@ fun IdleWidgetsSettingsSection(
                         checked = offAfterLongPress,
                         modifier = Modifier.searchAnchor("idle.off_long_press"),
                         onCheckedChange = { scope.launch { repository.setIdleOffAfterLongPress(landscape, it) } }
+                    )
+                    SwitchRow(
+                        title = stringResource(R.string.idle_off_when_stored_title),
+                        subtitle = stringResource(R.string.idle_off_when_stored_desc),
+                        checked = offWhenStored,
+                        modifier = Modifier.searchAnchor("idle.off_stored"),
+                        onCheckedChange = { scope.launch { repository.setIdleOffWhenStored(landscape, it) } }
                     )
                 }
                 Text(
@@ -200,6 +208,14 @@ fun IdleWidgetsSettingsSection(
                     Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.idle_select_button), fontWeight = FontWeight.SemiBold)
+                }
+                if (IdleWidgetKind.NextAlarm in selected) {
+                    SwitchRow(
+                        title = stringResource(R.string.idle_alarm_hide_far_title),
+                        subtitle = stringResource(R.string.idle_alarm_hide_far_desc),
+                        checked = settings.idleAlarmHideBeyond12h,
+                        onCheckedChange = { scope.launch { repository.setIdleAlarmHideBeyond12h(it) } }
+                    )
                 }
                 if (IdleWidgetKind.Modes in selected && !dndAccess) {
                     Text(
@@ -261,6 +277,12 @@ fun IdleWidgetsSettingsSection(
                 )
             }
         }
+
+        // ---- Units: temperature and wind speed ----
+        IdleUnitsCard(settings = settings, repository = repository)
+
+        // ---- Tick style: the smooth tick or the LED footsteps (shared by portrait and landscape) ----
+        LedTickSettingsCard(settings = settings, repository = repository)
     }
 
     if (showSelector) {

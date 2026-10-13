@@ -75,6 +75,9 @@ fun IslandOverlayView(
     statusBarHeight: Float,
     /** The idle widgets are held off the pill (Settings > Idle widgets: off after tap to close / long press to hide). */
     idleWidgetsSuppressed: Boolean = false,
+    /** Landscape: a tick has brought the pill in although it was hidden (ui/TickPill.kt): the idle widgets stay off it, only the tick shows. */
+    tickPillHold: Boolean = false,
+    onTickPillHold: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
     isInputActive: Boolean = false,
     onReplyStateChanged: (Boolean) -> Unit = {},
@@ -155,6 +158,8 @@ fun IslandOverlayView(
     ui.onUserTouch = { onUserEngagedState.value() }
     val onHandleHeldState = rememberUpdatedState(onHandleHeld)
     ui.onHandleHeld = { held -> onHandleHeldState.value(held) }
+    val onTickPillHoldState = rememberUpdatedState(onTickPillHold)
+    ui.onTickHold = { hold -> onTickPillHoldState.value(hold) }
     WidgetIslandWiring(ui, widgetIslandOpen, onWidgetIslandChange, settings)
     // The reader text reports its scrolling here; the gesture handler refuses a tap that starts on it (see ReaderScrollTracker).
     ui.readerScroll = com.agupta07505.smartisland.ui.expanded.LocalReaderScroll.current
@@ -273,7 +278,8 @@ fun IslandOverlayView(
         screenWidth = screenWidth,
         screenCenter = screenCenter,
         snapGeometry = pillExit.snapGeometry,
-        cardSwitching = { ui.cardSwipeSnap }
+        cardSwitching = { ui.cardSwipeSnap },
+        landscapePillStretch = widgetPill
     )
     SideEffect {
         pillExit.record(
@@ -419,8 +425,8 @@ fun IslandOverlayView(
         SideEffect {
             pillExit.dotCoversHandover = landscapeDot != null
             pillExit.shellSettled = {
-                val wantWidth = if (layout.isHiding && layout.hidingAlpha <= 0.01f) 0f else settings.width
-                val wantHeight = if (layout.isHiding && layout.hidingAlpha <= 0.01f) 0f else settings.height
+                val wantWidth = if (layout.isHiding) 0f else settings.width
+                val wantHeight = if (layout.isHiding) 0f else settings.height
                 kotlin.math.abs(layout.safeWidth.value - wantWidth) < SHELL_SETTLED_DP &&
                     kotlin.math.abs(layout.safeHeight.value - wantHeight) < SHELL_SETTLED_DP &&
                     kotlin.math.abs(mediaShellOpacity.value - settings.opacity) < SHELL_SETTLED_OPACITY
@@ -481,13 +487,17 @@ fun IslandOverlayView(
                     privacyActive = privacyState.active,
                     ui = ui,
                     animSpeed = settings.animationSpeed(isLandscape),
-                    idleSuppressed = idleWidgetsSuppressed,
+                    idleSuppressed = idleWidgetsSuppressed || tickPillHold,
                     modifier = Modifier.align(Alignment.TopCenter)
                 )
-                // The clock widget's tick on the full hour, over whatever the pill shows.
-                HourChimeLayer(settings, ui, settings.animationSpeed(isLandscape), Modifier.align(Alignment.TopCenter), suppressed = idleWidgetsSuppressed)
+                // The clock widget's tick on the full hour, over whatever the pill shows (also while the idle widgets are held off after a tap or long press).
+                // Landscape: with the pill hidden by a long press, the pill comes in just for the tick (ui/TickPill.kt).
+                val tickCanHold = isLandscape && !settings.enableNotchMode
+                HourChimeLayer(settings, ui, settings.animationSpeed(isLandscape), Modifier.align(Alignment.TopCenter), canHold = tickCanHold)
                 // The sunrise / afternoon / sunset / midnight glyphs (Day moments widget).
-                DayMomentLayer(settings, ui, settings.animationSpeed(isLandscape), Modifier.align(Alignment.TopCenter), suppressed = idleWidgetsSuppressed)
+                DayMomentLayer(settings, ui, settings.animationSpeed(isLandscape), Modifier.align(Alignment.TopCenter), canHold = tickCanHold)
+                // The weather change tick over whatever the pill shows (unless the pill's own weather widget does it).
+                WeatherTickLayer(settings, ui, settings.animationSpeed(isLandscape), Modifier.align(Alignment.TopCenter), canHold = tickCanHold)
             }
 
             ExpandedCardHost(
@@ -614,11 +624,10 @@ fun IslandOverlayView(
 
         // Landscape idle dot (see idleDotShown); portrait has none, its pill centre is the control. Drawn last, above the pill, so it can always be pressed. Own composable: keeps the null check and the float
         // maths out of this very large function (a VerifyError was seen when they lived here).
-        // The landscape pill state machine drives it while the pill leaves or comes back (overlap rules in model/PillPresence.kt).
+        // On or off only: the pill's slide in and out does not animate it (it just stays on while the pill leaves, see PillExitState.dotAlpha).
         LandscapeIdleDotView(
             dot = landscapeDot,
             alpha = { if (closingOntoIdle()) 1f else pillExit.dotAlpha(secondary.idleDotAlpha) },
-            scale = { pillExit.dotScale() },
             topShiftDp = { layout.topShift.value },
             color = layout.pillBackgroundColor,
             onTap = {
