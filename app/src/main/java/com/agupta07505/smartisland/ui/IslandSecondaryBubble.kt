@@ -98,7 +98,7 @@ internal fun SecondaryBubble(
                     // Bubble style, join: the body is drawn behind the pill by the layer above (so it never covers the
                     // pill's own content as it passes into it); this crisp copy only exists up to the join.
                     val joined = bubbleMerge && merge > 0f && mergeJoin(merge, contact) > 0f
-                    alpha = if (joined) 0f else secondary.secondaryAlpha * mergeBubbleAlpha(merge) * pillExit.pillAlpha()
+                    alpha = if (joined) 0f else (secondary.secondaryAlpha * mergeBubbleAlpha(merge) * pillExit.pillAlpha() * layout.hidingAlpha)
                     val bubbleScale = secondary.secondaryScale * switchScaleAnim.value
                     var moveX = travel * merge
                     if (bubbleMerge) {

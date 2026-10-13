@@ -147,7 +147,7 @@ internal fun Modifier.islandPillSurface(
             translationY += com.agupta07505.smartisland.util.SwipeDownPull.topAnchorShiftPx(pullScaleY, size.height)
             // Only the pill exit fades the layer. The swipe lock cue used to dim it too, but a layer alpha covers the whole subtree
             // (the card's backdrop and content), so the card went see-through for the 400 ms of the lock. The cue is the outline below.
-            alpha = if (shellHidden()) 0f else pillExit.shellAlpha()
+            alpha = if (shellHidden()) 0f else (pillExit.shellAlpha() * layout.hidingAlpha)
         }
         .then(
             if (settings.enableShadow && settings.shadowElevation > 0f && !layout.isHiding && !twoIslandsDrawn) {

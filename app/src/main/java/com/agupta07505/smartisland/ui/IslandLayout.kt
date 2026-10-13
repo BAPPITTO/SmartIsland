@@ -86,12 +86,14 @@ internal class IslandLayout(
     private val originX: () -> Dp,
     private val originY: () -> Dp,
     /** 0 = pill, 1 = card, on the same spring as the island's width; the shell's colour follows it (pill colour to the light surface). */
-    private val expandProgressState: State<Float>
+    private val expandProgressState: State<Float>,
+    private val hidingAlphaState: State<Float>
 ) {
     val expandProgress: Float get() = expandProgressState.value
     val singleSurfaceAlpha: Float get() = singleSurfaceAlphaState.value
     /** The single island's shadow: it still fades in (the card island's shadow is off by then), the surface does not. */
     val singleShadowAlpha: Float get() = singleShadowAlphaState.value
+    val hidingAlpha: Float get() = hidingAlphaState.value
     val width: Dp get() = widthState.value
     val height: Dp get() = heightState.value
     val yOffset: Dp get() = originY()
@@ -101,8 +103,8 @@ internal class IslandLayout(
     val expandedAlpha: Float get() = expandedAlphaState.value
     val contentScale: Float get() = contentScaleState.value
     val contentSlideY: Dp get() = contentSlideYState.value
-    val safeWidth: Dp get() = widthState.value.coerceAtLeast(0.dp)
-    val safeHeight: Dp get() = heightState.value.coerceAtLeast(0.dp)
+    val safeWidth: Dp get() = (if (isHiding && hidingAlphaState.value <= 0.01f) 0.dp else widthState.value).coerceAtLeast(0.dp)
+    val safeHeight: Dp get() = (if (isHiding && hidingAlphaState.value <= 0.01f) 0.dp else heightState.value).coerceAtLeast(0.dp)
     val safeRadius: Dp get() = radiusState.value.coerceAtLeast(0.dp)
     /** The pill's own content layer is composed (its fade is above 0). Only changes when that flips, so reading it in composition is cheap. */
     val collapsedShown: Boolean get() = collapsedShownState.value
@@ -378,6 +380,14 @@ internal fun rememberIslandLayout(
     val expandedTopOffset = if (launcherOpen) (expandedTopOffsetBase - LAUNCHER_EXPANDED_LIFT_DP.dp).coerceAtLeast(0.dp) else expandedTopOffsetBase
     // While the screen is shared the main cutout stays on screen next to the cast bubble.
     val isHiding = settings.autoHidePill && isAutoHidden && !privacyState.hasAnything
+    val hidingAlphaState = animateFloatAsState(
+        targetValue = if (isHiding) 0f else 1f,
+        animationSpec = tween(
+            durationMillis = animSpeed.durationMs(alphaMs),
+            easing = FastOutSlowInEasing
+        ),
+        label = "hidingAlpha"
+    )
     val pillBackgroundColor = Color(settings.pillColor)
     // 0 while the two separate islands draw their own surfaces, 1 for the single island.
     val singleSurfaceAlphaState = animateFloatAsState(
@@ -403,7 +413,7 @@ internal fun rememberIslandLayout(
     // A collapse that lands on a visible pill uses one shared motion in both orientations
     // (width bounces a little, height / radius / vertical progress settle without overshoot). A collapse onto an
     // auto-hidden pill keeps the old springs. Landscape's idle-circle close has its own, bounce-free, slower one (below).
-    val collapseOnPill = !isHiding
+    val collapseOnPill = !isHiding || hidingAlphaState.value > 0.01f
     // The expand spring as it really runs (speed-scaled), which the expand fades are read off.
     val expandStiffness = animSpeed.stiffness(islandSpringStiffness(isLandscape))
     val expandDamping = islandSpringDamping(isLandscape)
@@ -433,7 +443,7 @@ internal fun rememberIslandLayout(
     )
 
     val widthState = transition.animateDp(transitionSpec = { if (initialState == targetState) settleOrSnap else if (!targetState && collapseOnPill) collapseWidthSpec else sizeSpec }, label = "islandWidth") {
-        if (it) expandedWidth else if (isHiding) 0.dp else settings.width.dp
+        if (it) expandedWidth else settings.width.dp
     }
     // The height of an island that STAYS expanded (another card is swiped in, a text opens, a step finishes). The
     // transition's segment still reads "collapsed -> expanded" at rest, so the expand spring (which also rings a little) used to
@@ -462,7 +472,7 @@ internal fun rememberIslandLayout(
         else if (!targetState && collapseOnPill) collapseSettleSpec
         else heightSpec
     }, label = "islandHeight") {
-        if (it) expandedHeight else if (isHiding) 0.dp else settings.height.dp
+        if (it) expandedHeight else settings.height.dp
     }
     // Landscape only: lowers the collapsed cutouts inside a window that starts at the screen top.
     val collapsedTopShift = collapsedTopShiftDp(isLandscape, settings.enableNotchMode, settings.yOffset).dp
@@ -470,7 +480,7 @@ internal fun rememberIslandLayout(
         if (it) 0.dp else collapsedTopShift
     }
     val radiusState = transition.animateDp(transitionSpec = { if (initialState == targetState) settleOrSnap else if (!targetState && collapseOnPill) collapseSettleSpec else sizeSpec }, label = "islandRadius") {
-        if (it) 34.dp else if (isHiding) 0.dp else settings.cornerRadius.dp
+        if (it) 34.dp else settings.cornerRadius.dp
     }
 
     // Expanding: the collapsed content leaves quickly while the card grows, then the card content
@@ -633,7 +643,8 @@ internal fun rememberIslandLayout(
         expandedShownState = expandedShownState,
         originX = originX,
         originY = originY,
-        expandProgressState = expandProgressState
+        expandProgressState = expandProgressState,
+        hidingAlphaState = hidingAlphaState
     )
 }
 

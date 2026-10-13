@@ -419,8 +419,8 @@ fun IslandOverlayView(
         SideEffect {
             pillExit.dotCoversHandover = landscapeDot != null
             pillExit.shellSettled = {
-                val wantWidth = if (layout.isHiding) 0f else settings.width
-                val wantHeight = if (layout.isHiding) 0f else settings.height
+                val wantWidth = if (layout.isHiding && layout.hidingAlpha <= 0.01f) 0f else settings.width
+                val wantHeight = if (layout.isHiding && layout.hidingAlpha <= 0.01f) 0f else settings.height
                 kotlin.math.abs(layout.safeWidth.value - wantWidth) < SHELL_SETTLED_DP &&
                     kotlin.math.abs(layout.safeHeight.value - wantHeight) < SHELL_SETTLED_DP &&
                     kotlin.math.abs(mediaShellOpacity.value - settings.opacity) < SHELL_SETTLED_OPACITY
