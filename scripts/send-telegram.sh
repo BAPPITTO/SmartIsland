@@ -76,29 +76,36 @@ else
 🔗 <a href=\"${RUN_URL}\">GitHub Actions Run</a>"
 fi
 
+# Normalize and trim secrets
+TELEGRAM_BOT_TOKEN="$(echo "${TELEGRAM_BOT_TOKEN}" | tr -d '[:space:]')"
+CHAT_ID="$(echo "${TELEGRAM_CHAT_ID}" | tr -d '[:space:]')"
+TARGET_TOPIC="$(echo "${TARGET_TOPIC:-}" | tr -d '[:space:]')"
+
 # Normalize CHAT_ID: if numeric and missing leading '-' (e.g. copied from web URL https://t.me/c/<id>/<topic>),
 # automatically prefix -100 to target the Telegram supergroup properly.
-CHAT_ID="${TELEGRAM_CHAT_ID}"
 if [[ "$CHAT_ID" =~ ^[0-9]{9,}$ ]]; then
   CHAT_ID="-100${CHAT_ID}"
 fi
 
+REAL_APK_PATH="$(realpath "$APK_PATH" 2>/dev/null || echo "$APK_PATH")"
+
 echo "Uploading $FILE_NAME ($FILE_SIZE) to Telegram chat: $CHAT_ID (Topic: ${TARGET_TOPIC:-General})..."
 
 # Prepare curl arguments
+# Use --form-string for text fields so curl never misinterprets values starting with @ or < as local files.
 CURL_ARGS=(
   -s -S
   --connect-timeout 30
   --max-time 300
   -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument"
-  -F "chat_id=${CHAT_ID}"
-  -F "document=@${APK_PATH}"
-  -F "caption=${CAPTION}"
-  -F "parse_mode=HTML"
+  --form-string "chat_id=${CHAT_ID}"
+  -F "document=@${REAL_APK_PATH}"
+  --form-string "caption=${CAPTION}"
+  --form-string "parse_mode=HTML"
 )
 
 if [[ -n "${TARGET_TOPIC:-}" ]]; then
-  CURL_ARGS+=(-F "message_thread_id=${TARGET_TOPIC}")
+  CURL_ARGS+=(--form-string "message_thread_id=${TARGET_TOPIC}")
 fi
 
 RESPONSE=$(curl "${CURL_ARGS[@]}")
