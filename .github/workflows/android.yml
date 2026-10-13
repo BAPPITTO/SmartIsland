@@ -87,7 +87,6 @@ jobs:
     name: Build signed release
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      github.ref == 'refs/heads/main' ||
       startsWith(github.ref, 'refs/tags/v')
     needs: verify
     runs-on: ubuntu-latest
@@ -174,7 +173,9 @@ jobs:
 
   publish:
     name: Publish GitHub release
-    if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      startsWith(github.ref, 'refs/tags/v')
     needs: release
     runs-on: ubuntu-latest
     timeout-minutes: 10
