@@ -72,7 +72,14 @@ data class SmartIslandSettings(
     val enableShadow: Boolean = true,
     val expandedBlurEnabled: Boolean = false,
     val expandedBlurRadius: Float = 24f,
-    /** See-through blur of whatever is behind an open card (system window blur, heavier). Off by default; the card blur above works without it. */
+    /**
+     * Live blur: blurs whatever is behind the open island (system window blur, API 31+, heavier) and draws it as the
+     * island's background. Only the island's own rectangle is blurred. It is one of three choices with the card blur
+     * ([expandedBlurEnabled]) and off, see [expandedBlurMode]; the two are never both on. Both use [expandedBlurRadius].
+     * The media card's own blur ([mediaBlurEnabled]) is separate and not touched by this choice,
+     * and live blur is never drawn on the media card ([forMedia] turns it off).
+     */
+    val liveBlurEnabled: Boolean = false,
     /**
      * The media (music) card has its own blur and opacity. A phone or backup saved before this
      * existed starts from the shared values above (see the loaders), so nothing changes until the owner moves them.
@@ -161,6 +168,8 @@ data class SmartIslandSettings(
     /** Apps that switch the island totally off while they are in the foreground, per orientation (see model/IslandExemption). */
     val islandExemptApps: Set<String> = emptySet(),
     val islandExemptAppsLandscape: Set<String> = emptySet(),
+    /** Portrait only: apps that keep the collapsed pill on screen but dead (no content, no popups, no touches) while in the foreground. */
+    val islandExemptAppsStatic: Set<String> = emptySet(),
     val contentPillWidthPercentLandscape: Float = DEFAULT_CONTENT_PILL_PERCENT,
     // ---- Landscape profile (independent of the portrait fields above) ----
     // Legacy since LR4 (idle landscape cutout is always the camera circle); kept for old backups.
@@ -412,6 +421,7 @@ data class SmartIslandSettings(
         settingsObj.put("enableShadow", enableShadow)
         settingsObj.put("expandedBlurEnabled", expandedBlurEnabled)
         settingsObj.put("expandedBlurRadius", expandedBlurRadius.toDouble())
+        settingsObj.put("liveBlurEnabled", liveBlurEnabled)
         settingsObj.put("mediaBlurEnabled", mediaBlurEnabled)
         settingsObj.put("mediaBlurRadius", mediaBlurRadius.toDouble())
         settingsObj.put("mediaOpacity", mediaOpacity.toDouble())
@@ -503,6 +513,7 @@ data class SmartIslandSettings(
         settingsObj.put("contentPillSameAsIdle", contentPillSameAsIdle)
         settingsObj.put("islandExemptApps", JSONArray().also { a -> islandExemptApps.forEach { a.put(it) } })
         settingsObj.put("islandExemptAppsLandscape", JSONArray().also { a -> islandExemptAppsLandscape.forEach { a.put(it) } })
+        settingsObj.put("islandExemptAppsStatic", JSONArray().also { a -> islandExemptAppsStatic.forEach { a.put(it) } })
         settingsObj.put("contentPillSameAsIdleLandscape", contentPillSameAsIdleLandscape)
         settingsObj.put("contentPillWidthPercentLandscape", contentPillWidthPercentLandscape.toDouble())
         settingsObj.put("contentPillWidthPercent", contentPillWidthPercent.toDouble())
@@ -570,6 +581,14 @@ data class SmartIslandSettings(
         val settingsCount: Int
     )
 
+    /** Which of the three blur choices is active (live wins if both flags were ever set). */
+    val expandedBlurMode: ExpandedBlurMode
+        get() = when {
+            liveBlurEnabled -> ExpandedBlurMode.Live
+            expandedBlurEnabled -> ExpandedBlurMode.Card
+            else -> ExpandedBlurMode.Off
+        }
+
     /**
      * The settings the media (music) card draws with: the shared blur and opacity fields hold the media values, so
      * every existing helper (`cardBackgroundBlur`, `islandSurface`, the blur window) works unchanged on this copy.
@@ -577,7 +596,9 @@ data class SmartIslandSettings(
     fun forMedia(): SmartIslandSettings = copy(
         opacity = mediaOpacity,
         expandedBlurEnabled = mediaBlurEnabled,
-        expandedBlurRadius = mediaBlurRadius
+        expandedBlurRadius = mediaBlurRadius,
+        // Live blur never touches the media card: it keeps its own blur and its normal background.
+        liveBlurEnabled = false
     )
 
     /** [forMedia] when [media] is true (the shown card is a music card), else these settings. */
@@ -765,8 +786,12 @@ data class SmartIslandSettings(
                 autoExpandOnNotification = obj.optBoolean("autoExpandOnNotification", defaults.autoExpandOnNotification),
                 autoExpandOnLockScreen = obj.optBoolean("autoExpandOnLockScreen", defaults.autoExpandOnLockScreen),
                 enableShadow = obj.optBoolean("enableShadow", defaults.enableShadow),
-                expandedBlurEnabled = obj.optBoolean("expandedBlurEnabled", defaults.expandedBlurEnabled),
+                // Only one of card blur and live blur can be on; live wins if a file says both.
+                expandedBlurEnabled = obj.optBoolean("expandedBlurEnabled", defaults.expandedBlurEnabled) &&
+                    !obj.optBoolean("liveBlurEnabled", defaults.liveBlurEnabled),
                 expandedBlurRadius = safeFloat("expandedBlurRadius", defaults.expandedBlurRadius, MIN_EXPANDED_BLUR, MAX_EXPANDED_BLUR),
+                // Old backups have no live-blur key: it stays off.
+                liveBlurEnabled = obj.optBoolean("liveBlurEnabled", defaults.liveBlurEnabled),
                 // Old backups have no media keys: the media card starts from the shared blur and opacity.
                 mediaBlurEnabled = obj.optBoolean("mediaBlurEnabled", obj.optBoolean("expandedBlurEnabled", defaults.mediaBlurEnabled)),
                 mediaBlurRadius = safeFloat(
@@ -873,6 +898,7 @@ data class SmartIslandSettings(
                 contentPillSameAsIdle = obj.optBoolean("contentPillSameAsIdle", defaults.contentPillSameAsIdle),
                 islandExemptApps = safeStringSet("islandExemptApps", defaults.islandExemptApps),
                 islandExemptAppsLandscape = safeStringSet("islandExemptAppsLandscape", defaults.islandExemptAppsLandscape),
+                islandExemptAppsStatic = safeStringSet("islandExemptAppsStatic", defaults.islandExemptAppsStatic),
                 contentPillSameAsIdleLandscape = obj.optBoolean("contentPillSameAsIdleLandscape", defaults.contentPillSameAsIdleLandscape),
                 contentPillWidthPercentLandscape = safeFloat(
                     "contentPillWidthPercentLandscape", defaults.contentPillWidthPercentLandscape,
@@ -956,3 +982,5 @@ data class SmartIslandSettings(
         }
     }
 }
+/** The expanded island's blur choice: nothing, the card's own artwork blur, or the live blur of what is behind the island. */
+enum class ExpandedBlurMode { Off, Card, Live }

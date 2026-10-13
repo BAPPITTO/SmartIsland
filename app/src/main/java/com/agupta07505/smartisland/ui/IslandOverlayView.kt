@@ -60,6 +60,8 @@ import kotlinx.coroutines.flow.first
 fun IslandOverlayView(
     settings: SmartIslandSettings,
     expanded: Boolean,
+    /** Live blur: the blur window is under the open island, so the shell is drawn as a translucent tint over it (see BlurFollow.tintAlpha). */
+    liveBlurShown: Boolean = false,
     notifications: List<IslandNotification>,
     selectedIndex: Int,
     launcherApps: List<LaunchableApp>?,
@@ -421,6 +423,13 @@ fun IslandOverlayView(
             },
             label = "mediaShellOpacity"
         )
+        // Live blur: eases the shell from its solid look to the tint over the blur window (and back). Never for the media card, which keeps
+        // its own blur and background. Read while drawing, so the fade does not recompose.
+        val liveBlurFraction = androidx.compose.animation.core.animateFloatAsState(
+            targetValue = if (liveBlurShown && !mediaShell) 1f else 0f,
+            animationSpec = androidx.compose.animation.core.tween(durationMillis = settings.animationSpeed(isLandscape).durationMs(LIVE_BLUR_TINT_FADE_MS)),
+            label = "liveBlurTint"
+        )
         // Tells the pill exit when the shell has really reached the idle settings, so the hand-over from the idle dot waits for it.
         SideEffect {
             pillExit.dotCoversHandover = landscapeDot != null
@@ -460,7 +469,7 @@ fun IslandOverlayView(
         // Inner Box: The actual visible pill container, managing the black background shape and size animations
         Box(
             modifier = Modifier
-                .islandPillSurface(settings.forCard(mediaShell), layout, secondary, pillExit, switchScaleAnim, cb, ui, squareTop, pickerSideBySide, twoIslandsDrawn, { mediaShellOpacity.value }, reportBounds = surfaceBack, shellHidden = closingOntoIdle, palette = palette)
+                .islandPillSurface(settings.forCard(mediaShell), layout, secondary, pillExit, switchScaleAnim, cb, ui, squareTop, pickerSideBySide, twoIslandsDrawn, { mediaShellOpacity.value }, { liveBlurFraction.value }, reportBounds = surfaceBack, shellHidden = closingOntoIdle, palette = palette)
                 .islandMainGestures(
                     settings = settings,
                     isInputActive = isInputActive,
@@ -667,3 +676,6 @@ private const val SIDE_BY_SIDE_HOLD_MARGIN_MS = 0L
 /** How many cards' split widths are remembered, and how close two widths must be to count as the same. */
 private const val SPLIT_WIDTH_CACHE_MAX = 32
 private const val SPLIT_WIDTH_SAME_DP = 0.5f
+
+/** Fade (ms, before the animation-speed scale) of the shell between its solid look and the tint over the live blur. */
+private const val LIVE_BLUR_TINT_FADE_MS = 200

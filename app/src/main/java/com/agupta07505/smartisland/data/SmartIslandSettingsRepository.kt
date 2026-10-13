@@ -88,6 +88,7 @@ class SmartIslandSettingsRepository(private val context: Context) {
         val EnableShadow = booleanPreferencesKey("enable_shadow")
         val ExpandedBlurEnabled = booleanPreferencesKey("expanded_blur_enabled")
         val ExpandedBlurRadius = floatPreferencesKey("expanded_blur_radius")
+        val LiveBlurEnabled = booleanPreferencesKey("live_blur_enabled")
         val MediaBlurEnabled = booleanPreferencesKey("media_blur_enabled")
         val MediaBlurRadius = floatPreferencesKey("media_blur_radius")
         val MediaOpacity = floatPreferencesKey("media_opacity")
@@ -168,6 +169,7 @@ class SmartIslandSettingsRepository(private val context: Context) {
         val ContentPillWidthPercent = floatPreferencesKey("content_pill_width_percent")
         val IslandExemptApps = stringSetPreferencesKey("island_exempt_apps")
         val IslandExemptAppsLandscape = stringSetPreferencesKey("island_exempt_apps_landscape")
+        val IslandExemptAppsStatic = stringSetPreferencesKey("island_exempt_apps_static")
         val ContentPillSameAsIdleLandscape = booleanPreferencesKey("content_pill_same_as_idle_landscape")
         val ContentPillWidthPercentLandscape = floatPreferencesKey("content_pill_width_percent_landscape")
         val IdleOffWhenStored = booleanPreferencesKey("idle_off_when_stored")
@@ -343,9 +345,12 @@ class SmartIslandSettingsRepository(private val context: Context) {
                 autoExpandOnNotification = prefs[Keys.AutoExpandOnNotification] ?: defaults.autoExpandOnNotification,
                 autoExpandOnLockScreen = prefs[Keys.AutoExpandOnLockScreen] ?: defaults.autoExpandOnLockScreen,
                 enableShadow = prefs[Keys.EnableShadow] ?: defaults.enableShadow,
-                expandedBlurEnabled = prefs[Keys.ExpandedBlurEnabled] ?: defaults.expandedBlurEnabled,
+                // Only one of card blur and live blur can be on; live wins if both were ever stored.
+                expandedBlurEnabled = (prefs[Keys.ExpandedBlurEnabled] ?: defaults.expandedBlurEnabled) &&
+                    !(prefs[Keys.LiveBlurEnabled] ?: defaults.liveBlurEnabled),
                 expandedBlurRadius = (prefs[Keys.ExpandedBlurRadius] ?: defaults.expandedBlurRadius)
                     .coerceIn(SmartIslandSettings.MIN_EXPANDED_BLUR, SmartIslandSettings.MAX_EXPANDED_BLUR),
+                liveBlurEnabled = prefs[Keys.LiveBlurEnabled] ?: defaults.liveBlurEnabled,
                 // Media keys fall back to the shared values until the owner sets them.
                 mediaBlurEnabled = prefs[Keys.MediaBlurEnabled] ?: prefs[Keys.ExpandedBlurEnabled] ?: defaults.mediaBlurEnabled,
                 mediaBlurRadius = (prefs[Keys.MediaBlurRadius] ?: prefs[Keys.ExpandedBlurRadius] ?: defaults.mediaBlurRadius)
@@ -450,6 +455,8 @@ class SmartIslandSettingsRepository(private val context: Context) {
                     ?.filter { it.isNotBlank() && it.length <= MAX_PACKAGE_NAME_LENGTH }?.toSet() ?: defaults.islandExemptApps,
                 islandExemptAppsLandscape = prefs[Keys.IslandExemptAppsLandscape]
                     ?.filter { it.isNotBlank() && it.length <= MAX_PACKAGE_NAME_LENGTH }?.toSet() ?: defaults.islandExemptAppsLandscape,
+                islandExemptAppsStatic = prefs[Keys.IslandExemptAppsStatic]
+                    ?.filter { it.isNotBlank() && it.length <= MAX_PACKAGE_NAME_LENGTH }?.toSet() ?: defaults.islandExemptAppsStatic,
                 contentPillSameAsIdleLandscape = prefs[Keys.ContentPillSameAsIdleLandscape] ?: defaults.contentPillSameAsIdleLandscape,
                 contentPillWidthPercentLandscape = (prefs[Keys.ContentPillWidthPercentLandscape] ?: defaults.contentPillWidthPercentLandscape).let {
                     if (it.isNaN()) defaults.contentPillWidthPercentLandscape
@@ -551,6 +558,22 @@ class SmartIslandSettingsRepository(private val context: Context) {
     suspend fun setEnabled(value: Boolean) = editSafely { it[Keys.Enabled] = value }
     suspend fun setEnableShadow(value: Boolean) = editSafely { it[Keys.EnableShadow] = value }
     suspend fun setExpandedBlurEnabled(value: Boolean) = editSafely { it[Keys.ExpandedBlurEnabled] = value }
+    /**
+     * Picks Off, Card blur or Live blur: writes both flags together so they are never both on.
+     * The media card inherits the shared blur until the owner sets its own, so those two are pinned to what the
+     * media card shows now first; changing this choice then never changes the media card.
+     */
+    suspend fun setExpandedBlurMode(mode: ExpandedBlurMode) = editSafely {
+        if (it[Keys.MediaBlurEnabled] == null) {
+            it[Keys.MediaBlurEnabled] = it[Keys.ExpandedBlurEnabled] ?: SmartIslandSettings.Default.mediaBlurEnabled
+        }
+        if (it[Keys.MediaBlurRadius] == null) {
+            it[Keys.MediaBlurRadius] = (it[Keys.ExpandedBlurRadius] ?: SmartIslandSettings.Default.mediaBlurRadius)
+                .coerceIn(SmartIslandSettings.MIN_EXPANDED_BLUR, SmartIslandSettings.MAX_EXPANDED_BLUR)
+        }
+        it[Keys.ExpandedBlurEnabled] = mode == ExpandedBlurMode.Card
+        it[Keys.LiveBlurEnabled] = mode == ExpandedBlurMode.Live
+    }
     suspend fun setMediaBlurEnabled(value: Boolean) = editSafely { it[Keys.MediaBlurEnabled] = value }
     suspend fun setMediaBlurRadius(value: Float) = editSafely {
         it[Keys.MediaBlurRadius] = value.coerceIn(SmartIslandSettings.MIN_EXPANDED_BLUR, SmartIslandSettings.MAX_EXPANDED_BLUR)
@@ -916,6 +939,25 @@ class SmartIslandSettingsRepository(private val context: Context) {
         val key = if (landscape) Keys.IslandExemptAppsLandscape else Keys.IslandExemptApps
         val current = it[key] ?: emptySet()
         it[key] = if (exempt) current + packageName else current - packageName
+        // Portrait: an app is either "off" or "static", never both. Adding it (as off) or removing it clears the static entry.
+        if (!landscape) it[Keys.IslandExemptAppsStatic] = (it[Keys.IslandExemptAppsStatic] ?: emptySet()) - packageName
+    }
+
+    /**
+     * Portrait only: switches an exempt app between "island off" (static = false) and "static pill" (static = true).
+     * The app ends up in exactly one of the two lists.
+     */
+    suspend fun setIslandExemptStatic(packageName: String, static: Boolean) = editSafely {
+        if (packageName.isBlank() || packageName.length > MAX_PACKAGE_NAME_LENGTH) return@editSafely
+        val off = it[Keys.IslandExemptApps] ?: emptySet()
+        val stat = it[Keys.IslandExemptAppsStatic] ?: emptySet()
+        if (static) {
+            it[Keys.IslandExemptApps] = off - packageName
+            it[Keys.IslandExemptAppsStatic] = stat + packageName
+        } else {
+            it[Keys.IslandExemptAppsStatic] = stat - packageName
+            it[Keys.IslandExemptApps] = off + packageName
+        }
     }
     suspend fun setContentPillSameAsIdle(landscape: Boolean, value: Boolean) = editSafely {
         it[if (landscape) Keys.ContentPillSameAsIdleLandscape else Keys.ContentPillSameAsIdle] = value
@@ -1229,9 +1271,10 @@ class SmartIslandSettingsRepository(private val context: Context) {
         prefs[Keys.AutoExpandOnNotification] = settings.autoExpandOnNotification
         prefs[Keys.AutoExpandOnLockScreen] = settings.autoExpandOnLockScreen
         prefs[Keys.EnableShadow] = settings.enableShadow
-        prefs[Keys.ExpandedBlurEnabled] = settings.expandedBlurEnabled
+        prefs[Keys.ExpandedBlurEnabled] = settings.expandedBlurEnabled && !settings.liveBlurEnabled
         prefs[Keys.ExpandedBlurRadius] = settings.expandedBlurRadius
             .coerceIn(SmartIslandSettings.MIN_EXPANDED_BLUR, SmartIslandSettings.MAX_EXPANDED_BLUR)
+        prefs[Keys.LiveBlurEnabled] = settings.liveBlurEnabled
         prefs[Keys.MediaBlurEnabled] = settings.mediaBlurEnabled
         prefs[Keys.MediaBlurRadius] = settings.mediaBlurRadius
             .coerceIn(SmartIslandSettings.MIN_EXPANDED_BLUR, SmartIslandSettings.MAX_EXPANDED_BLUR)
@@ -1339,6 +1382,8 @@ class SmartIslandSettingsRepository(private val context: Context) {
         prefs[Keys.ContentPillWidthPercent] = settings.contentPillWidthPercent
         prefs[Keys.IslandExemptApps] = settings.islandExemptApps.filter { it.isNotBlank() && it.length <= MAX_PACKAGE_NAME_LENGTH }.toSet()
         prefs[Keys.IslandExemptAppsLandscape] = settings.islandExemptAppsLandscape
+            .filter { it.isNotBlank() && it.length <= MAX_PACKAGE_NAME_LENGTH }.toSet()
+        prefs[Keys.IslandExemptAppsStatic] = settings.islandExemptAppsStatic
             .filter { it.isNotBlank() && it.length <= MAX_PACKAGE_NAME_LENGTH }.toSet()
         prefs[Keys.ContentPillSameAsIdleLandscape] = settings.contentPillSameAsIdleLandscape
         prefs[Keys.ContentPillWidthPercentLandscape] = settings.contentPillWidthPercentLandscape

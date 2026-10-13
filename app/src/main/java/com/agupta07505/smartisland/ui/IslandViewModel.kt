@@ -8,6 +8,7 @@
 package com.agupta07505.smartisland.ui
 
 import com.agupta07505.smartisland.model.IdleWidgetOff
+import com.agupta07505.smartisland.model.ExemptMode
 import com.agupta07505.smartisland.model.IslandExemption
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -410,17 +411,43 @@ class IslandViewModel(
      * The app in the foreground is exempt in the current orientation (Settings > Exempt apps): the island is totally off while it stays
      * there. The overlay service hides the island's window on this, and the island closes if it was open.
      */
-    val islandOffForApp: StateFlow<Boolean> = combine(
+    val islandExemption: StateFlow<ExemptMode> = combine(
         foregroundPackage,
         settingsRepo.settings,
         orientation
     ) { fg, raw, state ->
-        IslandExemption.isOff(fg, raw.islandExemptApps, raw.islandExemptAppsLandscape, state.isLandscape)
+        IslandExemption.modeFor(
+            fg, raw.islandExemptApps, raw.islandExemptAppsStatic, raw.islandExemptAppsLandscape, state.isLandscape
+        )
     }.distinctUntilChanged().stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
-        initialValue = false
+        initialValue = ExemptMode.None
     )
+
+    /** The island is totally off for the app in the foreground (window hidden, touches go to the app). */
+    val islandOffForApp: StateFlow<Boolean> = islandExemption
+        .map { it == ExemptMode.Off }
+        .distinctUntilChanged()
+        .stateIn(scope = viewModelScope, started = SharingStarted.Eagerly, initialValue = false)
+
+    /** Portrait: the app in the foreground keeps the collapsed pill on screen, but dead (nothing on it, no touches). */
+    val islandStaticForApp: StateFlow<Boolean> = islandExemption
+        .map { it == ExemptMode.Static }
+        .distinctUntilChanged()
+        .stateIn(scope = viewModelScope, started = SharingStarted.Eagerly, initialValue = false)
+
+    /**
+     * The exemption right now, computed from the current values instead of the flow above. The flow lags a moment behind the
+     * foreground app, and the overlay service sizes and shows its window straight after it changes the foreground app.
+     */
+    fun exemptionNow(): ExemptMode {
+        val raw = rawSettings.value
+        return IslandExemption.modeFor(
+            foregroundPackage.value, raw.islandExemptApps, raw.islandExemptAppsStatic, raw.islandExemptAppsLandscape,
+            orientation.value.isLandscape
+        )
+    }
 
     /** Visible cards in arrival order, before the priority order and the popup are applied. */
     private val visibleUnordered: StateFlow<List<IslandNotification>> = combine(
@@ -605,6 +632,8 @@ class IslandViewModel(
     private var widgetIslandOpenedAt = 0L
 
     fun setWidgetIslandOpen(open: Boolean) {
+        // An exempt app is in front: the island stays shut.
+        if (open && exemptionNow() != ExemptMode.None) return
         if (open) {
             widgetIslandSnapPending = false
             widgetIslandOpenedAt = android.os.SystemClock.elapsedRealtime()
@@ -737,6 +766,13 @@ class IslandViewModel(
      * collapsed or while two separate islands are shown). The service puts the blur window here.
      */
     val expandedSurfaceBounds = MutableStateFlow<android.graphics.Rect?>(null)
+
+    /**
+     * True while the blur window is really showing under the expanded island (Live blur chosen AND the system can blur behind a window).
+     * The island draws its shell as a translucent tint only then; otherwise (blur off, unsupported, media card) it keeps its normal solid
+     * background, which is the fallback. Set by the service in `refreshBlurWindow`.
+     */
+    val liveBlurShown = MutableStateFlow(false)
 
     val isInputActive = MutableStateFlow(false)
 
@@ -1052,13 +1088,17 @@ class IslandViewModel(
         }
         viewModelScope.launch {
             runSuspendCatchingLogged(TAG, "Exempt-app collector failed") {
-                // An exempt app came to the front: whatever was open closes (the window itself is hidden by the service).
-                islandOffForApp.collect { off ->
-                    if (off) {
-                        collapse()
-                        closeWidgetIsland(snap = true)
+                // An exempt app came to the front: whatever was open closes (an off island's window is hidden by the service,
+                // a static one stops taking touches). Nothing may open while the app stays in front either (a card that
+                // pops up by itself would be sitting open when the user comes back), so an open island closes again at once.
+                combine(islandExemption, expanded) { mode, open -> mode != ExemptMode.None to open }
+                    .distinctUntilChanged()
+                    .collect { (exempt, open) ->
+                        if (exempt) {
+                            if (open) collapse()
+                            closeWidgetIsland(snap = true)
+                        }
                     }
-                }
             }
         }
         viewModelScope.launch {
@@ -1252,6 +1292,7 @@ class IslandViewModel(
     /** Open Apps shortcut (long press on the collapsed cutout, portrait): expands the island onto the quick-launch grid. */
     fun openAppsLauncher() {
         if (!settings.value.enableAppShortcuts || shadeOpen.value || expanded.value) return
+        if (exemptionNow() != ExemptMode.None) return
         appsLauncherOpen.value = true
         expanded.value = true
     }
@@ -1260,6 +1301,8 @@ class IslandViewModel(
         // Never open under the shade: the visible list is empty there, so the island would be empty.
         if (shadeOpen.value) return
         if (!currentCardMayExpand()) return
+        // An exempt app is in front (island off or static): nothing opens, a popup included.
+        if (exemptionNow() != ExemptMode.None) return
         expanded.value = true
     }
 
@@ -1336,6 +1379,7 @@ class IslandViewModel(
         lastToggleTimeMs = now
         // Opening is refused for apps that never expand; closing is always allowed.
         if (!expanded.value && !currentCardMayExpand()) return
+        if (!expanded.value && exemptionNow() != ExemptMode.None) return
         // Opening needs a card to show, and no shade: otherwise the island would open empty.
         if (!expanded.value && (shadeOpen.value || visibleNotifications.value.isEmpty())) return
         if (expanded.value) appsLauncherOpen.value = false

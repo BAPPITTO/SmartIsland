@@ -33,4 +33,59 @@ object BlurFollow {
     fun rectMoved(last: android.graphics.Rect, next: android.graphics.Rect): Boolean =
         kotlin.math.abs(last.left - next.left) > 2 || kotlin.math.abs(last.top - next.top) > 2 ||
             kotlin.math.abs(last.right - next.right) > 2 || kotlin.math.abs(last.bottom - next.bottom) > 2
+
+    /** Corner radius (dp) of the expanded island's shell; the blur rectangle is inset so it stays inside this rounded corner. */
+    const val EXPANDED_CORNER_DP = 34f
+
+    /** Lowest and highest opacity of the island's tint over the blur: below it the card text loses contrast, above it the blur barely shows. */
+    const val TINT_MIN = 0.30f
+    const val TINT_MAX = 0.75f
+
+    /** Share of the island's own opacity that is kept as the tint while Live blur shows through. */
+    const val TINT_SHARE = 0.6f
+
+    /**
+     * The opacity the island's shell is drawn with while the blur window sits under it: the user's opacity ([opacity], 0..1) scaled by
+     * [TINT_SHARE] and kept within [TINT_MIN]..[TINT_MAX], so the blur reads as frosted glass and the card stays legible.
+     * A shell that is already see-through (opacity below [TINT_MIN]) is left as it is, never made more solid.
+     */
+    fun tintAlpha(opacity: Float): Float {
+        val o = opacity.coerceIn(0f, 1f)
+        return minOf(o, (o * TINT_SHARE).coerceIn(TINT_MIN, TINT_MAX))
+    }
+
+    /** The shell's opacity at [fraction] (0 = solid look, 1 = tint over the blur): eases between [opacity] and [tintAlpha]. */
+    fun shellAlpha(opacity: Float, fraction: Float): Float {
+        val f = fraction.coerceIn(0f, 1f)
+        if (f <= 0f) return opacity
+        return opacity + (tintAlpha(opacity) - opacity) * f
+    }
+
+    /** Smallest blur rectangle (px, either side) worth showing: below this the island is still a pill and nothing is blurred. */
+    const val MIN_SIDE_PX = 24
+
+    /**
+     * How far (px) a rectangle must be pulled in from each edge of a rounded rectangle with corner radius [radiusPx] so that its
+     * corners lie inside the rounded corner: r * (1 - 1/sqrt(2)). The radius never exceeds half of the shorter side.
+     */
+    fun cornerInsetPx(widthPx: Int, heightPx: Int, radiusPx: Float): Int {
+        val r = radiusPx.coerceAtMost(minOf(widthPx, heightPx) / 2f).coerceAtLeast(0f)
+        return kotlin.math.ceil(r * (1f - 1f / kotlin.math.sqrt(2f))).toInt()
+    }
+
+    /**
+     * The layout key of the blur window for an island at [left], [top], [right], [bottom] (px, on screen): left, top, width, height
+     * of the rectangle inset from the rounded corners, then [blurRadiusPx]. Null when the island is too small to blur.
+     * The order matches [needsRelayout].
+     */
+    fun layoutKey(left: Int, top: Int, right: Int, bottom: Int, radiusPx: Float, blurRadiusPx: Int): IntArray? {
+        val w = right - left
+        val h = bottom - top
+        if (w <= 0 || h <= 0 || blurRadiusPx <= 0) return null
+        val inset = cornerInsetPx(w, h, radiusPx)
+        val iw = w - 2 * inset
+        val ih = h - 2 * inset
+        if (iw < MIN_SIDE_PX || ih < MIN_SIDE_PX) return null
+        return intArrayOf(left + inset, top + inset, iw, ih, blurRadiusPx)
+    }
 }

@@ -89,6 +89,8 @@ class SmartIslandOverlayService : AccessibilityService() {
     private var widgetWindowJob: kotlinx.coroutines.Job? = null
     private var collapseJob: kotlinx.coroutines.Job? = null
     private var lastParams: WindowManager.LayoutParams? = null
+    /** Live blur: the empty window under the island that the system blurs the screen behind (see IslandBlurWindow). */
+    private var blurWindow: IslandBlurWindow? = null
 
     private val torchCallback = object : android.hardware.camera2.CameraManager.TorchCallback() {
         override fun onTorchModeChanged(cameraId: String, enabled: Boolean) {
@@ -266,6 +268,11 @@ class SmartIslandOverlayService : AccessibilityService() {
         val picked = com.agupta07505.smartisland.util.ForegroundApp.pick(appWindows) { pkg ->
             pkg == packageName || pkg == com.agupta07505.smartisland.util.ShadeDetector.SYSTEM_UI || isInputMethodPackage(pkg)
         }
+        // The app window the user is in exists but its root (so its package) cannot be read yet: the caller falls back to the
+        // package of the window event, instead of keeping the previous app (which left an exempt app not recognised).
+        if (picked == null && !locked &&
+            appWindows.any { it.isApplicationType && it.packageName.isNullOrEmpty() && (it.isFocused || it.isActive) }
+        ) return false
         val next = picked ?: if (locked) null else viewModel.foregroundPackage.value
         if (next != viewModel.foregroundPackage.value) {
             com.agupta07505.smartisland.util.AppLogRecorder.i(
@@ -729,8 +736,8 @@ class SmartIslandOverlayService : AccessibilityService() {
 
         serviceScope.launch {
             runSuspendCatchingLogged(TAG, "Exempt-app visibility collector failed") {
-                // The island's window is hidden (and its touches go to the app) while an exempt app is in the foreground.
-                viewModel.islandOffForApp.collectLatest {
+                // The island's window is hidden (off) or dead (static: no touches, nothing on it) while an exempt app is in the foreground.
+                viewModel.islandExemption.collectLatest {
                     if (destroyed || !viewModel.displaySettings.value.enabled) return@collectLatest
                     // Back from an exempt app: the rotation / app switch may have changed the geometry meanwhile.
                     updateWindowLayoutParams(isWindowExpanded, viewModel.displaySettings.value)
@@ -761,6 +768,19 @@ class SmartIslandOverlayService : AccessibilityService() {
                         startOverlaySession(settings)
                     }
                 }
+            }
+        }
+
+        serviceScope.launch {
+            runSuspendCatchingLogged(TAG, "Live blur collector failed") {
+                // The blur window follows the island's rect and every input that decides whether it shows.
+                kotlinx.coroutines.flow.combine(
+                    viewModel.expandedSurfaceBounds,
+                    viewModel.expanded,
+                    viewModel.shownCardIsMedia,
+                    viewModel.displaySettings,
+                    viewModel.islandOffForApp
+                ) { _, _, _, _, _ -> Unit }.collect { refreshBlurWindow() }
             }
         }
 
@@ -1043,7 +1063,8 @@ class SmartIslandOverlayService : AccessibilityService() {
                 val isLocked = keyguardManager?.isKeyguardLocked == true
                 isLockScreenActive = isLocked
                 val isLandscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-                val isHidden = (!viewModel.displaySettings.value.showOnLockScreen && isLocked) || (isLandscape && !viewModel.displaySettings.value.showInLandscape) || viewModel.islandOffForApp.value
+                val isHidden = (!viewModel.displaySettings.value.showOnLockScreen && isLocked) || (isLandscape && !viewModel.displaySettings.value.showInLandscape) ||
+                    viewModel.exemptionNow() == com.agupta07505.smartisland.model.ExemptMode.Off
                 visibility = if (isHidden) android.view.View.GONE else android.view.View.VISIBLE
 
                 installOverlayViewTreeOwners()
@@ -1096,14 +1117,19 @@ class SmartIslandOverlayService : AccessibilityService() {
 
                 setupTouchableRegion(this)
             }
+            // The blur window goes in first: windows of one type stack in the order they were added, and it must sit under the island.
+            if (blurWindow == null) blurWindow = IslandBlurWindow(this, windowManager)
+            blurWindow?.attach()
             runCatchingLogged(TAG, "windowManager.addView failed") {
                 windowManager.addView(islandView, collapsedParams(viewModel.displaySettings.value))
             } ?: run {
                 islandView = null
+                blurWindow?.detach()
             }
         } catch (e: Exception) {
             android.util.Log.e(TAG, "ensureCollapsedWindow fatal", e)
             islandView = null
+            blurWindow?.detach()
         }
     }
 
@@ -1147,7 +1173,9 @@ class SmartIslandOverlayService : AccessibilityService() {
                 if (method.name == "onComputeInternalInsets" && args != null && args.isNotEmpty()) {
                     val insets = args[0]
                     val isExpanded = viewModel.expanded.value
-                    val isGone = view.visibility == android.view.View.GONE
+                    // Gone, or a static exempt-app pill: no touch is caught, they all reach the app below.
+                    val isGone = view.visibility == android.view.View.GONE ||
+                        viewModel.exemptionNow() == com.agupta07505.smartisland.model.ExemptMode.Static
                     val settingsVal = viewModel.displaySettings.value
                     val notificationsCount = viewModel.visibleNotifications.value.size
                     val privacyNow = viewModel.privacy.value
@@ -1409,14 +1437,18 @@ class SmartIslandOverlayService : AccessibilityService() {
         val isLandscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
         val privacyNow = viewModel.privacy.value
         val visibleCount = viewModel.visibleNotifications.value.size
-        val isHidden = (!settings.showOnLockScreen && isLocked) || (isLandscape && !settings.showInLandscape) || viewModel.islandOffForApp.value
+        val isHidden = (!settings.showOnLockScreen && isLocked) || (isLandscape && !settings.showInLandscape) ||
+            viewModel.exemptionNow() == com.agupta07505.smartisland.model.ExemptMode.Off
+        // Static exempt app (portrait): the collapsed pill stays where it is, but takes no touches and shows nothing.
+        val isStatic = !isHidden && viewModel.exemptionNow() == com.agupta07505.smartisland.model.ExemptMode.Static
 
         val targetVisibility = if (isHidden) android.view.View.GONE else android.view.View.VISIBLE
         if (view.visibility != targetVisibility) {
             view.visibility = targetVisibility
+            refreshBlurWindow()
         }
 
-        val isSplitMode = com.agupta07505.smartisland.model.hasSecondaryCutout(
+        val isSplitMode = !isStatic && com.agupta07505.smartisland.model.hasSecondaryCutout(
             com.agupta07505.smartisland.model.cutoutCardCount(
                 viewModel.visibleNotifications.value, viewModel.expanded.value,
                 viewModel.selectedIndex.value
@@ -1461,7 +1493,7 @@ class SmartIslandOverlayService : AccessibilityService() {
         // While a card is on the island the window is already full height when collapsed (the touchable region keeps every touch
         // outside the pill going to the app below, as it does for the full width). Growing the window on the tap took a frame or
         // two, and the opening card was clipped to the small collapsed window before the jump to its real height.
-        val preGrown = isTouchableRegionSupported.value && visibleCount > 0 && !isHidden
+        val preGrown = isTouchableRegionSupported.value && visibleCount > 0 && !isHidden && !isStatic
         val fullWindow = expanded || widgetWindowOpen
         val h = if (fullWindow || preGrown) {
             WindowManager.LayoutParams.MATCH_PARENT
@@ -1482,7 +1514,10 @@ class SmartIslandOverlayService : AccessibilityService() {
         val watchOutside = if (expanded && !isInput && isTouchableRegionSupported.value && viewModel.autoExpanded.value) {
             WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
         } else 0
-        val currentFlags = focusFlags or watchOutside or
+        // A static pill is never touched: the window ignores touches altogether (this also covers devices where the touchable
+        // region cannot be set and the window is as wide as the pill).
+        val noTouch = if (isStatic) WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE else 0
+        val currentFlags = focusFlags or watchOutside or noTouch or
             WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
             WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
@@ -1545,6 +1580,42 @@ class SmartIslandOverlayService : AccessibilityService() {
                 windowManager.removeViewImmediate(view)
             }
         }
+        blurWindow?.detach()
+        blurWindow = null
+        if (::viewModel.isInitialized) viewModel.liveBlurShown.value = false
+    }
+
+    /**
+     * Live blur: puts the blur window under the expanded island, or hides it. It shows only while the single expanded island is open
+     * with Live blur chosen, the system can blur behind a window, the island is visible and the shown card is not a music card
+     * (the media card keeps its own blur). The island reports its rect in its own window's pixels; the window starts at the screen
+     * top (full width, x = 0 while expanded), so the screen row is the reported top plus the window's y.
+     */
+    private fun refreshBlurWindow() {
+        val blur = blurWindow
+        if (blur == null) { if (::viewModel.isInitialized) viewModel.liveBlurShown.value = false; return }
+        if (destroyed || !::viewModel.isInitialized) { blur.show(null); return }
+        val view = islandView
+        val settings = viewModel.displaySettings.value
+        val bounds = viewModel.expandedSurfaceBounds.value
+        val wanted = view != null && view.visibility == android.view.View.VISIBLE && settings.enabled &&
+            settings.expandedBlurMode == com.agupta07505.smartisland.data.ExpandedBlurMode.Live &&
+            viewModel.expanded.value && !viewModel.shownCardIsMedia.value && bounds != null
+        if (!wanted || bounds == null) { blur.show(null); viewModel.liveBlurShown.value = false; return }
+        val density = resources.displayMetrics.density
+        val isLandscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val windowY = if (settings.enableNotchMode || isLandscape) 0 else settings.yOffset.dpToPx()
+        val key = com.agupta07505.smartisland.util.BlurFollow.layoutKey(
+            left = bounds.left,
+            top = bounds.top + windowY,
+            right = bounds.right,
+            bottom = bounds.bottom + windowY,
+            radiusPx = com.agupta07505.smartisland.util.BlurFollow.EXPANDED_CORNER_DP * density,
+            blurRadiusPx = (settings.expandedBlurRadius * density).toInt()
+        )
+        blur.show(key)
+        // The island's shell turns into a tint only while a blur is really there (not while the island is still a pill, or unsupported).
+        viewModel.liveBlurShown.value = key != null && blur.isSupported()
     }
 
     private fun collapsedParams(settings: SmartIslandSettings): WindowManager.LayoutParams {
