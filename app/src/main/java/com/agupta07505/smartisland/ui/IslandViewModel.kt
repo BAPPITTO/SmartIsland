@@ -1091,7 +1091,7 @@ class IslandViewModel(
                 // An exempt app came to the front: whatever was open closes (an off island's window is hidden by the service,
                 // a static one stops taking touches). Nothing may open while the app stays in front either (a card that
                 // pops up by itself would be sitting open when the user comes back), so an open island closes again at once.
-                combine(islandExemption, expanded) { mode, open -> mode != ExemptMode.None to open }
+                combine(islandExemption, expanded) { mode, open -> Pair(mode != ExemptMode.None, open) }
                     .distinctUntilChanged()
                     .collect { (exempt, open) ->
                         if (exempt) {
