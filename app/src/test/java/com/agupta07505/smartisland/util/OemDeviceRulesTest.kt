@@ -80,6 +80,7 @@ class OemDeviceRulesTest {
         assertTrue(OemDeviceRules.isHotspot("com.samsung.android.app.mobilehotspot", "Hotspot active"))
         assertTrue(OemDeviceRules.isHotspot("com.android.settings", "Portable hotspot enabled"))
         assertTrue(OemDeviceRules.isHotspot("com.miui.securitycenter", "Tethering active"))
+        assertFalse(OemDeviceRules.isHotspot("com.miui.securitycenter", "Battery saver is active"))
         assertFalse(OemDeviceRules.isHotspot("com.spotify.music", "Playing music"))
     }
 

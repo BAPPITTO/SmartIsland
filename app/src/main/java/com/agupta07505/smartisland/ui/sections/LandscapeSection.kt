@@ -133,7 +133,7 @@ fun LandscapeSection(
             title = "Idle cutout",
             stateKey = "land_idle",
             summary = "The small circle shown when nothing is on the island",
-            initiallyExpanded = true
+            initiallyExpanded = false
         ) {
             GroupLabel("Position")
             ChoiceRow(

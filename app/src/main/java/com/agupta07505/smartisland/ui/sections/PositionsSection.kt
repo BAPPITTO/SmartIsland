@@ -206,7 +206,7 @@ fun PositionsSection(
             title = "Quick presets",
             stateKey = "pos_presets_${if (settings.enableNotchMode) "notch" else "pill"}",
             summary = "One-tap layouts for common camera cutouts",
-            initiallyExpanded = true,
+            initiallyExpanded = false,
             framed = false
         ) {
         Card(
@@ -333,84 +333,79 @@ fun PositionsSection(
                         modifier = Modifier.weight(1f)
                     )
                 }
-            }
-        }
-        }
 
-        // 3. Companion Circle Position (Pill Mode only)
-        if (!settings.enableNotchMode) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.circle_position_card_title),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = stringResource(R.string.circle_position_card_desc),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                // Companion Circle Position (Pill Mode only)
+                if (!settings.enableNotchMode) {
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
 
-                    val isLeft = settings.circlePosition == SmartIslandSettings.CIRCLE_POSITION_LEFT
                     Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                            .padding(2.dp),
-                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(if (isLeft) MaterialTheme.colorScheme.primary else Color.Transparent)
-                                .bounceClick {
-                                    scope.launch { repository.setCirclePosition(SmartIslandSettings.CIRCLE_POSITION_LEFT) }
-                                }
-                                .padding(horizontal = 10.dp, vertical = 6.dp)
-                        ) {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = stringResource(R.string.circle_position_left),
+                                text = stringResource(R.string.circle_position_card_title),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = stringResource(R.string.circle_position_card_desc),
                                 style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isLeft) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
 
-                        Box(
+                        val isLeft = settings.circlePosition == SmartIslandSettings.CIRCLE_POSITION_LEFT
+                        Row(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(if (!isLeft) MaterialTheme.colorScheme.primary else Color.Transparent)
-                                .bounceClick {
-                                    scope.launch { repository.setCirclePosition(SmartIslandSettings.CIRCLE_POSITION_RIGHT) }
-                                }
-                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                .padding(2.dp),
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
-                            Text(
-                                text = stringResource(R.string.circle_position_right),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = if (!isLeft) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (isLeft) MaterialTheme.colorScheme.primary else Color.Transparent)
+                                    .bounceClick {
+                                        scope.launch { repository.setCirclePosition(SmartIslandSettings.CIRCLE_POSITION_LEFT) }
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.circle_position_left),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isLeft) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (!isLeft) MaterialTheme.colorScheme.primary else Color.Transparent)
+                                    .bounceClick {
+                                        scope.launch { repository.setCirclePosition(SmartIslandSettings.CIRCLE_POSITION_RIGHT) }
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.circle_position_right),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (!isLeft) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }
             }
+        }
         }
 
         CollapsibleCard(
@@ -427,7 +422,7 @@ fun PositionsSection(
             title = "Size and position",
             stateKey = "pos_tuning_${if (settings.enableNotchMode) "notch" else "pill"}",
             summary = "Width, height, offsets and corner radius",
-            initiallyExpanded = true,
+            initiallyExpanded = false,
             framed = false
         ) {
         Card(
@@ -576,7 +571,7 @@ fun PositionsSection(
             title = stringResource(R.string.camera_cutout_title),
             stateKey = "pos_camera_cutout",
             summary = stringResource(R.string.camera_cutout_summary),
-            initiallyExpanded = settings.cameraCutoutManual,
+            initiallyExpanded = false,
             framed = false
         ) {
             Card(

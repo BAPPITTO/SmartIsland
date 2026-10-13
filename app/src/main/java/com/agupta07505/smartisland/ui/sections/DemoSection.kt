@@ -126,7 +126,7 @@ fun DemoSection(
                 stateKey = "demo_group_$group",
                 summary = if (showingCount > 0) "$showingCount showing" else "${events.size} samples",
                 icon = iconFor(events.first()),
-                initiallyExpanded = index == 0
+                initiallyExpanded = false
             ) {
                 events.forEachIndexed { rowIndex, event ->
                     if (rowIndex > 0) {
