@@ -74,12 +74,21 @@ object UtilityActions {
      * Opens the app on the App Shortcuts configuration (where the pinned apps and the Utilities layout are edited). The island stays
      * open on top, so the choices made there show up in it while they are being made.
      */
-    fun openShortcutSettings(context: Context, picker: String? = null) {
+    fun openShortcutSettings(context: Context) {
         val intent = Intent(context.applicationContext, com.agupta07505.smartisland.MainActivity::class.java)
             .putExtra(EXTRA_OPEN_SECTION, SECTION_APP_SHORTCUTS)
-            .apply { if (picker != null) putExtra(PickerRequest.EXTRA_OPEN_PICKER, picker) }
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         runCatching { context.startActivity(intent) }
+    }
+
+    /**
+     * Opens one of the island's pickers ([PickerRequest.APPS], [PickerRequest.UTILITY]) in its own small window, without bringing the app up. The island
+     * stays open on top, so the choices show up in it as they are made.
+     */
+    fun openPicker(context: Context, picker: String) {
+        val kind = com.agupta07505.smartisland.ui.pickers.PickerKinds.forRequest(picker) ?: return
+        runCatching { context.startActivity(com.agupta07505.smartisland.ui.pickers.PickerActivity.intentFor(context, kind)) }
+            .onFailure { openShortcutSettings(context) }
     }
 
     /** Screenshots wait a moment so the island is gone from the picture. */

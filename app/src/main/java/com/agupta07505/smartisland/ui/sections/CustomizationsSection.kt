@@ -43,14 +43,14 @@ import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material.icons.rounded.WifiTethering
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
+import com.agupta07505.smartisland.ui.glass.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
+import com.agupta07505.smartisland.ui.glass.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -351,31 +351,7 @@ fun CustomizationsSection(
                         onCheckedChange = { checked -> scope.launch { repository.setExpandedBlurEnabled(checked) } }
                     )
                 }
-                // See-through blur of whatever is behind the open card (system window blur, heavy).
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.toggle_expanded_blur_behind_title),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = stringResource(R.string.toggle_expanded_blur_behind_desc),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Switch(
-                        checked = settings.expandedBlurBehind,
-                        onCheckedChange = { checked -> scope.launch { repository.setExpandedBlurBehind(checked) } }
-                    )
-                }
-                AnimatedVisibility(visible = settings.expandedBlurEnabled || settings.expandedBlurBehind) {
+                AnimatedVisibility(visible = settings.expandedBlurEnabled) {
                     SliderSettingItem(
                         label = stringResource(R.string.slider_expanded_blur_radius),
                         value = localBlurRadius,
@@ -427,24 +403,7 @@ fun CustomizationsSection(
                         onCheckedChange = { checked -> scope.launch { repository.setMediaBlurEnabled(checked) } }
                     )
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = stringResource(R.string.toggle_media_blur_behind_title),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Switch(
-                        checked = settings.mediaBlurBehind,
-                        onCheckedChange = { checked -> scope.launch { repository.setMediaBlurBehind(checked) } }
-                    )
-                }
-                AnimatedVisibility(visible = settings.mediaBlurEnabled || settings.mediaBlurBehind) {
+                AnimatedVisibility(visible = settings.mediaBlurEnabled) {
                     SliderSettingItem(
                         label = stringResource(R.string.slider_media_blur_radius),
                         value = localMediaBlurRadius,

@@ -77,6 +77,22 @@ internal fun islandFontFamily(context: Context, id: String): FontFamily {
     return family
 }
 
+/**
+ * The android Typeface behind a font id, for drawing text into a bitmap (the LED dot style turns any font into dots, see LedRaster).
+ * A custom font whose file is missing falls back to the phone's own bold font. Bold weight is used where the font has it.
+ */
+internal fun islandTypeface(context: Context, id: String): android.graphics.Typeface {
+    if (CustomFonts.isCustomId(id)) return CustomFonts.typeface(context, id) ?: android.graphics.Typeface.DEFAULT_BOLD
+    builtinFontRes(id, 700)?.let { res ->
+        androidx.core.content.res.ResourcesCompat.getFont(context, res)?.let { return it }
+    }
+    return when (id) {
+        SmartIslandSettings.FONT_SERIF -> android.graphics.Typeface.create(android.graphics.Typeface.SERIF, android.graphics.Typeface.BOLD)
+        SmartIslandSettings.FONT_MONOSPACE -> android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
+        else -> android.graphics.Typeface.DEFAULT_BOLD
+    }
+}
+
 /** Forgets a deleted custom font. */
 internal fun forgetCustomFontFamily(id: String) {
     customFamilies.remove(id)

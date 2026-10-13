@@ -17,13 +17,14 @@ class IdleCloseSequenceTest {
     private val speeds = AnimationSpeed.entries
 
     @Test
-    fun theOpeningIsTheIdleVanishUpToTheHandOverPlusThePillSpringOrTheSecondaryReturn() {
-        // Normal: the vanish hands over after about 120 ms, then the pill spring settles in about 300 ms.
-        val opening = IdleCloseSequence.openingMs(AnimationSpeed.NORMAL)
-        val pill = pillSpringSettleMs(PILL_SPRING_STIFFNESS).toInt()
-        assertTrue("opening $opening ms", opening in (pill + 40)..(pill + 220))
-        // The secondary cutout comes back over 460 ms next to it: the longer one is the opening.
-        assertTrue(opening >= SECONDARY_RETURN_BASE_MS)
+    fun theOpeningIsThePillSpringOrTheSecondaryReturnWhicheverIsLonger() {
+        for (speed in speeds) {
+            val pill = pillSpringSettleMs(speed.userStiffness(PILL_SPRING_STIFFNESS)).toInt()
+            val secondary = speed.userDurationMs(SECONDARY_RETURN_BASE_MS)
+            assertEquals("$speed", maxOf(pill, secondary), IdleCloseSequence.openingMs(speed))
+        }
+        // Normal: the pill spring (about 300 ms) is shorter than the 460 ms secondary return, so the return is the opening.
+        assertTrue(IdleCloseSequence.openingMs(AnimationSpeed.NORMAL) >= SECONDARY_RETURN_BASE_MS)
     }
 
     @Test
@@ -101,19 +102,5 @@ class IdleCloseSequenceTest {
             val k = IdleCloseSequence.criticalStiffnessForSettleMs(ms)
             assertEquals(ms.toDouble(), springTimeToProgressMs(k, 1f, IdleCloseSequence.SETTLED).toDouble(), 2.0)
         }
-    }
-
-    @Test
-    fun fastOutSlowInTimeIsMonotoneAndHitsTheEnds() {
-        assertEquals(0f, IdleCloseSequence.fastOutSlowInTimeFor(0f), 0.001f)
-        assertEquals(1f, IdleCloseSequence.fastOutSlowInTimeFor(1f), 0.001f)
-        var last = 0f
-        for (i in 1..10) {
-            val t = IdleCloseSequence.fastOutSlowInTimeFor(i / 10f)
-            assertTrue(t >= last)
-            last = t
-        }
-        // The curve starts quickly: 60 % of the travel takes well under 60 % of the time.
-        assertTrue(IdleCloseSequence.fastOutSlowInTimeFor(0.6f) < 0.6f)
     }
 }

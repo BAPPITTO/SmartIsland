@@ -60,7 +60,7 @@ import androidx.compose.material3.FilterChipDefaults
 import com.agupta07505.smartisland.ui.SliderSettingItem
 import com.agupta07505.smartisland.ui.bounceClick
 import kotlin.math.roundToInt
-import androidx.compose.material3.Card
+import com.agupta07505.smartisland.ui.glass.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -74,7 +74,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Switch
+import com.agupta07505.smartisland.ui.glass.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
@@ -443,6 +443,17 @@ fun NotificationsAndPrivacySection(
                         LockScreenEventList(settings = settings, repository = repository)
                     }
                 }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+
+                ToggleRowItem(
+                    searchKey = "np.live_events_foreground",
+                    title = stringResource(R.string.toggle_live_events_foreground_title),
+                    subtitle = stringResource(R.string.toggle_live_events_foreground_desc),
+                    icon = Icons.Rounded.OpenInFull,
+                    checked = settings.showLiveEventsInForeground,
+                    onCheckedChange = { scope.launch { repository.setShowLiveEventsInForeground(it) } }
+                )
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
 

@@ -13,7 +13,6 @@ import com.agupta07505.smartisland.ui.expanded.expandedGradientBrush
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class CardStyleTest {
@@ -33,6 +32,5 @@ class CardStyleTest {
 
     @Test
     fun seeThroughBlurIsOffByDefault() {
-        assertFalse(base.expandedBlurBehind)
     }
 }

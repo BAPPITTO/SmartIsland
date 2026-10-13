@@ -23,7 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ExpandMore
-import androidx.compose.material3.Card
+import com.agupta07505.smartisland.ui.glass.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -124,7 +124,7 @@ fun CollapsibleCard(
         modifier = modifier
             .fillMaxWidth()
             .animateContentSize(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
@@ -140,8 +140,8 @@ fun CollapsibleCard(
                 if (icon != null) {
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(10.dp))
+                            .size(38.dp)
+                            .clip(RoundedCornerShape(12.dp))
                             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
                         contentAlignment = Alignment.Center
                     ) {

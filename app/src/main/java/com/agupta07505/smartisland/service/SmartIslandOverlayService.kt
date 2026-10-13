@@ -47,7 +47,6 @@ import com.agupta07505.smartisland.ui.IslandViewModel
 import com.agupta07505.smartisland.ui.OverlayIsland
 import com.agupta07505.smartisland.ui.expanded.sendIntentWithOptions
 import com.agupta07505.smartisland.data.forOrientation
-import com.agupta07505.smartisland.util.BlurFollow
 import com.agupta07505.smartisland.util.LandscapeCameraDetector
 import com.agupta07505.smartisland.util.runCatchingLogged
 import com.agupta07505.smartisland.util.runSuspendCatchingLogged
@@ -575,7 +574,7 @@ class SmartIslandOverlayService : AccessibilityService() {
                 runCatchingLogged(TAG, "orientation refresh failed") {
                     refreshOrientation()
                     // Applied directly too, so the window never waits on the settings flow.
-                    val raw = com.agupta07505.smartisland.util.LandscapeDemo.applyTo(viewModel.orientation.value)
+                    val raw = viewModel.orientation.value
                     val effective = viewModel.settingsSnapshot().forOrientation(
                         raw, hasContent = viewModel.visibleNotifications.value.isNotEmpty()
                     )
@@ -729,6 +728,17 @@ class SmartIslandOverlayService : AccessibilityService() {
         )
 
         serviceScope.launch {
+            runSuspendCatchingLogged(TAG, "Exempt-app visibility collector failed") {
+                // The island's window is hidden (and its touches go to the app) while an exempt app is in the foreground.
+                viewModel.islandOffForApp.collectLatest {
+                    if (destroyed || !viewModel.displaySettings.value.enabled) return@collectLatest
+                    // Back from an exempt app: the rotation / app switch may have changed the geometry meanwhile.
+                    updateWindowLayoutParams(isWindowExpanded, viewModel.displaySettings.value)
+                }
+            }
+        }
+
+        serviceScope.launch {
             runSuspendCatchingLogged(TAG, "Privacy state collector failed") {
                 // The sharing bubble changes the touchable area and the window size.
                 viewModel.privacy.collectLatest {
@@ -765,8 +775,6 @@ class SmartIslandOverlayService : AccessibilityService() {
                         isWindowExpanded = true
                         updateWindowLayoutParams(true, viewModel.displaySettings.value)
                     } else {
-                        // The blur window must not trail the closing island (it is throttled while moving).
-                        hideBlurNow()
                         collapseJob = serviceScope.launch {
                             kotlinx.coroutines.delay(AUTO_COLLAPSE_DELAY_MS)
                             isWindowExpanded = false
@@ -976,8 +984,7 @@ class SmartIslandOverlayService : AccessibilityService() {
         // `settings` is the raw stored profile; resolve it for the current orientation synchronously.
         updateWindowLayoutParams(
             isWindowExpanded,
-            com.agupta07505.smartisland.util.LandscapeDemo.applyTo(settings)
-                .forOrientation(com.agupta07505.smartisland.util.LandscapeDemo.applyTo(viewModel.orientation.value))
+            settings.forOrientation(viewModel.orientation.value)
         )
         // The listener's own import runs when it connects, which can be before this overlay exists: ask it to import again.
         // Once per session: this function runs on every settings change (a slider drag), and each sync reads the whole shade.
@@ -1036,7 +1043,7 @@ class SmartIslandOverlayService : AccessibilityService() {
                 val isLocked = keyguardManager?.isKeyguardLocked == true
                 isLockScreenActive = isLocked
                 val isLandscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-                val isHidden = (!viewModel.displaySettings.value.showOnLockScreen && isLocked) || (isLandscape && !viewModel.displaySettings.value.showInLandscape)
+                val isHidden = (!viewModel.displaySettings.value.showOnLockScreen && isLocked) || (isLandscape && !viewModel.displaySettings.value.showInLandscape) || viewModel.islandOffForApp.value
                 visibility = if (isHidden) android.view.View.GONE else android.view.View.VISIBLE
 
                 installOverlayViewTreeOwners()
@@ -1089,9 +1096,6 @@ class SmartIslandOverlayService : AccessibilityService() {
 
                 setupTouchableRegion(this)
             }
-            // The blur window goes in first so it stays below the island window (later windows
-            // of the same type sit on top); otherwise it would blur the island itself.
-            ensureBlurWindow()
             runCatchingLogged(TAG, "windowManager.addView failed") {
                 windowManager.addView(islandView, collapsedParams(viewModel.displaySettings.value))
             } ?: run {
@@ -1405,7 +1409,7 @@ class SmartIslandOverlayService : AccessibilityService() {
         val isLandscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
         val privacyNow = viewModel.privacy.value
         val visibleCount = viewModel.visibleNotifications.value.size
-        val isHidden = (!settings.showOnLockScreen && isLocked) || (isLandscape && !settings.showInLandscape)
+        val isHidden = (!settings.showOnLockScreen && isLocked) || (isLandscape && !settings.showInLandscape) || viewModel.islandOffForApp.value
 
         val targetVisibility = if (isHidden) android.view.View.GONE else android.view.View.VISIBLE
         if (view.visibility != targetVisibility) {
@@ -1526,162 +1530,7 @@ class SmartIslandOverlayService : AccessibilityService() {
         }
     }
 
-    // ---- Real-time background blur behind the expanded island ----------------------------------
-    // A separate, untouchable, see-through window sized to the expanded island asks the system to
-    // blur whatever is behind it (FLAG_BLUR_BEHIND, Android 12+). It is inset a little so its
-    // square corners stay inside the island's rounded corners.
-
-    private var blurView: android.view.View? = null
-    private var blurJob: kotlinx.coroutines.Job? = null
-    private var lastBlurKey: IntArray? = null
-    /** The island rect the blur follower saw last; a move from it hides the blur window until the island is still. */
-    private var lastBlurBounds: android.graphics.Rect? = null
-
-    /** One params object for the blur window, changed in place instead of allocating a new one per relayout. */
-    private var blurParams: WindowManager.LayoutParams? = null
-
-    private fun ensureBlurWindow() {
-        if (blurView != null || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
-        val view = android.view.View(this).apply {
-            // Nearly invisible, but not empty, so the system keeps the window's surface alive.
-            setBackgroundColor(android.graphics.Color.argb(1, 0, 0, 0))
-            visibility = android.view.View.GONE
-        }
-        val params = WindowManager.LayoutParams(
-            1, 1,
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-        }
-        val added = runCatchingLogged(TAG, "blur window addView failed") {
-            windowManager.addView(view, params)
-        }
-        if (added == null) return
-        blurView = view
-        blurParams = params
-        lastBlurKey = null
-        blurJob?.cancel()
-        blurJob = serviceScope.launch {
-            kotlinx.coroutines.flow.combine(
-                viewModel.expandedSurfaceBounds,
-                viewModel.displaySettings,
-                viewModel.shownCardIsMedia,
-                // The real expanded state. The rect below is cleared by a LaunchedEffect one composition after a collapse starts,
-                // and the last rect it reported stays in the flow until then. Without this the blur window (a plain, square-cornered
-                // rectangle) came back at the old card size for a few frames over the already shrinking, rounded pill.
-                viewModel.expanded
-            ) { bounds, settings, media, isExpanded ->
-                (if (isExpanded) bounds else null) to settings.forCard(media)
-            }
-                // The island reports its rect on every frame while it grows, shrinks or changes card, and each blur update is
-                // a window relayout (a binder call plus a new blur layer) on the main thread. The blur window is a plain
-                // rectangle that lags the island, so while the island moves it would show as a grey box and frame around
-                // the pill (a smaller card, a rounded corner). So it hides at once when the rect moves and comes back once the
-                // rect has been still for BLUR_SETTLE_MS (collectLatest drops the wait whenever a newer rect arrives).
-                .collectLatest { (bounds, settings) ->
-                    // Blur behind is off (the usual case): nothing to follow, so no per-frame wait or rect copy at all.
-                    if (!settings.expandedBlurBehind) {
-                        lastBlurBounds = null
-                        updateBlurWindow(null, settings)
-                        return@collectLatest
-                    }
-                    val previous = lastBlurBounds
-                    if (bounds != null && previous != null && BlurFollow.rectMoved(previous, bounds)) hideBlurNow()
-                    // Reuse one Rect instead of allocating a copy for every reported frame.
-                    lastBlurBounds = bounds?.let { (previous ?: android.graphics.Rect()).apply { set(it) } }
-                    if (bounds != null) kotlinx.coroutines.delay(BLUR_SETTLE_MS)
-                    updateBlurWindow(bounds, settings)
-                }
-        }
-    }
-
-    /** Hides the blur window at once (the island started to close); it comes back with the next reported rect. */
-    private fun hideBlurNow() {
-        val view = blurView ?: return
-        if (view.visibility != android.view.View.GONE) {
-            blurDiag("hide (rect moved)")
-            view.visibility = android.view.View.GONE
-        }
-        lastBlurKey = null
-    }
-
-    /** Blur window show / hide lines for the in-app diagnostic log (tag BlurDiag): when it shows and the rect it shows at. */
-    private fun blurDiag(message: String) {
-        com.agupta07505.smartisland.util.AppLogRecorder.i("BlurDiag", message)
-    }
-
-    private fun updateBlurWindow(bounds: android.graphics.Rect?, settings: SmartIslandSettings) {
-        val view = blurView ?: return
-        val island = islandView
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
-        val canBlur = settings.expandedBlurBehind &&
-            viewModel.expanded.value &&
-            bounds != null && island != null &&
-            island.isAttachedToWindow &&
-            island.visibility == android.view.View.VISIBLE &&
-            windowManager.isCrossWindowBlurEnabled
-        if (!canBlur) {
-            if (view.visibility != android.view.View.GONE) {
-                blurDiag("hide (blur off, no rect or not expanded) bounds=${bounds ?: "null"}")
-                view.visibility = android.view.View.GONE
-            }
-            lastBlurKey = null
-            return
-        }
-        val rect = bounds ?: return
-        val density = resources.displayMetrics.density
-        val origin = IntArray(2)
-        island?.getLocationOnScreen(origin)
-        val inset = (com.agupta07505.smartisland.ui.expanded.SPLIT_ISLAND_CORNER.value * 0.29f * density).toInt()
-        val left = origin[0] + rect.left + inset
-        val top = origin[1] + rect.top + inset
-        val width = (rect.width() - 2 * inset).coerceAtLeast(1)
-        val height = (rect.height() - 2 * inset).coerceAtLeast(1)
-        val radius = (settings.expandedBlurRadius * density).toInt().coerceAtLeast(1)
-        val key = intArrayOf(left, top, width, height, radius)
-        // A drift of a few px (swell, lean, drag jitter) is invisible through the blur and not worth a relayout.
-        val visible = view.visibility == android.view.View.VISIBLE
-        if (visible && !BlurFollow.needsRelayout(lastBlurKey, key)) return
-        lastBlurKey = key
-        val params = blurParams ?: return
-        params.width = width
-        params.height = height
-        params.x = left
-        params.y = top
-        params.blurBehindRadius = radius
-        params.flags = params.flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
-        if (!visible) {
-            blurDiag("show rect=[$left,$top,${left + width},${top + height}] island=$rect")
-            view.visibility = android.view.View.VISIBLE
-        }
-        runCatchingLogged(TAG, "blur window update failed") {
-            windowManager.updateViewLayout(view, params)
-        }
-    }
-
-    private fun removeBlurWindow() {
-        blurJob?.cancel()
-        blurJob = null
-        lastBlurKey = null
-        lastBlurBounds = null
-        blurParams = null
-        val view = blurView ?: return
-        blurView = null
-        if (!::windowManager.isInitialized) return
-        runCatchingLogged(TAG, "Failed to remove blur window") {
-            if (view.isAttachedToWindow) windowManager.removeViewImmediate(view)
-        }
-    }
-
     private fun removeCollapsedWindow() {
-        removeBlurWindow()
         val view = islandView ?: return
         // Clear the reference before removal so repeated teardown calls are harmless,
         // even when an OEM WindowManager throws while detaching an already-removed view.
@@ -2377,7 +2226,5 @@ class SmartIslandOverlayService : AccessibilityService() {
         private const val SETTLE_SCAN_FIRST_MS = 400L
         private const val SETTLE_SCAN_SECOND_MS = 1_100L
         private const val WINDOW_PACKAGE_CACHE_MAX = 96
-        /** The blur window follows the island at most this often while the island is moving. */
-        private const val BLUR_SETTLE_MS = 90L
     }
 }

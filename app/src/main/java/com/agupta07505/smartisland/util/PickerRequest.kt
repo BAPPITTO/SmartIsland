@@ -7,18 +7,12 @@
 
 package com.agupta07505.smartisland.util
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-
 /**
- * Which picker the island's plus button wants open once the app's settings screen is up ([APPS]: the pinned apps picker,
- * [UTILITY]: the "add a utility" dialog). The settings sections read it, open the picker and clear it.
+ * Which picker the island's plus button wants open: [APPS] is the pinned apps picker, [UTILITY] the "add a utility" flow. Both open in
+ * their own small window ([com.agupta07505.smartisland.ui.pickers.PickerActivity]); the app's settings screens host the same shared dialogs
+ * themselves and are never asked to open one on the island's behalf.
  */
 object PickerRequest {
-    const val EXTRA_OPEN_PICKER = "open_picker"
     const val APPS = "apps"
     const val UTILITY = "utility"
-
-    var pending: String? by mutableStateOf<String?>(null)
 }

@@ -8,29 +8,16 @@
 package com.agupta07505.smartisland.ui
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Easing
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
-import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import com.agupta07505.smartisland.data.SmartIslandSettings
-import com.agupta07505.smartisland.model.IDLE_BLINK_MS
 import com.agupta07505.smartisland.model.IdleCloseSequence
-import com.agupta07505.smartisland.model.IDLE_OPEN_AT_EXIT
-import com.agupta07505.smartisland.model.IDLE_PULSE_DOWN_MS
-import com.agupta07505.smartisland.model.IDLE_PULSE_SCALE
-import com.agupta07505.smartisland.model.IDLE_PULSE_UP_MS
-import com.agupta07505.smartisland.model.IDLE_VANISH_MS
-import com.agupta07505.smartisland.model.PILL_ENTER_AT_IDLE_VANISH
 import com.agupta07505.smartisland.model.PILL_SPRING_DAMPING
 import com.agupta07505.smartisland.model.PILL_SPRING_STIFFNESS
 import com.agupta07505.smartisland.model.PillExitDirection
@@ -44,8 +31,6 @@ import com.agupta07505.smartisland.model.pillSlideProgress
 import com.agupta07505.smartisland.model.pillTransition
 import com.agupta07505.smartisland.util.AnimationSpeed
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -54,14 +39,14 @@ import androidx.compose.runtime.setValue
  * One state machine for the landscape cutout leaving AND coming back (rules: model/PillPresence.kt, maths of the
  * slide: model/LandscapePillExit.kt). Kept out of the overlay's very large function on purpose, like the idle dot.
  *
- * Two numbers drive everything:
+ * One number drives everything:
  *  - [presence]: 1 = collapsed pill in place, 0 = pill gone. It is driven by a critically damped spring (no bounce)
  *    on an [Animatable], so a card arriving mid-exit (or the card going mid-entry) reverses in place and keeps the
  *    velocity it had: never a snap, never a restart from rest. The animation speed scales the spring's stiffness.
- *  - [idle]: how much of the idle circle is drawn (0..1). The idle circle is the island's separate round dot, so it can
- *    overlap the pill's slide: it opens when the exit is 70 % done and, when a card comes, vanishes first and the pill
- *    slides in once the vanish is 60 % done. Both hand-offs wait on progress, not on a clock. Same order for calls and
- *    popups (no exceptions).
+ *
+ * The idle circle (the camera cutout circle) is NOT part of the motion: it never fades, blinks or pulses, and the pill
+ * does not wait for it. It is on or off (see [dotAlpha]): on while the pill leaves and during the hand-over, so it is
+ * simply there when the pill has gone.
  *
  * While the pill leaves, the island keeps the settings it had with the card (size and position do not glide to
  * the idle size); when it is gone the island takes the idle settings with a jump ([PillPhase.Settling]) and the dot
@@ -100,12 +85,6 @@ internal class PillExitState {
 
     /** The next run starts from [presence] at rest (a new exit or entry), instead of continuing the running motion. */
     var restartPresence = true
-
-    /** 0 = idle circle not drawn, 1 = fully open. */
-    var idle by mutableFloatStateOf(0f)
-
-    /** 0..1 shape of the idle circle's pulse (0 = normal size, 1 = fully enlarged by [IDLE_PULSE_SCALE]). */
-    var pulse by mutableFloatStateOf(0f)
 
     /** Set while composing: the island's size and position jump instead of gliding. */
     var snapGeometry = false
@@ -151,21 +130,11 @@ internal class PillExitState {
         frozen = null
         phase = PillPhase.None
         presence = 1f
-        idle = 0f
-        pulse = 0f
         restartPresence = true
         exitStiffnessUser = null
     }
 
     private fun effPresence(): Float = if (enterStarting) 0f else if (phase == PillPhase.None || phase == PillPhase.Settling) 1f else presence
-
-    private fun effIdle(): Float = when {
-        enterStarting -> 1f
-        // The dot keeps standing in for the idle cutout until the shell has settled on the idle settings.
-        phase == PillPhase.Settling && dotCoversHandover -> 1f
-        phase == PillPhase.Leaving || phase == PillPhase.Entering -> idle.coerceIn(0f, 1f)
-        else -> 0f
-    }
 
     fun slideXDp(): Float = pillExitOffsetDp(direction, travelDp, pillSlideProgress(effPresence())).dx
 
@@ -181,21 +150,11 @@ internal class PillExitState {
     fun shellAlpha(): Float = if (phase == PillPhase.Settling && dotCoversHandover) 0f else pillAlpha()
 
     /**
-     * Scale of the idle circle: 1, except for the one pulse every exit ends with (it blinks in, then enlarges and
-     * shrinks back to normal size, tweens only). There is no plain blink any more.
+     * Opacity of the idle circle: on or off, never animated. It is fully on from the moment the pill starts to leave
+     * until the island's own idle cutout has taken over (the circle stands in for it while the shell settles), else [base].
      */
-    fun dotScale(): Float = 1f + IDLE_PULSE_SCALE * pulse.coerceIn(0f, 1f)
-
-    /** Opacity of the idle circle: driven by the machine while it runs, else by [base] (its normal fade). */
-    fun dotAlpha(base: Float): Float = if (dotDriven(base)) effIdle() else base
-
-    // A dot that stays on screen next to the pill anyway (base fully shown) is left alone while a pill comes in.
-    private fun dotDriven(base: Float): Boolean = when {
-        phase == PillPhase.Leaving -> true
-        phase == PillPhase.Settling -> dotCoversHandover
-        phase == PillPhase.Entering || enterStarting -> base < 0.99f
-        else -> false
-    }
+    fun dotAlpha(base: Float): Float =
+        if (phase == PillPhase.Leaving || (phase == PillPhase.Settling && dotCoversHandover)) 1f else base
 
     fun start(block: suspend () -> Unit, scope: kotlinx.coroutines.CoroutineScope) {
         job?.cancel()
@@ -216,31 +175,14 @@ internal class PillExitState {
         }
     }
 
-    /** Pill slides out and fades; the idle circle opens when the exit is 70 % done. Continues from the current motion. */
+    /** Pill slides out and fades. Continues from the current motion. The idle circle takes no part in it. */
     suspend fun runExit(speed: AnimationSpeed) {
         beginPresenceRun()
-        coroutineScope {
-            launch {
-                // Progress-based: if a reversed entry already is past 70 % this passes at once.
-                snapshotFlow { pillSlideProgress(presence) }.first { it >= IDLE_OPEN_AT_EXIT }
-                // A blink: a short fade at full size (see [dotScale]), no spring and no overshoot. With animations off it is at once.
-                val blinkMs = if (com.agupta07505.smartisland.util.SystemAnimScale.animationsOff()) 1 else speed.durationMs(IDLE_BLINK_MS).coerceAtLeast(1)
-                animateTo(idle, 1f, blinkMs, LinearOutSlowInEasing) { idle = it }
-                // Every exit pulses once: the circle enlarges and shrinks back to normal size.
-                if (!com.agupta07505.smartisland.util.SystemAnimScale.animationsOff()) {
-                    animateTo(0f, 1f, speed.durationMs(IDLE_PULSE_UP_MS).coerceAtLeast(1), FastOutSlowInEasing) { pulse = it }
-                    animateTo(1f, 0f, speed.durationMs(IDLE_PULSE_DOWN_MS).coerceAtLeast(1), FastOutSlowInEasing) { pulse = it }
-                }
-                pulse = 0f
-            }
-            presenceAnim.animateTo(0f, presenceSpec(speed)) { presence = value }
-        }
+        presenceAnim.animateTo(0f, presenceSpec(speed)) { presence = value }
         // Gone: the island takes the idle settings with a jump and the dot hands over at the same spot.
         presenceAnim.snapTo(1f)
         frozen = null
         presence = 1f
-        idle = 0f
-        pulse = 0f
         phase = PillPhase.Settling
         withFrameNanos { }
         withFrameNanos { }
@@ -258,32 +200,14 @@ internal class PillExitState {
         exitStiffnessUser = null
     }
 
-    /** Idle circle vanishes first; the pill springs back in once the vanish is 60 % done. Continues from the current motion. */
+    /** Pill springs back in right away (it does not wait for the idle circle). Continues from the current motion. */
     suspend fun runEnter(speed: AnimationSpeed) {
         beginPresenceRun()
-        // A card came back while the circle was pulsing: the pulse is over, the circle vanishes from its normal size.
-        pulse = 0f
-        val vanishFull = speed.durationMs(IDLE_VANISH_MS)
-        val idleStart = idle.coerceIn(0f, 1f)
-        // Animations off (system scale 0): no minimum length, the idle circle is gone at once.
-        val vanishMs = if (com.agupta07505.smartisland.util.SystemAnimScale.animationsOff()) 1 else (vanishFull * idleStart).toInt().coerceAtLeast(40)
-        coroutineScope {
-            launch { animateTo(idle, 0f, vanishMs, FastOutSlowInEasing) { idle = it } }
-            // Nothing of the idle circle is drawn yet (reversing an exit that has not opened it): come back right away.
-            if (idleStart > 0.01f) {
-                snapshotFlow { idle }.first { it <= idleStart * (1f - PILL_ENTER_AT_IDLE_VANISH) }
-            }
-            presenceAnim.animateTo(1f, presenceSpec(speed)) { presence = value }
-        }
+        presenceAnim.animateTo(1f, presenceSpec(speed)) { presence = value }
         presenceAnim.snapTo(1f)
         presence = 1f
-        idle = 0f
         phase = PillPhase.None
         exitStiffnessUser = null
-    }
-
-    private suspend fun animateTo(from: Float, to: Float, ms: Int, easing: Easing, set: (Float) -> Unit) {
-        animate(initialValue = from, targetValue = to, animationSpec = tween(ms, easing = easing)) { v, _ -> set(v) }
     }
 }
 
@@ -334,12 +258,10 @@ internal fun rememberLandscapePillExit(
     SideEffect {
         when (transition) {
             PillTransition.StartExit -> {
-                state.pulse = 0f
                 state.exitStiffnessUser = exitStiffness
                 state.freeze(state.lastSettings)
                 state.presence = 1f
                 state.restartPresence = true
-                state.idle = 0f
                 state.phase = PillPhase.Leaving
                 state.start({ state.runExit(animSpeed) }, scope)
             }
@@ -347,7 +269,6 @@ internal fun rememberLandscapePillExit(
                 state.freeze(null)
                 state.presence = 0f
                 state.restartPresence = true
-                state.idle = 1f
                 state.phase = PillPhase.Entering
                 state.start({ state.runEnter(animSpeed) }, scope)
             }

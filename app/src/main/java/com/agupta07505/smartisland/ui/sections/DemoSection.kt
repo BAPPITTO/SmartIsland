@@ -23,14 +23,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ClearAll
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material3.Card
+import com.agupta07505.smartisland.ui.glass.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
+import com.agupta07505.smartisland.ui.glass.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
@@ -69,17 +69,16 @@ fun DemoSection(
     val showingKeys = cards.filter { DemoEvents.isDemoKey(it.key) }.map { it.key }.toSet()
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        LandscapeLabSection(notificationRepository = notificationRepository)
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    text = "Simulation Lab",
+                    text = "Sample cards",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -87,9 +86,9 @@ fun DemoSection(
                 Text(
                     text = when {
                         notificationRepository == null -> "The island is not ready yet. Open the app again."
-                        !settings.enabled -> "The island is off. Turn it on from Home, then tap a button to see that card."
+                        !settings.enabled -> "The island is off. Turn it on from the Home tab, then tap a button to see that card."
                         else -> "Tap Show to put a sample card on the island. Short events leave by themselves; " +
-                            "the others stay until you clear them. Events switched off on Home stay hidden."
+                            "the others stay until you clear them. Events switched off on the Home tab stay hidden."
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -127,7 +126,7 @@ fun DemoSection(
                 stateKey = "demo_group_$group",
                 summary = if (showingCount > 0) "$showingCount showing" else "${events.size} samples",
                 icon = iconFor(events.first()),
-                initiallyExpanded = false
+                initiallyExpanded = index == 0
             ) {
                 events.forEachIndexed { rowIndex, event ->
                     if (rowIndex > 0) {
@@ -137,7 +136,7 @@ fun DemoSection(
                     val off = !settings.isEventEnabled(event.id)
                     DemoRow(
                         title = event.label,
-                        subtitle = if (off) "Switched off on Home" else null,
+                        subtitle = if (off) "Switched off on the Home tab" else null,
                         event = event,
                         showing = showing,
                         enabled = notificationRepository != null,

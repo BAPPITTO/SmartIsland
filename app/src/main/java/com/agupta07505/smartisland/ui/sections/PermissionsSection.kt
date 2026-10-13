@@ -31,7 +31,7 @@ import androidx.compose.material.icons.rounded.FlashOn
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import com.agupta07505.smartisland.ui.glass.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
@@ -83,6 +84,8 @@ fun PermissionsSection(
     val scope = rememberCoroutineScope()
     var isExecutingShizuku by remember { mutableStateOf(false) }
     var isRepairingAccessibility by remember { mutableStateOf(false) }
+    // Which of the two 1-tap setups is running, for the button label.
+    var runningScope by remember { mutableStateOf<ShizukuManager.SetupScope?>(null) }
     // The "try the Shizuku methods" check: asked for after the auto setup, and always available from its button.
     var showCheckDialog by remember { mutableStateOf(false) }
     var isChecking by remember { mutableStateOf(false) }
@@ -99,8 +102,43 @@ fun PermissionsSection(
             Toast.makeText(context, context.getString(R.string.shizuku_check_done), Toast.LENGTH_SHORT).show()
         }
     }
-    // Whether the app may read notifications Android marks as sensitive; read again every time the screen comes back.
+    var isOemAutostartEnabled by remember { mutableStateOf(batteryIgnored) }
+    var isOverlayWarningDisabled by remember { mutableStateOf(false) }
     var sensitiveAllowed by remember { mutableStateOf(ShizukuManager.isSensitiveNotificationAccessAllowed(context)) }
+    // One tap of either setup button: check Shizuku is ready, ask for its permission, or run the chosen setup.
+    fun runSetup(scopeToGrant: ShizukuManager.SetupScope) {
+        when {
+            !ShizukuManager.isInstalled(context) || !ShizukuManager.isBinderAvailable() -> {
+                Toast.makeText(context, context.getString(R.string.shizuku_not_running), Toast.LENGTH_LONG).show()
+            }
+            !ShizukuManager.hasPermission() -> ShizukuManager.requestPermission()
+            else -> {
+                isExecutingShizuku = true
+                runningScope = scopeToGrant
+                scope.launch {
+                    val result = if (scopeToGrant == ShizukuManager.SetupScope.All) {
+                        ShizukuManager.autoGrantAllPermissions(context)
+                    } else {
+                        ShizukuManager.autoGrantNecessaryPermissions(context)
+                    }
+                    isExecutingShizuku = false
+                    runningScope = null
+                    result.onSuccess {
+                        Toast.makeText(context, context.getString(R.string.shizuku_success), Toast.LENGTH_LONG).show()
+                        isOemAutostartEnabled = true
+                        isOverlayWarningDisabled = true
+                        sensitiveAllowed = ShizukuManager.isSensitiveNotificationAccessAllowed(context)
+                        onRefreshPermissions()
+                        // Setup is the moment to find out which Shizuku methods work on this phone.
+                        showCheckDialog = true
+                    }.onFailure { err ->
+                        Toast.makeText(context, context.getString(R.string.shizuku_failed, err.localizedMessage ?: ""), Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        }
+    }
+    // Whether the app may read notifications Android marks as sensitive; read again every time the screen comes back.
     val permLifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(permLifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -111,8 +149,6 @@ fun PermissionsSection(
         permLifecycleOwner.lifecycle.addObserver(observer)
         onDispose { permLifecycleOwner.lifecycle.removeObserver(observer) }
     }
-    var isOemAutostartEnabled by remember { mutableStateOf(batteryIgnored) }
-    var isOverlayWarningDisabled by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -181,55 +217,34 @@ fun PermissionsSection(
                             )
                         }
                     }
-                    Spacer(Modifier.width(10.dp))
-                    Button(
-                        enabled = !isExecutingShizuku,
-                        onClick = {
-                            when {
-                                !ShizukuManager.isInstalled(context) -> {
-                                    Toast.makeText(context, context.getString(R.string.shizuku_not_running), Toast.LENGTH_LONG).show()
-                                }
-                                !ShizukuManager.isBinderAvailable() -> {
-                                    Toast.makeText(context, context.getString(R.string.shizuku_not_running), Toast.LENGTH_LONG).show()
-                                }
-                                !ShizukuManager.hasPermission() -> {
-                                    ShizukuManager.requestPermission()
-                                }
-                                else -> {
-                                    isExecutingShizuku = true
-                                    scope.launch {
-                                        val result = ShizukuManager.autoGrantAllPermissions(context)
-                                        isExecutingShizuku = false
-                                        result.onSuccess { msg ->
-                                            Toast.makeText(context, context.getString(R.string.shizuku_success), Toast.LENGTH_LONG).show()
-                                            isOemAutostartEnabled = true
-                                            isOverlayWarningDisabled = true
-                                            sensitiveAllowed = ShizukuManager.isSensitiveNotificationAccessAllowed(context)
-                                            onRefreshPermissions()
-                                            // Setup is the moment to find out which Shizuku methods work on this phone.
-                                            showCheckDialog = true
-                                        }.onFailure { err ->
-                                            Toast.makeText(context, context.getString(R.string.shizuku_failed, err.localizedMessage ?: ""), Toast.LENGTH_LONG).show()
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
-                    ) {
-                        Text(
-                            text = if (isExecutingShizuku) stringResource(R.string.shizuku_btn_running) else stringResource(R.string.shizuku_btn_run),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
                 }
                 Text(
                     text = stringResource(R.string.shizuku_card_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 16.sp
+                )
+                SetupOption(
+                    title = stringResource(R.string.shizuku_option_necessary_title),
+                    description = stringResource(R.string.shizuku_option_necessary_desc),
+                    buttonText = stringResource(
+                        if (runningScope == ShizukuManager.SetupScope.Necessary) R.string.shizuku_btn_running
+                        else R.string.shizuku_option_necessary_btn
+                    ),
+                    filled = true,
+                    enabled = !isExecutingShizuku,
+                    onClick = { runSetup(ShizukuManager.SetupScope.Necessary) }
+                )
+                SetupOption(
+                    title = stringResource(R.string.shizuku_option_all_title),
+                    description = stringResource(R.string.shizuku_option_all_desc),
+                    buttonText = stringResource(
+                        if (runningScope == ShizukuManager.SetupScope.All) R.string.shizuku_btn_running
+                        else R.string.shizuku_option_all_btn
+                    ),
+                    filled = false,
+                    enabled = !isExecutingShizuku,
+                    onClick = { runSetup(ShizukuManager.SetupScope.All) }
                 )
                 OutlinedButton(
                     modifier = Modifier.fillMaxWidth(),
@@ -278,7 +293,6 @@ fun PermissionsSection(
                         fontWeight = FontWeight.Bold
                     )
                 }
-
                 OutlinedButton(
                     enabled = !isExecutingShizuku,
                     onClick = {
@@ -632,4 +646,56 @@ private fun shizukuMethodLabel(method: ShizukuMethodCheck.Method): Int = when (m
     ShizukuMethodCheck.Method.ScreenRecorder -> R.string.shizuku_method_screen_recorder
     ShizukuMethodCheck.Method.TrimCache -> R.string.shizuku_method_trim_cache
     ShizukuMethodCheck.Method.Hotspot -> R.string.shizuku_method_hotspot
+}
+
+/** One of the two 1-tap setups: what it grants, and its button. */
+@Composable
+private fun SetupOption(
+    title: String,
+    description: String,
+    buttonText: String,
+    filled: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = description,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            lineHeight = 16.sp
+        )
+        if (filled) {
+            Button(
+                onClick = onClick,
+                enabled = enabled,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(text = buttonText, fontWeight = FontWeight.Bold)
+            }
+        } else {
+            OutlinedButton(
+                onClick = onClick,
+                enabled = enabled,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(text = buttonText, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
 }

@@ -8,6 +8,7 @@
 package com.agupta07505.smartisland.ui
 
 import com.agupta07505.smartisland.model.IdleWidgetOff
+import com.agupta07505.smartisland.model.IslandExemption
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -63,22 +64,10 @@ class IslandViewModel(
     /** True while the phone is turning and the island is hidden until the new orientation has settled (model/RotationVeil.kt). */
     val rotationVeil = MutableStateFlow(false)
 
-    /** Stored settings, with the Landscape Lab's layout on top while the lab is playing (else exactly the stored ones). */
-    private val labRaw: kotlinx.coroutines.flow.Flow<SmartIslandSettings> = combine(
-        settingsRepo.settings,
-        com.agupta07505.smartisland.util.LandscapeDemo.override
-    ) { raw, lab -> if (lab == null) raw else lab.applyTo(raw) }
-
-    /** Display state, with the Landscape Lab's rotation and camera on top while the lab is playing. */
-    private val labOrientation: kotlinx.coroutines.flow.Flow<OrientationState> = combine(
-        orientation,
-        com.agupta07505.smartisland.util.LandscapeDemo.override
-    ) { state, lab -> if (lab == null) state else lab.applyTo(state) }
-
     /** Settings with the portrait or landscape profile already applied. */
     val settings: StateFlow<SmartIslandSettings> = combine(
-        labRaw,
-        labOrientation
+        settingsRepo.settings,
+        orientation
     ) { raw, state -> raw.forOrientation(state) }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
@@ -90,8 +79,8 @@ class IslandViewModel(
      * (reverse landscape), so the picker always sits on the side away from the camera.
      */
     val pickerOnLeft: StateFlow<Boolean> = combine(
-        labRaw,
-        labOrientation
+        settingsRepo.settings,
+        orientation
     ) { raw, state ->
         state.isLandscape &&
             raw.landscapeCameraSide(state) == SmartIslandSettings.LANDSCAPE_POSITION_RIGHT
@@ -104,7 +93,7 @@ class IslandViewModel(
     /** Latest stored (raw, orientation-free) settings, for callers that need a synchronous read. */
     fun settingsSnapshot(): SmartIslandSettings = rawSettings.value
 
-    private val rawSettings: StateFlow<SmartIslandSettings> = labRaw.stateIn(
+    private val rawSettings: StateFlow<SmartIslandSettings> = settingsRepo.settings.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
         initialValue = SmartIslandSettings.Default
@@ -213,8 +202,8 @@ class IslandViewModel(
      * Follows rotation, the landscape circle settings and the camera cutout.
      */
     val idleDot: StateFlow<com.agupta07505.smartisland.model.IdleDotGeometry?> = combine(
-        labRaw,
-        labOrientation
+        settingsRepo.settings,
+        orientation
     ) { raw, state -> com.agupta07505.smartisland.model.idleDot(raw, state) }
         .distinctUntilChanged()
         .stateIn(
@@ -279,6 +268,8 @@ class IslandViewModel(
      */
     private fun putAwayAllWithLead() {
         val wasExpanded = expanded.value
+        // Putting every card away with a tap on the cutout is a tap to close: "off after tap to close" holds the widgets off from here.
+        _idleClosedByTap.value = true
         val plan = com.agupta07505.smartisland.model.IdleCloseSequence.plan(openingSpeed())
         // The waits are plain wall-clock time, so the system animator scale is applied here (once). Animations off: scale 0,
         // no waits, everything happens at once.
@@ -373,6 +364,17 @@ class IslandViewModel(
     fun togglePillHidden() = setPillHidden(!_pillHidden.value)
 
     /**
+     * Landscape: a tick (hourly, day moment, weather change) needs the wide pill although a long press hid it or the widgets are held off.
+     * While true the pill is on the island ([landscapeWidgetPill]); the tick layers set it (ui/TickPill.kt) and clear it when they are done.
+     */
+    private val _tickHold = MutableStateFlow(false)
+    val tickHold: StateFlow<Boolean> = _tickHold
+
+    fun setTickHold(hold: Boolean) {
+        _tickHold.value = hold
+    }
+
+    /**
      * True after a tap on the cutout closed the open island (Settings > Idle widgets: "off after tap to close"). It holds the widgets off when the
      * pill later times out into idle, until a tap opens the island (or brings the stored cards back) again. New cards and the screen turning
      * off do not clear it.
@@ -386,15 +388,34 @@ class IslandViewModel(
     val idleWidgetsSuppressed: StateFlow<Boolean> = combine(
         _idleClosedByTap,
         _pillHidden,
-        labRaw,
-        labOrientation
-    ) { closedByTap, pillHidden, raw, state ->
+        settingsRepo.settings,
+        orientation,
+        baseVisible
+    ) { closedByTap, pillHidden, raw, state, stored ->
         IdleWidgetOff.suppressed(
             closedByTap = closedByTap,
             pillHidden = pillHidden,
             offAfterTapClose = if (state.isLandscape) raw.idleOffAfterTapCloseLandscape else raw.idleOffAfterTapClose,
-            offAfterLongPress = if (state.isLandscape) raw.idleOffAfterLongPressLandscape else raw.idleOffAfterLongPress
+            offAfterLongPress = if (state.isLandscape) raw.idleOffAfterLongPressLandscape else raw.idleOffAfterLongPress,
+            hasStoredNotifications = stored.isNotEmpty(),
+            offWhenStored = if (state.isLandscape) raw.idleOffWhenStoredLandscape else raw.idleOffWhenStored
         )
+    }.distinctUntilChanged().stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = false
+    )
+
+    /**
+     * The app in the foreground is exempt in the current orientation (Settings > Exempt apps): the island is totally off while it stays
+     * there. The overlay service hides the island's window on this, and the island closes if it was open.
+     */
+    val islandOffForApp: StateFlow<Boolean> = combine(
+        foregroundPackage,
+        settingsRepo.settings,
+        orientation
+    ) { fg, raw, state ->
+        IslandExemption.isOff(fg, raw.islandExemptApps, raw.islandExemptAppsLandscape, state.isLandscape)
     }.distinctUntilChanged().stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
@@ -471,19 +492,20 @@ class IslandViewModel(
      * remains at its own spot as the toggle). See model/LandscapeWidgetPill.kt.
      */
     val landscapeWidgetPill: StateFlow<Boolean> = combine(
-        labRaw,
-        labOrientation,
+        settingsRepo.settings,
+        orientation,
         _pillHidden,
         shadeOpen,
-        idleWidgetsSuppressed
-    ) { raw, state, pillHidden, shade, suppressed ->
+        combine(idleWidgetsSuppressed, _tickHold) { suppressed, hold -> suppressed to hold }
+    ) { raw, state, pillHidden, shade, (suppressed, hold) ->
         landscapeWidgetPillWanted(
             isLandscape = state.isLandscape,
             widgetsEnabled = if (state.isLandscape) raw.idleWidgetsEnabledLandscape else raw.idleWidgetsEnabled,
             widgetIds = raw.idleWidgetIds,
             pillHidden = pillHidden,
             shadeOpen = shade,
-            widgetsSuppressed = suppressed
+            widgetsSuppressed = suppressed,
+            tickHold = hold
         )
     }.distinctUntilChanged().stateIn(
         scope = viewModelScope,
@@ -498,13 +520,13 @@ class IslandViewModel(
      * themselves depend on it, so using this flow there would be circular).
      */
     val displaySettings: StateFlow<SmartIslandSettings> = combine(
-        labRaw,
-        labOrientation,
+        settingsRepo.settings,
+        orientation,
         visibleNotifications,
         landscapeWidgetPill
     ) { raw, state, cards, widgetPill ->
         // The landscape widget pill keeps the collapsed pill's geometry while no card is on the island.
-        raw.forOrientation(state, hasContent = pillOnIsland(cards.isNotEmpty(), widgetPill))
+        raw.forOrientation(state, hasContent = pillOnIsland(cards.isNotEmpty(), widgetPill), hasCards = cards.isNotEmpty())
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
@@ -788,24 +810,6 @@ class IslandViewModel(
     }
 
     init {
-        // Landscape Lab: tells the lab whether the phone really is in landscape, and carries out its commands.
-        viewModelScope.launch {
-            orientation.collect { com.agupta07505.smartisland.util.LandscapeDemo.deviceLandscape.value = it.isLandscape }
-        }
-        viewModelScope.launch {
-            com.agupta07505.smartisland.util.LandscapeDemo.commands.collect { command ->
-                when (command) {
-                    com.agupta07505.smartisland.util.LabCommand.EXPAND -> expand()
-                    com.agupta07505.smartisland.util.LabCommand.COLLAPSE -> {
-                        closeSiblingPicker()
-                        collapse()
-                    }
-                    com.agupta07505.smartisland.util.LabCommand.OPEN_PICKER -> openSiblingPicker()
-                    com.agupta07505.smartisland.util.LabCommand.CLOSE_PICKER -> closeSiblingPicker()
-                    com.agupta07505.smartisland.util.LabCommand.TAP_IDLE_DOT -> onIdleDotTapped()
-                }
-            }
-        }
         viewModelScope.launch {
             runSuspendCatchingLogged(TAG, "Notifications collector failed") {
                 var previousKeys: List<String> = emptyList()
@@ -1047,6 +1051,17 @@ class IslandViewModel(
             }
         }
         viewModelScope.launch {
+            runSuspendCatchingLogged(TAG, "Exempt-app collector failed") {
+                // An exempt app came to the front: whatever was open closes (the window itself is hidden by the service).
+                islandOffForApp.collect { off ->
+                    if (off) {
+                        collapse()
+                        closeWidgetIsland(snap = true)
+                    }
+                }
+            }
+        }
+        viewModelScope.launch {
             runSuspendCatchingLogged(TAG, "Timer-reset collector failed") {
                 notificationRepo.resetTimerEvent.collect {
                     resetAutoCollapseTimer()
@@ -1148,7 +1163,11 @@ class IslandViewModel(
         viewModelScope.launch {
             runSuspendCatchingLogged(TAG, "Auto-collapse pause collector failed") {
                 // The quick-launch window (Open Apps shortcut) is in use, not a card to be put away: no countdown while it is open.
-                combine(autoCollapsePaused, siblingPickerOpen, autoCollapseHeld, appsLauncherOpen) { reading, picking, held, apps -> reading || picking || held || apps }
+                combine(autoCollapsePaused, siblingPickerOpen, autoCollapseHeld, appsLauncherOpen, cardDepth) { reading, picking, held, apps, depth ->
+                    // The card's own open step (reader, preview, picture selector, picture) also holds the countdown. It is read from the
+                    // view model's state, not only from the card's report, so a reordered list or a re-selection cannot lose the hold.
+                    reading || picking || held || apps || depth != com.agupta07505.smartisland.model.CardDepth.First
+                }
                     .distinctUntilChanged()
                     .collect { paused ->
                     if (paused) {
@@ -1327,7 +1346,9 @@ class IslandViewModel(
 
     private fun startAutoCollapseTimer() {
         autoCollapseJob?.cancel()
-        if (isInputActive.value || autoCollapsePaused.value || siblingPickerOpen.value || autoCollapseHeld.value || appsLauncherOpen.value) return
+        if (isInputActive.value || autoCollapsePaused.value || siblingPickerOpen.value || autoCollapseHeld.value || appsLauncherOpen.value ||
+            cardDepth.value != com.agupta07505.smartisland.model.CardDepth.First
+        ) return
         autoCollapseJob = viewModelScope.launch {
             delay(AUTO_COLLAPSE_DELAY_MS)
             collapse()
@@ -1506,8 +1527,6 @@ class IslandViewModel(
             !(n.mode == IslandMode.LiveActivity && !orientation.value.isLandscape)
 
     override fun onCleared() {
-        // Landscape Lab: its override must not outlive the island that shows it.
-        com.agupta07505.smartisland.util.LandscapeDemo.stop(notificationRepo)
         super.onCleared()
     }
 
@@ -1522,7 +1541,8 @@ class IslandViewModel(
 
         /**
          * What the island may show: cards whose event switch is on, minus the live cards (music, navigation, timers,
-         * recordings, downloads, live activities; not calls) of the app that is already in the foreground.
+         * recordings, downloads, live activities; not calls) of the app that is already in the foreground, unless
+         * [SmartIslandSettings.showLiveEventsInForeground] is on.
          */
         internal fun filterVisible(
             list: List<IslandNotification>,
@@ -1536,7 +1556,8 @@ class IslandViewModel(
                 (locked && event != null && settings.isEventHiddenOnLockScreen(event.id)) ||
                 // The per-app lock-screen rule (calls excepted).
                 (locked && settings.isAppHiddenOnLockScreen(notif.packageName, notif.mode)) ||
-                com.agupta07505.smartisland.util.ForegroundApp.hidesCard(notif.mode, notif.packageName, foregroundPackage)
+                (!settings.showLiveEventsInForeground &&
+                    com.agupta07505.smartisland.util.ForegroundApp.hidesCard(notif.mode, notif.packageName, foregroundPackage))
         }
         /**
          * While the pill is hidden only calls (incoming, ringing or ongoing) stay on the island;

@@ -40,7 +40,6 @@ import androidx.compose.runtime.getValue
 internal fun LandscapeIdleDotView(
     dot: com.agupta07505.smartisland.model.IdleDotGeometry?,
     alpha: () -> Float,
-    scale: () -> Float = { 1f },
     topShiftDp: () -> Float,
     color: Color,
     onTap: () -> Unit,
@@ -63,9 +62,6 @@ internal fun LandscapeIdleDotView(
                 translationX = centerX.toPx()
                 translationY = (dot.topDp - topShiftDp()).dp.toPx()
                 this.alpha = alphaNow.value()
-                val dotScale = scale()
-                scaleX = dotScale
-                scaleY = dotScale
             }
             .clip(CircleShape)
             .background(color.copy(alpha = dot.opacity), CircleShape)

@@ -45,12 +45,18 @@ class WidgetIslandContentTest {
     }
 
     @Test
-    fun alarmOnlyWithinTwelveHours() {
+    fun alarmHasAnIslandWheneverOneIsStillToCome() {
         assertFalse(has(IdleWidgetKind.NextAlarm, alarm = 0L))
         assertFalse(has(IdleWidgetKind.NextAlarm, alarm = now - 1L))
         assertTrue(has(IdleWidgetKind.NextAlarm, alarm = now + 1L))
-        assertTrue(has(IdleWidgetKind.NextAlarm, alarm = now + 12 * hour))
-        assertFalse(has(IdleWidgetKind.NextAlarm, alarm = now + 12 * hour + 1L))
+        assertTrue(has(IdleWidgetKind.NextAlarm, alarm = now + 12 * hour + 1L))
+        assertTrue(has(IdleWidgetKind.NextAlarm, alarm = now + 30 * hour))
+    }
+
+    @Test
+    fun windNeedsAReadingLikeWeather() {
+        assertFalse(has(IdleWidgetKind.Wind))
+        assertTrue(has(IdleWidgetKind.Wind, weather = true))
     }
 
     @Test

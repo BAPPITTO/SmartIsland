@@ -53,7 +53,7 @@ internal fun privacyColor(kind: PrivacyKind): Color = when (kind) {
     PrivacyKind.ScreenShare -> SCREEN_SHARE_COLOR
 }
 
-private fun privacyIcon(kind: PrivacyKind): ImageVector = when (kind) {
+internal fun privacyIcon(kind: PrivacyKind): ImageVector = when (kind) {
     PrivacyKind.Camera -> Icons.Rounded.CameraAlt
     PrivacyKind.Microphone -> Icons.Rounded.Mic
     PrivacyKind.Location -> Icons.Rounded.LocationOn

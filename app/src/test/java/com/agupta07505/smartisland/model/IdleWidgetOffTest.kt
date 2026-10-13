@@ -27,6 +27,13 @@ class IdleWidgetOffTest {
     }
 
     @Test
+    fun storedNotificationsOnlyCountWhenTheirSwitchIsOn() {
+        assertTrue(IdleWidgetOff.suppressed(false, false, false, false, hasStoredNotifications = true, offWhenStored = true))
+        assertFalse(IdleWidgetOff.suppressed(false, false, false, false, hasStoredNotifications = true, offWhenStored = false))
+        assertFalse(IdleWidgetOff.suppressed(false, false, false, false, hasStoredNotifications = false, offWhenStored = true))
+    }
+
+    @Test
     fun timersAreKeptInRange() {
         assertEquals(1.5f, IdleSlots.normalizeTickSeconds(0.2f), 1e-6f)
         assertEquals(10f, IdleSlots.normalizeTickSeconds(99f), 1e-6f)

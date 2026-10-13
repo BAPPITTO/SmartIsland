@@ -192,28 +192,46 @@ object ShizukuManager {
         return mergeColonSeparated(current, listenerComponent)
     }
 
-    /**
-     * Executes ADB shell commands via Shizuku process on IO dispatcher to auto-grant:
-     * - Allow restricted settings (Android 13+)
-     * - Usage Access / Usage Stats (GET_USAGE_STATS)
-     * - Accessibility Service & System Alert Window (preserving existing accessibility services)
-     * - Notification Listener Access (preserving existing notification listeners)
-     * - Do Not Disturb access (for the silent ringer)
-     * - Modify system settings (WRITE_SETTINGS, for the brightness slider)
-     * - Battery Optimization whitelist
-     * - Nearby devices (Bluetooth) and notification runtime permissions
-     * Location and VPN are optional and not granted here.
-     */
-    suspend fun autoGrantAllPermissions(context: Context): Result<String> = withContext(Dispatchers.IO) {
-        val pkg = context.packageName
-        val accessibilityClass = "$pkg/${SmartIslandOverlayService::class.java.name}"
-        val notificationClass = "$pkg/${SmartIslandNotificationListenerService::class.java.name}"
-        val mergedAccessibilityServices = getMergedAccessibilityServices(context, accessibilityClass)
-        val mergedNotificationListeners = getMergedNotificationListeners(context, notificationClass)
+    /** How much the 1-tap setup grants: only what the island needs to work, or that plus every optional permission. */
+    enum class SetupScope { Necessary, All }
 
-        val commands = listOf(
+    private const val SETUP_PREFS = "shizuku_setup"
+    private const val SETUP_SCOPE_KEY = "scope"
+
+    /** The scope of the last setup that succeeded on this phone, or null when none has run. */
+    fun savedScope(context: Context): SetupScope? = runCatching {
+        val name = context.getSharedPreferences(SETUP_PREFS, Context.MODE_PRIVATE).getString(SETUP_SCOPE_KEY, null)
+        SetupScope.entries.firstOrNull { it.name == name }
+    }.getOrNull()
+
+    private fun saveScope(context: Context, scope: SetupScope) {
+        runCatching {
+            context.getSharedPreferences(SETUP_PREFS, Context.MODE_PRIVATE).edit().putString(SETUP_SCOPE_KEY, scope.name).apply()
+        }
+    }
+
+    /**
+     * The shell commands of one setup. Necessary: everything the island needs to work, and the steps that take many screens by hand:
+     * - Allow restricted settings (Android 13+, needed before accessibility and notification access can be switched on)
+     * - Accessibility Service and System Alert Window (preserving existing accessibility services)
+     * - Notification Listener Access (preserving existing notification listeners)
+     * - Hidden notification text (RECEIVE_SENSITIVE_NOTIFICATIONS)
+     * - Modify system settings (WRITE_SETTINGS, the brightness slider)
+     * - Notifications and Nearby devices (Bluetooth) runtime permissions
+     * - Battery optimisation whitelist, autostart, background and standby bucket
+     * All adds the optional ones (see [optionalCommands]).
+     */
+    internal fun setupCommands(
+        scope: SetupScope,
+        pkg: String,
+        accessibilityClass: String,
+        notificationClass: String,
+        mergedAccessibilityServices: String,
+        mergedNotificationListeners: String
+    ): List<String> {
+        val necessary = listOf(
+            // First: accessibility and notification access cannot be switched on while this is still restricted.
             "appops set $pkg ACCESS_RESTRICTED_SETTINGS allow",
-            "appops set $pkg GET_USAGE_STATS allow",
             "appops set $pkg SYSTEM_ALERT_WINDOW allow",
             // Modify system settings (the brightness slider on the Utilities page).
             "appops set $pkg WRITE_SETTINGS allow",
@@ -226,13 +244,28 @@ object ShizukuManager {
             "settings put secure accessibility_enabled 1",
             "cmd notification allow_listener $notificationClass",
             "settings put secure enabled_notification_listeners $mergedNotificationListeners",
-            // Do Not Disturb access, so the ringer utility can go to silent.
-            "cmd notification allow_dnd $pkg",
             "am set-standby-bucket $pkg active",
             "dumpsys deviceidle whitelist +$pkg"
         ) + runtimePermissionCommands(pkg) + sensitiveNotificationCommands(pkg)
-        runShizukuCommands(commands)
+        return if (scope == SetupScope.All) necessary + optionalCommands(pkg) else necessary
     }
+
+    /**
+     * Permissions only some features use, granted by the "all permissions" setup and never by the necessary one:
+     * - Usage access (recent apps in the App Shortcuts)
+     * - Do Not Disturb access (the silent ringer, the mode idle widget)
+     * - Location, fine and coarse (the weather widget, the Wi-Fi network name, GPS use in the privacy dots)
+     * - Watch app ops (camera, microphone and location use in the privacy dots, without the fallback)
+     * A ROM that lacks one of them just prints an error; the commands are joined with ";" so the rest still run.
+     * The VPN consent is a system dialog that cannot be granted from here.
+     */
+    internal fun optionalCommands(pkg: String): List<String> = listOf(
+        "appops set $pkg GET_USAGE_STATS allow",
+        "cmd notification allow_dnd $pkg",
+        "pm grant $pkg android.permission.ACCESS_FINE_LOCATION",
+        "pm grant $pkg android.permission.ACCESS_COARSE_LOCATION",
+        "pm grant $pkg android.permission.WATCH_APPOPS"
+    )
 
     /**
      * Repairs a stale/crashed AccessibilityService binding through Shizuku.
@@ -275,10 +308,37 @@ object ShizukuManager {
             runShizukuCommands(commands)
         }
 
+    /** Grants only what the island needs to work (see [setupCommands]). */
+    suspend fun autoGrantNecessaryPermissions(context: Context): Result<String> = grant(context, SetupScope.Necessary)
+
+    /** Grants everything: the necessary permissions and the optional ones (see [setupCommands]). */
+    suspend fun autoGrantAllPermissions(context: Context): Result<String> = grant(context, SetupScope.All)
+
     /**
-     * Runtime permissions the app declares that the setup grants for the user: nearby devices (Bluetooth connect, for the Bluetooth cards) and
-     * notifications. Location (fine and coarse) is left out on purpose: it is optional, used only by the weather widget and the Wi-Fi / privacy
-     * extras, and the user chooses it in the app. The VPN consent is a system dialog that cannot be granted from here and is optional too.
+     * Applies again the scope the user chose last (the necessary one when none was chosen yet). Used after a boot or an update,
+     * so a phone that only got the necessary permissions is never given the optional ones behind the user's back.
+     */
+    suspend fun reapplySavedSetup(context: Context): Result<String> = grant(context, savedScope(context) ?: SetupScope.Necessary)
+
+    private suspend fun grant(context: Context, scope: SetupScope): Result<String> = withContext(Dispatchers.IO) {
+        val pkg = context.packageName
+        val accessibilityClass = "$pkg/${SmartIslandOverlayService::class.java.name}"
+        val notificationClass = "$pkg/${SmartIslandNotificationListenerService::class.java.name}"
+        val commands = setupCommands(
+            scope = scope,
+            pkg = pkg,
+            accessibilityClass = accessibilityClass,
+            notificationClass = notificationClass,
+            mergedAccessibilityServices = getMergedAccessibilityServices(context, accessibilityClass),
+            mergedNotificationListeners = getMergedNotificationListeners(context, notificationClass)
+        )
+        runShizukuCommands(commands).onSuccess { saveScope(context, scope) }
+    }
+
+    /**
+     * Runtime permissions of the necessary setup: nearby devices (Bluetooth connect, for the Bluetooth cards) and notifications. Location
+     * (fine and coarse) is left out on purpose: it is optional (see [optionalCommands]), used only by the weather widget and the Wi-Fi /
+     * privacy extras.
      * A ROM that lacks one of the permissions just prints an error; the commands are joined with ";" so the rest still run.
      */
     internal fun runtimePermissionCommands(pkg: String): List<String> = listOf(
@@ -286,7 +346,7 @@ object ShizukuManager {
         "pm grant $pkg android.permission.POST_NOTIFICATIONS"
     )
 
-    /** Permissions the setup never grants by itself because the user opts in to them (see [runtimePermissionCommands]). */
+    /** Permissions the necessary setup never grants; only the "all permissions" setup does (see [optionalCommands]). */
     internal val OPTIONAL_PERMISSIONS = setOf(
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
@@ -398,8 +458,6 @@ object ShizukuManager {
             "appops set $pkg AUTO_START allow",
             "appops set $pkg RUN_IN_BACKGROUND allow",
             "appops set $pkg RUN_ANY_IN_BACKGROUND allow",
-            // Do Not Disturb access, so the ringer utility can go to silent.
-            "cmd notification allow_dnd $pkg",
             "am set-standby-bucket $pkg active",
             "dumpsys deviceidle whitelist +$pkg"
         )

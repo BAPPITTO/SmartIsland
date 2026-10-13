@@ -19,11 +19,9 @@ import kotlin.math.sqrt
  * animates it 0 -> 1 starting from wherever it is. Both run on ONE critically damped spring (no bounce), so an
  * interruption reverses in place and keeps its velocity: it never snaps and never restarts from rest.
  *
- * The idle circle runs on its own number ("idle", 0 = not drawn, 1 = fully open) and overlaps the slide:
- *  - Leaving: the idle circle starts opening when the pill has done [IDLE_OPEN_AT_EXIT] of its exit (progress, not time).
- *  - Coming back: the idle circle vanishes first; the pill starts sliding in when the vanish is
- *    [PILL_ENTER_AT_IDLE_VANISH] done (progress, not time).
- *  - No exceptions: calls and popups use the same order.
+ * The idle circle (the camera cutout circle) is not part of this motion. It does not fade, blink or pulse, and the pill
+ * neither waits for it nor starts it: the circle is on or off (it stays on while the pill leaves, then the island's own
+ * idle cutout takes the same spot).
  * The pill keeps its size in this app, so leaving and coming back share one geometry (no size mismatch).
  */
 enum class PillPhase {
@@ -56,37 +54,12 @@ enum class PillTransition {
     Cancel
 }
 
-/** Share of the exit (its progress) after which the idle circle starts to open. */
-const val IDLE_OPEN_AT_EXIT = 0.7f
-
-/** Share of the idle circle's vanish after which the pill starts to slide back in. */
-const val PILL_ENTER_AT_IDLE_VANISH = 0.6f
-
 /** The pill's presence spring: critically damped (no bounce). Stiffness is scaled by the animation speed. */
 const val PILL_SPRING_DAMPING = 1f
 const val PILL_SPRING_STIFFNESS = 340f
 
 /** The spring counts as settled at this share of its travel (used to cap the merge that rides along with the exit). */
 const val PILL_SPRING_SETTLED = 0.98f
-
-/**
- * Base length (ms, scaled by the animation speed) of the idle circle appearing when the pill has left: a blink, a quick fade at full
- * size. It does not grow or bounce (it used to scale up on a springy 0.62 damping, which looked like it flowed out).
- */
-const val IDLE_BLINK_MS = 110
-
-/**
- * Landscape idle circle: when the cards leave by a tap on the idle circle or by the idle timer, the circle that
- * blinks in also pulses once: it enlarges by [IDLE_PULSE_SCALE] and shrinks back to its normal size (two tweens, no spring,
- * no overshoot). Lengths are base values, scaled by the animation speed. Any other exit (the last card dismissed, a call
- * ended) keeps the plain blink.
- */
-const val IDLE_PULSE_SCALE = 0.35f
-const val IDLE_PULSE_UP_MS = 130
-const val IDLE_PULSE_DOWN_MS = 170
-
-/** Base length of the idle circle's vanish when a card arrives (a tween, scaled by the animation speed). */
-const val IDLE_VANISH_MS = 200
 
 /**
  * Progress (0..1) of a Compose spring (mass 1, so omega = sqrt(stiffness)) that starts at rest and is aimed at 1,

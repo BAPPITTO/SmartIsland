@@ -54,6 +54,7 @@ fun OverlayIsland(
     val cardDepth by viewModel.cardDepth.collectAsState()
     val landscapeDot by viewModel.idleDot.collectAsState()
     val widgetPill by viewModel.landscapeWidgetPill.collectAsState()
+    val tickHold by viewModel.tickHold.collectAsState()
     val idleClosing by viewModel.idleClosing.collectAsState()
     val idleLeaving by viewModel.idleLeaving.collectAsState()
     val rotationHidden by viewModel.rotationVeil.collectAsState()
@@ -228,6 +229,8 @@ fun OverlayIsland(
         isFullWidth = isFullWidth,
         hasIdleStoredCards = hasIdleStoredCards,
         idleWidgetsSuppressed = idleSuppressed,
+        tickPillHold = tickHold,
+        onTickPillHold = { viewModel.setTickHold(it) },
         onRevealIdleCards = { viewModel.revealIdleCards() },
         onSwitchEvent = { forward -> viewModel.switchEvent(forward) },
         onSwitchNotification = { forward -> viewModel.switchNotification(forward) },

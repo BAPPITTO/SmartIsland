@@ -1603,7 +1603,7 @@ private fun LauncherGrid(
                         ) {
                             rowApps.forEach { appOrNull ->
                                 if (appOrNull == null) {
-                                    AddAppTile(onClick = { com.agupta07505.smartisland.util.UtilityActions.openShortcutSettings(context, com.agupta07505.smartisland.util.PickerRequest.APPS) })
+                                    AddAppTile(onClick = { com.agupta07505.smartisland.util.UtilityActions.openPicker(context, com.agupta07505.smartisland.util.PickerRequest.APPS) })
                                     return@forEach
                                 }
                                 val app: LaunchableApp = appOrNull

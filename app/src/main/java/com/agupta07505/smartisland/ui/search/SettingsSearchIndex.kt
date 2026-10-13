@@ -10,14 +10,14 @@ package com.agupta07505.smartisland.ui.search
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.BugReport
+import androidx.compose.material.icons.rounded.Code
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.FlashOn
 import androidx.compose.material.icons.rounded.Gesture
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Palette
-import androidx.compose.material.icons.rounded.Code
-import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.People
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SettingsBackupRestore
@@ -217,6 +217,10 @@ internal fun buildSettingsSearchIndex(str: (Int) -> String): List<SettingsSearch
         listOf("lock screen", "content", "hide text", "private", "sensitive")
     )
     npToggle(
+        "live_events_foreground", R.string.toggle_live_events_foreground_title, R.string.toggle_live_events_foreground_desc,
+        listOf("foreground", "app open", "music", "navigation", "timer", "recording", "download", "live activity", "hide")
+    )
+    npToggle(
         "network_access", R.string.toggle_network_access_title, R.string.toggle_network_access_desc,
         listOf("internet", "online", "vpn location", "network checks", "release")
     )
@@ -282,6 +286,10 @@ internal fun buildSettingsSearchIndex(str: (Int) -> String): List<SettingsSearch
         str(R.string.idle_off_after_tap_desc), listOf("tap", "close", "camera cutout", "hide", "off"), "idle.off_tap"
     )
     add(
+        "idle.off_stored", str(R.string.idle_off_when_stored_title), idle, idleScreen, Icons.Rounded.Timer,
+        str(R.string.idle_off_when_stored_desc), listOf("stored", "notification", "hide", "off"), "idle.off_stored"
+    )
+    add(
         "idle.off_long_press", str(R.string.idle_off_after_long_press_title), idle, idleScreen, Icons.Rounded.Timer,
         str(R.string.idle_off_after_long_press_desc), listOf("long press", "hide", "pill", "off"), "idle.off_long_press"
     )
@@ -292,6 +300,14 @@ internal fun buildSettingsSearchIndex(str: (Int) -> String): List<SettingsSearch
     add(
         "idle.tick_timer", str(R.string.idle_tick_timer_title), idle, idleScreen, Icons.Rounded.Timer,
         str(R.string.idle_tick_timer_desc), listOf("tick", "glyph", "timer", "slider", "seconds"), "idle.tick_timer"
+    )
+    add(
+        "idle.units", str(R.string.idle_units_title), idle, idleScreen, Icons.Rounded.Timer,
+        str(R.string.idle_units_note), listOf("celsius", "fahrenheit", "temperature", "unit", "wind", "kmh", "mph", "knots", "metric", "imperial"), "idle.units"
+    )
+    add(
+        "idle.led_tick", str(R.string.led_tick_switch_title), idle, idleScreen, Icons.Rounded.Timer,
+        str(R.string.led_tick_switch_desc), listOf("led", "tick", "footsteps", "dots", "pattern", "pace", "font", "animation"), "idle.led_tick"
     )
     add(
         "idle.switch_timer", str(R.string.idle_switch_timer_title), idle, idleScreen, Icons.Rounded.Timer,
@@ -342,10 +358,6 @@ internal fun buildSettingsSearchIndex(str: (Int) -> String): List<SettingsSearch
     add(
         "color.blur", str(R.string.toggle_expanded_blur_title), color, colorScreen, Icons.Rounded.Palette,
         "", listOf("blur", "backdrop", "artwork", "album")
-    )
-    add(
-        "color.blur_behind", str(R.string.toggle_expanded_blur_behind_title), color, colorScreen, Icons.Rounded.Palette,
-        "", listOf("blur", "see-through", "window blur", "behind")
     )
     add(
         "color.media_look", str(R.string.media_look_title), color, colorScreen, Icons.Rounded.Palette,
@@ -464,7 +476,7 @@ internal fun buildSettingsSearchIndex(str: (Int) -> String): List<SettingsSearch
     )
     add(
         "perm.shizuku", str(R.string.shizuku_card_title), perms, permScreen, Icons.Rounded.Shield,
-        str(R.string.shizuku_card_desc), listOf("shizuku", "adb", "one tap", "auto setup", "screen sharing", "cast")
+        str(R.string.shizuku_card_desc), listOf("shizuku", "adb", "one tap", "auto setup", "necessary", "all permissions", "optional", "screen sharing", "cast")
     )
 
     // --- Diagnostics ---------------------------------------------------------------------------------------------

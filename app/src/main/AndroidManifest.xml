@@ -93,6 +93,17 @@
             </intent-filter>
         </activity>
 
+        <!-- The island's own pickers (pinned apps, utilities) in a see-through window of their own: choosing never opens the app. -->
+        <activity
+            android:name=".ui.pickers.PickerActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|uiMode|density|fontScale|layoutDirection|locale"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.SmartIsland.Picker" />
+
         <activity
             android:name=".ui.PrivacyUsageActivity"
             android:exported="false"

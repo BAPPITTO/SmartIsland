@@ -71,6 +71,7 @@ class SmartIslandSettingsRepository(private val context: Context) {
         val UtilityCalculatorFloating = booleanPreferencesKey("utility_calculator_floating")
         val WelcomeDialogShown = booleanPreferencesKey("welcome_dialog_shown")
         val ShowOnLockScreen = booleanPreferencesKey("show_on_lock_screen")
+        val ShowLiveEventsInForeground = booleanPreferencesKey("show_live_events_in_foreground")
         val LockScreenPrivacy = stringPreferencesKey("lock_screen_privacy")
         val ShowNotificationActions = booleanPreferencesKey("show_notification_actions")
         val HideFromNotificationShade = booleanPreferencesKey("hide_from_notification_shade")
@@ -87,10 +88,8 @@ class SmartIslandSettingsRepository(private val context: Context) {
         val EnableShadow = booleanPreferencesKey("enable_shadow")
         val ExpandedBlurEnabled = booleanPreferencesKey("expanded_blur_enabled")
         val ExpandedBlurRadius = floatPreferencesKey("expanded_blur_radius")
-        val ExpandedBlurBehind = booleanPreferencesKey("expanded_blur_behind")
         val MediaBlurEnabled = booleanPreferencesKey("media_blur_enabled")
         val MediaBlurRadius = floatPreferencesKey("media_blur_radius")
-        val MediaBlurBehind = booleanPreferencesKey("media_blur_behind")
         val MediaOpacity = floatPreferencesKey("media_opacity")
         val ExpandedGradientEnabled = booleanPreferencesKey("expanded_gradient_enabled")
         val ExpandedGradientColor = longPreferencesKey("expanded_gradient_color")
@@ -113,6 +112,9 @@ class SmartIslandSettingsRepository(private val context: Context) {
         val DeveloperModeEnabled = booleanPreferencesKey("developer_mode_enabled")
         val RecordLogs = booleanPreferencesKey("record_logs")
         val ThemeMode = stringPreferencesKey("theme_mode")
+        val LiquidGlassTheme = booleanPreferencesKey("liquid_glass_theme")
+        val MaterialYou = booleanPreferencesKey("material_you")
+        val AccentColor = longPreferencesKey("accent_color")
         val ExpandedTheme = stringPreferencesKey("expanded_theme")
         val IslandFont = stringPreferencesKey("island_font")
         val EnableNotchMode = booleanPreferencesKey("enable_notch_mode")
@@ -162,11 +164,27 @@ class SmartIslandSettingsRepository(private val context: Context) {
         val IdleOffAfterTapCloseLandscape = booleanPreferencesKey("idle_off_after_tap_close_landscape")
         val IdleOffAfterLongPress = booleanPreferencesKey("idle_off_after_long_press")
         val IdleOffAfterLongPressLandscape = booleanPreferencesKey("idle_off_after_long_press_landscape")
+        val ContentPillSameAsIdle = booleanPreferencesKey("content_pill_same_as_idle")
+        val ContentPillWidthPercent = floatPreferencesKey("content_pill_width_percent")
+        val IslandExemptApps = stringSetPreferencesKey("island_exempt_apps")
+        val IslandExemptAppsLandscape = stringSetPreferencesKey("island_exempt_apps_landscape")
+        val ContentPillSameAsIdleLandscape = booleanPreferencesKey("content_pill_same_as_idle_landscape")
+        val ContentPillWidthPercentLandscape = floatPreferencesKey("content_pill_width_percent_landscape")
+        val IdleOffWhenStored = booleanPreferencesKey("idle_off_when_stored")
+        val IdleOffWhenStoredLandscape = booleanPreferencesKey("idle_off_when_stored_landscape")
         val IdleGlyphTickSeconds = floatPreferencesKey("idle_glyph_tick_seconds")
         val IdleWidgetIds = stringPreferencesKey("idle_widget_ids")
         val IdleWidgetCycleSeconds = intPreferencesKey("idle_widget_cycle_seconds")
         val WidgetIslandCloseSeconds = intPreferencesKey("widget_island_close_seconds")
+        val IdleAlarmHideBeyond12h = booleanPreferencesKey("idle_alarm_hide_beyond_12h")
         val IdleWidgetTempUnit = stringPreferencesKey("idle_widget_temp_unit")
+        val IdleWidgetWindUnit = stringPreferencesKey("idle_widget_wind_unit")
+        val IdleTickStyle = stringPreferencesKey("idle_tick_style")
+        val LedTickPattern = stringPreferencesKey("led_tick_pattern")
+        val LedTickPaceMs = intPreferencesKey("led_tick_pace_ms")
+        val LedTickFont = stringPreferencesKey("led_tick_font")
+        val LedTickColor = stringPreferencesKey("led_tick_color")
+        val LedTickStagger = booleanPreferencesKey("led_tick_stagger")
         val IdleGlyphFont = stringPreferencesKey("idle_glyph_font")
         val FontMixEnabled = booleanPreferencesKey("font_mix_enabled")
         val FontMixLight = stringPreferencesKey("font_mix_light")
@@ -293,6 +311,7 @@ class SmartIslandSettingsRepository(private val context: Context) {
                 utilityCalculatorFloating = prefs[Keys.UtilityCalculatorFloating] ?: defaults.utilityCalculatorFloating,
                 welcomeDialogShown = prefs[Keys.WelcomeDialogShown] ?: defaults.welcomeDialogShown,
                 showOnLockScreen = prefs[Keys.ShowOnLockScreen] ?: defaults.showOnLockScreen,
+                showLiveEventsInForeground = prefs[Keys.ShowLiveEventsInForeground] ?: defaults.showLiveEventsInForeground,
                 lockScreenPrivacy = prefs[Keys.LockScreenPrivacy]
                     ?.takeIf { it in VALID_LOCK_SCREEN_PRIVACY_VALUES }
                     ?: defaults.lockScreenPrivacy,
@@ -325,12 +344,10 @@ class SmartIslandSettingsRepository(private val context: Context) {
                 autoExpandOnLockScreen = prefs[Keys.AutoExpandOnLockScreen] ?: defaults.autoExpandOnLockScreen,
                 enableShadow = prefs[Keys.EnableShadow] ?: defaults.enableShadow,
                 expandedBlurEnabled = prefs[Keys.ExpandedBlurEnabled] ?: defaults.expandedBlurEnabled,
-                expandedBlurBehind = prefs[Keys.ExpandedBlurBehind] ?: defaults.expandedBlurBehind,
                 expandedBlurRadius = (prefs[Keys.ExpandedBlurRadius] ?: defaults.expandedBlurRadius)
                     .coerceIn(SmartIslandSettings.MIN_EXPANDED_BLUR, SmartIslandSettings.MAX_EXPANDED_BLUR),
                 // Media keys fall back to the shared values until the owner sets them.
                 mediaBlurEnabled = prefs[Keys.MediaBlurEnabled] ?: prefs[Keys.ExpandedBlurEnabled] ?: defaults.mediaBlurEnabled,
-                mediaBlurBehind = prefs[Keys.MediaBlurBehind] ?: prefs[Keys.ExpandedBlurBehind] ?: defaults.mediaBlurBehind,
                 mediaBlurRadius = (prefs[Keys.MediaBlurRadius] ?: prefs[Keys.ExpandedBlurRadius] ?: defaults.mediaBlurRadius)
                     .coerceIn(SmartIslandSettings.MIN_EXPANDED_BLUR, SmartIslandSettings.MAX_EXPANDED_BLUR),
                 mediaOpacity = validDimension(
@@ -366,6 +383,9 @@ class SmartIslandSettingsRepository(private val context: Context) {
                 developerModeEnabled = prefs[Keys.DeveloperModeEnabled] ?: defaults.developerModeEnabled,
                 recordLogs = prefs[Keys.RecordLogs] ?: defaults.recordLogs,
                 themeMode = prefs[Keys.ThemeMode] ?: defaults.themeMode,
+                liquidGlassTheme = prefs[Keys.LiquidGlassTheme] ?: defaults.liquidGlassTheme,
+                materialYou = prefs[Keys.MaterialYou] ?: defaults.materialYou,
+                accentColor = validColor(prefs[Keys.AccentColor], defaults.accentColor),
                 expandedTheme = prefs[Keys.ExpandedTheme]?.takeIf { it in SmartIslandSettings.VALID_EXPANDED_THEMES } ?: defaults.expandedTheme,
                 islandFont = prefs[Keys.IslandFont]?.takeIf { SmartIslandSettings.isValidFont(it) } ?: defaults.islandFont,
                 enableNotchMode = prefs[Keys.EnableNotchMode] ?: defaults.enableNotchMode,
@@ -397,7 +417,7 @@ class SmartIslandSettingsRepository(private val context: Context) {
                 landscapeCornerRadius = validDimension(prefs[Keys.LandscapeCornerRadius], defaults.landscapeCornerRadius, SmartIslandSettings.MIN_CORNER_RADIUS, SmartIslandSettings.MAX_CORNER_RADIUS),
                 landscapeOpacity = validDimension(prefs[Keys.LandscapeOpacity], defaults.landscapeOpacity, SmartIslandSettings.MIN_OPACITY, SmartIslandSettings.MAX_OPACITY),
                 landscapeCircleSize = validDimension(prefs[Keys.LandscapeCircleSize], defaults.landscapeCircleSize, SmartIslandSettings.MIN_CIRCLE_SIZE, SmartIslandSettings.MAX_CIRCLE_SIZE),
-                landscapeCircleOpacity = validDimension(prefs[Keys.LandscapeCircleOpacity], defaults.landscapeCircleOpacity, SmartIslandSettings.MIN_OPACITY, SmartIslandSettings.MAX_OPACITY),
+                landscapeCircleOpacity = validDimension(prefs[Keys.LandscapeCircleOpacity], defaults.landscapeCircleOpacity, SmartIslandSettings.MIN_CIRCLE_OPACITY, SmartIslandSettings.MAX_OPACITY),
                 landscapeCircleEdgeInset = validDimension(prefs[Keys.LandscapeCircleEdgeInset], defaults.landscapeCircleEdgeInset, SmartIslandSettings.MIN_CIRCLE_EDGE_INSET, SmartIslandSettings.MAX_CIRCLE_EDGE_INSET),
                 landscapeCircleYOffset = validDimension(prefs[Keys.LandscapeCircleYOffset], defaults.landscapeCircleYOffset, SmartIslandSettings.MIN_Y_OFFSET, SmartIslandSettings.MAX_LANDSCAPE_Y_OFFSET),
                 landscapeCirclePosition = prefs[Keys.LandscapeCirclePosition]?.takeIf { it in VALID_LANDSCAPE_POSITIONS } ?: defaults.landscapeCirclePosition,
@@ -424,6 +444,22 @@ class SmartIslandSettingsRepository(private val context: Context) {
                 idleOffAfterTapCloseLandscape = prefs[Keys.IdleOffAfterTapCloseLandscape] ?: defaults.idleOffAfterTapCloseLandscape,
                 idleOffAfterLongPress = prefs[Keys.IdleOffAfterLongPress] ?: defaults.idleOffAfterLongPress,
                 idleOffAfterLongPressLandscape = prefs[Keys.IdleOffAfterLongPressLandscape] ?: defaults.idleOffAfterLongPressLandscape,
+                idleOffWhenStored = prefs[Keys.IdleOffWhenStored] ?: defaults.idleOffWhenStored,
+                contentPillSameAsIdle = prefs[Keys.ContentPillSameAsIdle] ?: defaults.contentPillSameAsIdle,
+                islandExemptApps = prefs[Keys.IslandExemptApps]
+                    ?.filter { it.isNotBlank() && it.length <= MAX_PACKAGE_NAME_LENGTH }?.toSet() ?: defaults.islandExemptApps,
+                islandExemptAppsLandscape = prefs[Keys.IslandExemptAppsLandscape]
+                    ?.filter { it.isNotBlank() && it.length <= MAX_PACKAGE_NAME_LENGTH }?.toSet() ?: defaults.islandExemptAppsLandscape,
+                contentPillSameAsIdleLandscape = prefs[Keys.ContentPillSameAsIdleLandscape] ?: defaults.contentPillSameAsIdleLandscape,
+                contentPillWidthPercentLandscape = (prefs[Keys.ContentPillWidthPercentLandscape] ?: defaults.contentPillWidthPercentLandscape).let {
+                    if (it.isNaN()) defaults.contentPillWidthPercentLandscape
+                    else it.coerceIn(SmartIslandSettings.MIN_CONTENT_PILL_PERCENT, SmartIslandSettings.MAX_CONTENT_PILL_PERCENT)
+                },
+                contentPillWidthPercent = (prefs[Keys.ContentPillWidthPercent] ?: defaults.contentPillWidthPercent).let {
+                    if (it.isNaN()) defaults.contentPillWidthPercent
+                    else it.coerceIn(SmartIslandSettings.MIN_CONTENT_PILL_PERCENT, SmartIslandSettings.MAX_CONTENT_PILL_PERCENT)
+                },
+                idleOffWhenStoredLandscape = prefs[Keys.IdleOffWhenStoredLandscape] ?: defaults.idleOffWhenStoredLandscape,
                 idleGlyphTickSeconds = com.agupta07505.smartisland.model.IdleSlots.normalizeTickSeconds(
                     prefs[Keys.IdleGlyphTickSeconds] ?: defaults.idleGlyphTickSeconds
                 ),
@@ -435,6 +471,7 @@ class SmartIslandSettingsRepository(private val context: Context) {
                         com.agupta07505.smartisland.model.IdleWidgets.MIN_CYCLE_SECONDS,
                         com.agupta07505.smartisland.model.IdleWidgets.MAX_CYCLE_SECONDS
                     ),
+                idleAlarmHideBeyond12h = prefs[Keys.IdleAlarmHideBeyond12h] ?: defaults.idleAlarmHideBeyond12h,
                 widgetIslandCloseSeconds = com.agupta07505.smartisland.model.WidgetIslandTimer.normalize(
                     prefs[Keys.WidgetIslandCloseSeconds] ?: defaults.widgetIslandCloseSeconds
                 ),
@@ -450,6 +487,14 @@ class SmartIslandSettingsRepository(private val context: Context) {
                 ),
                 idleWidgetTempUnit = (prefs[Keys.IdleWidgetTempUnit] ?: defaults.idleWidgetTempUnit)
                     .takeIf { it in com.agupta07505.smartisland.model.IdleWidgets.VALID_UNITS } ?: defaults.idleWidgetTempUnit,
+                idleWidgetWindUnit = (prefs[Keys.IdleWidgetWindUnit] ?: defaults.idleWidgetWindUnit)
+                    .takeIf { it in com.agupta07505.smartisland.model.IdleWidgets.VALID_WIND_UNITS } ?: defaults.idleWidgetWindUnit,
+                idleTickStyle = com.agupta07505.smartisland.model.LedTick.normalizeStyle(prefs[Keys.IdleTickStyle] ?: defaults.idleTickStyle),
+                ledTickPattern = com.agupta07505.smartisland.model.LedTick.normalizePattern(prefs[Keys.LedTickPattern] ?: defaults.ledTickPattern),
+                ledTickPaceMs = com.agupta07505.smartisland.model.LedTick.normalizePace(prefs[Keys.LedTickPaceMs] ?: defaults.ledTickPaceMs),
+                ledTickFont = prefs[Keys.LedTickFont]?.takeIf { it.isEmpty() || SmartIslandSettings.isValidFont(it) } ?: defaults.ledTickFont,
+                ledTickColor = com.agupta07505.smartisland.model.LedTick.normalizeColor(prefs[Keys.LedTickColor] ?: defaults.ledTickColor),
+                ledTickStagger = prefs[Keys.LedTickStagger] ?: defaults.ledTickStagger,
                 secondaryMergeMs = (prefs[Keys.SecondaryMergeMs] ?: defaults.secondaryMergeMs)
                     .coerceIn(SmartIslandSettings.MIN_SECONDARY_MERGE_MS, SmartIslandSettings.MAX_SECONDARY_MERGE_MS),
                 animSpeedPortrait = prefs[Keys.AnimSpeedPortrait]
@@ -506,9 +551,7 @@ class SmartIslandSettingsRepository(private val context: Context) {
     suspend fun setEnabled(value: Boolean) = editSafely { it[Keys.Enabled] = value }
     suspend fun setEnableShadow(value: Boolean) = editSafely { it[Keys.EnableShadow] = value }
     suspend fun setExpandedBlurEnabled(value: Boolean) = editSafely { it[Keys.ExpandedBlurEnabled] = value }
-    suspend fun setExpandedBlurBehind(value: Boolean) = editSafely { it[Keys.ExpandedBlurBehind] = value }
     suspend fun setMediaBlurEnabled(value: Boolean) = editSafely { it[Keys.MediaBlurEnabled] = value }
-    suspend fun setMediaBlurBehind(value: Boolean) = editSafely { it[Keys.MediaBlurBehind] = value }
     suspend fun setMediaBlurRadius(value: Float) = editSafely {
         it[Keys.MediaBlurRadius] = value.coerceIn(SmartIslandSettings.MIN_EXPANDED_BLUR, SmartIslandSettings.MAX_EXPANDED_BLUR)
     }
@@ -676,6 +719,9 @@ class SmartIslandSettingsRepository(private val context: Context) {
 
     suspend fun setShowOnLockScreen(value: Boolean) = editSafely {
         it[Keys.ShowOnLockScreen] = value
+    }
+    suspend fun setShowLiveEventsInForeground(value: Boolean) = editSafely {
+        it[Keys.ShowLiveEventsInForeground] = value
     }
     suspend fun setLockScreenPrivacy(value: String) = editSafely {
         it[Keys.LockScreenPrivacy] = value.takeIf { privacy ->
@@ -864,6 +910,23 @@ class SmartIslandSettingsRepository(private val context: Context) {
     suspend fun setIdleOffAfterTapClose(landscape: Boolean, value: Boolean) = editSafely {
         it[if (landscape) Keys.IdleOffAfterTapCloseLandscape else Keys.IdleOffAfterTapClose] = value
     }
+    /** One app's exemption (true = the island is totally off while that app is in the foreground), for one orientation. */
+    suspend fun setIslandExemptApp(landscape: Boolean, packageName: String, exempt: Boolean) = editSafely {
+        if (packageName.isBlank() || packageName.length > MAX_PACKAGE_NAME_LENGTH) return@editSafely
+        val key = if (landscape) Keys.IslandExemptAppsLandscape else Keys.IslandExemptApps
+        val current = it[key] ?: emptySet()
+        it[key] = if (exempt) current + packageName else current - packageName
+    }
+    suspend fun setContentPillSameAsIdle(landscape: Boolean, value: Boolean) = editSafely {
+        it[if (landscape) Keys.ContentPillSameAsIdleLandscape else Keys.ContentPillSameAsIdle] = value
+    }
+    suspend fun setContentPillWidthPercent(landscape: Boolean, value: Float) = editSafely {
+        it[if (landscape) Keys.ContentPillWidthPercentLandscape else Keys.ContentPillWidthPercent] = if (value.isNaN()) SmartIslandSettings.DEFAULT_CONTENT_PILL_PERCENT
+        else value.coerceIn(SmartIslandSettings.MIN_CONTENT_PILL_PERCENT, SmartIslandSettings.MAX_CONTENT_PILL_PERCENT)
+    }
+    suspend fun setIdleOffWhenStored(landscape: Boolean, value: Boolean) = editSafely {
+        it[if (landscape) Keys.IdleOffWhenStoredLandscape else Keys.IdleOffWhenStored] = value
+    }
     suspend fun setIdleOffAfterLongPress(landscape: Boolean, value: Boolean) = editSafely {
         it[if (landscape) Keys.IdleOffAfterLongPressLandscape else Keys.IdleOffAfterLongPress] = value
     }
@@ -879,6 +942,7 @@ class SmartIslandSettingsRepository(private val context: Context) {
             com.agupta07505.smartisland.model.IdleWidgets.MAX_CYCLE_SECONDS
         )
     }
+    suspend fun setIdleAlarmHideBeyond12h(value: Boolean) = editSafely { it[Keys.IdleAlarmHideBeyond12h] = value }
     suspend fun setWidgetIslandCloseSeconds(value: Int) = editSafely {
         it[Keys.WidgetIslandCloseSeconds] = com.agupta07505.smartisland.model.WidgetIslandTimer.normalize(value)
     }
@@ -899,8 +963,30 @@ class SmartIslandSettingsRepository(private val context: Context) {
     suspend fun setIdleGlyphScale(value: Int) = editSafely {
         it[Keys.IdleGlyphScale] = com.agupta07505.smartisland.model.IdleSlots.normalizeGlyphScale(value)
     }
+    suspend fun setIdleTickStyle(value: String) = editSafely {
+        it[Keys.IdleTickStyle] = com.agupta07505.smartisland.model.LedTick.normalizeStyle(value)
+    }
+    suspend fun setLedTickPattern(value: String) = editSafely {
+        it[Keys.LedTickPattern] = com.agupta07505.smartisland.model.LedTick.normalizePattern(value)
+    }
+    suspend fun setLedTickPaceMs(value: Int) = editSafely {
+        it[Keys.LedTickPaceMs] = com.agupta07505.smartisland.model.LedTick.normalizePace(value)
+    }
+    suspend fun setLedTickFont(value: String) = editSafely {
+        it[Keys.LedTickFont] = value.takeIf { v -> v.isEmpty() || SmartIslandSettings.isValidFont(v) } ?: ""
+    }
+    suspend fun setLedTickColor(value: String) = editSafely {
+        it[Keys.LedTickColor] = com.agupta07505.smartisland.model.LedTick.normalizeColor(value)
+    }
+    suspend fun setLedTickStagger(enabled: Boolean) = editSafely {
+        it[Keys.LedTickStagger] = enabled
+    }
     suspend fun setIdleWidgetTempUnit(value: String) = editSafely {
         it[Keys.IdleWidgetTempUnit] = value.takeIf { v -> v in com.agupta07505.smartisland.model.IdleWidgets.VALID_UNITS }
+            ?: com.agupta07505.smartisland.model.IdleWidgets.UNIT_AUTO
+    }
+    suspend fun setIdleWidgetWindUnit(value: String) = editSafely {
+        it[Keys.IdleWidgetWindUnit] = value.takeIf { v -> v in com.agupta07505.smartisland.model.IdleWidgets.VALID_WIND_UNITS }
             ?: com.agupta07505.smartisland.model.IdleWidgets.UNIT_AUTO
     }
     suspend fun setAllowNetworkChecks(value: Boolean) = editSafely {
@@ -932,6 +1018,11 @@ class SmartIslandSettingsRepository(private val context: Context) {
     }
     suspend fun setThemeMode(value: String) = editSafely {
         it[Keys.ThemeMode] = value
+    }
+    suspend fun setLiquidGlassTheme(value: Boolean) = editSafely { it[Keys.LiquidGlassTheme] = value }
+    suspend fun setMaterialYou(value: Boolean) = editSafely { it[Keys.MaterialYou] = value }
+    suspend fun setAccentColor(value: Long) = editSafely {
+        it[Keys.AccentColor] = validColor(value, SmartIslandSettings.Default.accentColor)
     }
     suspend fun setExpandedTheme(value: String) = editSafely {
         it[Keys.ExpandedTheme] = if (value in SmartIslandSettings.VALID_EXPANDED_THEMES) value else SmartIslandSettings.Default.expandedTheme
@@ -1021,7 +1112,7 @@ class SmartIslandSettingsRepository(private val context: Context) {
         it[Keys.LandscapeCircleSize] = validDimension(value, SmartIslandSettings.Default.landscapeCircleSize, SmartIslandSettings.MIN_CIRCLE_SIZE, SmartIslandSettings.MAX_CIRCLE_SIZE)
     }
     suspend fun setLandscapeCircleOpacity(value: Float) = editSafely {
-        it[Keys.LandscapeCircleOpacity] = validDimension(value, SmartIslandSettings.Default.landscapeCircleOpacity, SmartIslandSettings.MIN_OPACITY, SmartIslandSettings.MAX_OPACITY)
+        it[Keys.LandscapeCircleOpacity] = validDimension(value, SmartIslandSettings.Default.landscapeCircleOpacity, SmartIslandSettings.MIN_CIRCLE_OPACITY, SmartIslandSettings.MAX_OPACITY)
     }
     suspend fun setLandscapeCircleEdgeInset(value: Float) = editSafely {
         it[Keys.LandscapeCircleEdgeInset] = validDimension(value, SmartIslandSettings.Default.landscapeCircleEdgeInset, SmartIslandSettings.MIN_CIRCLE_EDGE_INSET, SmartIslandSettings.MAX_CIRCLE_EDGE_INSET)
@@ -1116,6 +1207,7 @@ class SmartIslandSettingsRepository(private val context: Context) {
         prefs[Keys.UtilityCalculatorFloating] = settings.utilityCalculatorFloating
         prefs[Keys.WelcomeDialogShown] = settings.welcomeDialogShown
         prefs[Keys.ShowOnLockScreen] = settings.showOnLockScreen
+        prefs[Keys.ShowLiveEventsInForeground] = settings.showLiveEventsInForeground
         prefs[Keys.LockScreenPrivacy] = settings.lockScreenPrivacy.takeIf { it in VALID_LOCK_SCREEN_PRIVACY_VALUES }
             ?: SmartIslandSettings.Default.lockScreenPrivacy
         prefs[Keys.ShowNotificationActions] = settings.showNotificationActions
@@ -1138,11 +1230,9 @@ class SmartIslandSettingsRepository(private val context: Context) {
         prefs[Keys.AutoExpandOnLockScreen] = settings.autoExpandOnLockScreen
         prefs[Keys.EnableShadow] = settings.enableShadow
         prefs[Keys.ExpandedBlurEnabled] = settings.expandedBlurEnabled
-        prefs[Keys.ExpandedBlurBehind] = settings.expandedBlurBehind
         prefs[Keys.ExpandedBlurRadius] = settings.expandedBlurRadius
             .coerceIn(SmartIslandSettings.MIN_EXPANDED_BLUR, SmartIslandSettings.MAX_EXPANDED_BLUR)
         prefs[Keys.MediaBlurEnabled] = settings.mediaBlurEnabled
-        prefs[Keys.MediaBlurBehind] = settings.mediaBlurBehind
         prefs[Keys.MediaBlurRadius] = settings.mediaBlurRadius
             .coerceIn(SmartIslandSettings.MIN_EXPANDED_BLUR, SmartIslandSettings.MAX_EXPANDED_BLUR)
         prefs[Keys.MediaOpacity] = validDimension(
@@ -1178,6 +1268,9 @@ class SmartIslandSettingsRepository(private val context: Context) {
         prefs[Keys.DeveloperModeEnabled] = settings.developerModeEnabled
         prefs[Keys.RecordLogs] = settings.recordLogs
         prefs[Keys.ThemeMode] = settings.themeMode
+        prefs[Keys.LiquidGlassTheme] = settings.liquidGlassTheme
+        prefs[Keys.MaterialYou] = settings.materialYou
+        prefs[Keys.AccentColor] = validColor(settings.accentColor, SmartIslandSettings.Default.accentColor)
         prefs[Keys.ExpandedTheme] = if (settings.expandedTheme in SmartIslandSettings.VALID_EXPANDED_THEMES) settings.expandedTheme else SmartIslandSettings.Default.expandedTheme
         prefs[Keys.IslandFont] = settings.islandFont
         prefs[Keys.EnableNotchMode] = settings.enableNotchMode
@@ -1241,6 +1334,15 @@ class SmartIslandSettingsRepository(private val context: Context) {
         prefs[Keys.IdleOffAfterTapCloseLandscape] = settings.idleOffAfterTapCloseLandscape
         prefs[Keys.IdleOffAfterLongPress] = settings.idleOffAfterLongPress
         prefs[Keys.IdleOffAfterLongPressLandscape] = settings.idleOffAfterLongPressLandscape
+        prefs[Keys.IdleOffWhenStored] = settings.idleOffWhenStored
+        prefs[Keys.ContentPillSameAsIdle] = settings.contentPillSameAsIdle
+        prefs[Keys.ContentPillWidthPercent] = settings.contentPillWidthPercent
+        prefs[Keys.IslandExemptApps] = settings.islandExemptApps.filter { it.isNotBlank() && it.length <= MAX_PACKAGE_NAME_LENGTH }.toSet()
+        prefs[Keys.IslandExemptAppsLandscape] = settings.islandExemptAppsLandscape
+            .filter { it.isNotBlank() && it.length <= MAX_PACKAGE_NAME_LENGTH }.toSet()
+        prefs[Keys.ContentPillSameAsIdleLandscape] = settings.contentPillSameAsIdleLandscape
+        prefs[Keys.ContentPillWidthPercentLandscape] = settings.contentPillWidthPercentLandscape
+        prefs[Keys.IdleOffWhenStoredLandscape] = settings.idleOffWhenStoredLandscape
         prefs[Keys.IdleGlyphTickSeconds] = com.agupta07505.smartisland.model.IdleSlots.normalizeTickSeconds(settings.idleGlyphTickSeconds)
         prefs[Keys.IdleWidgetIds] = com.agupta07505.smartisland.model.IdleWidgets.normalize(settings.idleWidgetIds)
         prefs[Keys.IdleWidgetCycleSeconds] = settings.idleWidgetCycleSeconds.coerceIn(
@@ -1248,6 +1350,7 @@ class SmartIslandSettingsRepository(private val context: Context) {
             com.agupta07505.smartisland.model.IdleWidgets.MAX_CYCLE_SECONDS
         )
         prefs[Keys.WidgetIslandCloseSeconds] = com.agupta07505.smartisland.model.WidgetIslandTimer.normalize(settings.widgetIslandCloseSeconds)
+        prefs[Keys.IdleAlarmHideBeyond12h] = settings.idleAlarmHideBeyond12h
         prefs[Keys.WidgetIslandBatteryMetric] = settings.widgetIslandBatteryMetric
             .takeIf { it in com.agupta07505.smartisland.model.WidgetIslandContent.VALID_BATTERY_METRICS } ?: com.agupta07505.smartisland.model.WidgetIslandContent.BATTERY_WATT
         prefs[Keys.IdleGlyphFont] = settings.idleGlyphFont.takeIf { it.isEmpty() || SmartIslandSettings.isValidFont(it) } ?: ""
@@ -1259,6 +1362,15 @@ class SmartIslandSettingsRepository(private val context: Context) {
         prefs[Keys.IdleWidgetTempUnit] = settings.idleWidgetTempUnit
             .takeIf { it in com.agupta07505.smartisland.model.IdleWidgets.VALID_UNITS }
             ?: com.agupta07505.smartisland.model.IdleWidgets.UNIT_AUTO
+        prefs[Keys.IdleWidgetWindUnit] = settings.idleWidgetWindUnit
+            .takeIf { it in com.agupta07505.smartisland.model.IdleWidgets.VALID_WIND_UNITS }
+            ?: com.agupta07505.smartisland.model.IdleWidgets.UNIT_AUTO
+        prefs[Keys.IdleTickStyle] = com.agupta07505.smartisland.model.LedTick.normalizeStyle(settings.idleTickStyle)
+        prefs[Keys.LedTickPattern] = com.agupta07505.smartisland.model.LedTick.normalizePattern(settings.ledTickPattern)
+        prefs[Keys.LedTickPaceMs] = com.agupta07505.smartisland.model.LedTick.normalizePace(settings.ledTickPaceMs)
+        prefs[Keys.LedTickFont] = settings.ledTickFont.takeIf { it.isEmpty() || SmartIslandSettings.isValidFont(it) } ?: ""
+        prefs[Keys.LedTickColor] = com.agupta07505.smartisland.model.LedTick.normalizeColor(settings.ledTickColor)
+        prefs[Keys.LedTickStagger] = settings.ledTickStagger
         prefs[Keys.SecondaryMergeMs] = settings.secondaryMergeMs
             .coerceIn(SmartIslandSettings.MIN_SECONDARY_MERGE_MS, SmartIslandSettings.MAX_SECONDARY_MERGE_MS)
         prefs[Keys.AnimSpeedPortrait] = settings.animSpeedPortrait

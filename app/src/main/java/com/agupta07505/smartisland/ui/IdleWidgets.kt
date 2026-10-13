@@ -10,12 +10,16 @@ package com.agupta07505.smartisland.ui
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Easing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -27,6 +31,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -53,6 +58,7 @@ import androidx.compose.ui.unit.Dp
 import com.agupta07505.smartisland.model.WidgetIslandContent
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AcUnit
+import androidx.compose.material.icons.rounded.Air
 import androidx.compose.material.icons.rounded.Alarm
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
@@ -81,6 +87,7 @@ import androidx.compose.material.icons.rounded.WbTwilight
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
@@ -92,6 +99,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -99,6 +107,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.agupta07505.smartisland.data.SmartIslandSettings
+import com.agupta07505.smartisland.model.AttentionStates
+import com.agupta07505.smartisland.model.GlyphAttention
+import com.agupta07505.smartisland.model.GlyphMotion
+import com.agupta07505.smartisland.model.GlyphMotionKind
+import com.agupta07505.smartisland.model.GlyphMotions
 import com.agupta07505.smartisland.model.IdleWidgetKind
 import com.agupta07505.smartisland.model.IdleWidgets
 import com.agupta07505.smartisland.model.IdleSlots
@@ -107,10 +120,12 @@ import com.agupta07505.smartisland.model.ModeKind
 import com.agupta07505.smartisland.model.ModeStatus
 import com.agupta07505.smartisland.model.NotificationCounts
 import com.agupta07505.smartisland.model.WeatherLook
+import com.agupta07505.smartisland.model.WeatherMorph
 import com.agupta07505.smartisland.model.nextStepWithContent
 import com.agupta07505.smartisland.model.weatherLook
 import com.agupta07505.smartisland.ui.IslandText as Text
 import com.agupta07505.smartisland.util.IdleWidgetData
+import com.agupta07505.smartisland.util.SystemAnimScale
 import com.agupta07505.smartisland.util.rememberIdleWidgetData
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -139,14 +154,18 @@ class IdleWidgetFrame(
     /** The widget on the pill was just changed by the automatic timer (not by a swipe): the glyphs travel left to right in three ticks. */
     val autoSwitch: Boolean = false,
     /** Milliseconds between the sideways ticks of the glyphs (Settings > Idle widgets). */
-    val tickPeriodMs: Long = IdleSlots.SIDE_TICK_PERIOD_MS
+    val tickPeriodMs: Long = IdleSlots.SIDE_TICK_PERIOD_MS,
+    /** The LED footsteps tick (Settings > Idle widgets > Tick style): null = the smooth tick. See ui/LedTickSlot.kt. */
+    val led: com.agupta07505.smartisland.model.LedTickConfig? = null,
+    /** The wind speed unit to draw (already resolved from Auto): see [IdleWidgets.resolveWindUnit]. */
+    val windUnit: String = IdleWidgets.WIND_KMH
 )
 
 /** The same data and unit as this frame, for another [kind], always as the wide (non-compact) layout. Used by the semi-expanded widget island. */
 internal fun IdleWidgetFrame.asWide(kind: IdleWidgetKind): IdleWidgetFrame =
     IdleWidgetFrame(
         kind = kind, data = data, fahrenheit = fahrenheit, compact = false, appear = appear,
-        glyphFont = glyphFont, glyphScale = glyphScale, tickPeriodMs = tickPeriodMs
+        glyphFont = glyphFont, glyphScale = glyphScale, tickPeriodMs = tickPeriodMs, led = led, windUnit = windUnit
     )
 
 /**
@@ -185,6 +204,7 @@ internal fun IdleWidgetIslandContent(
             when (kind) {
                 IdleWidgetKind.Date -> DateIslandBody(shown)
                 IdleWidgetKind.Weather -> WeatherIslandBody(shown)
+                IdleWidgetKind.Wind -> WindIslandBody(shown)
                 IdleWidgetKind.Battery -> BatteryIslandBody(shown, batteryMetric)
                 IdleWidgetKind.NextAlarm -> AlarmIslandBody(shown)
                 IdleWidgetKind.NetSpeed -> SpeedIslandBody(shown)
@@ -268,6 +288,31 @@ private fun WeatherIslandBody(frame: IdleWidgetFrame) {
 }
 
 @Composable
+private fun WindIslandBody(frame: IdleWidgetFrame) {
+    val snapshot = frame.data.weather ?: return
+    val direction = IdleWidgets.compass(snapshot.windDirectionDeg)
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        IdleWidgetIcon(IdleWidgetKind.Wind, frame, size = 30.dp)
+        Column {
+            Text(
+                text = IdleWidgets.windIslandText(snapshot.windKmh, frame.windUnit),
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                softWrap = false
+            )
+            Text(
+                text = listOfNotNull("Wind", direction).joinToString(" \u00B7 "),
+                color = SOFT_WHITE,
+                fontSize = 11.sp,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@Composable
 private fun BatteryIslandBody(frame: IdleWidgetFrame, metric: String) {
     val data = frame.data
     val toFull = if (data.chargeTimeRemainingMs > 0L) WidgetIslandContent.durationText(data.chargeTimeRemainingMs) + " to full" else null
@@ -303,12 +348,14 @@ private fun AlarmIslandBody(frame: IdleWidgetFrame) {
     val is24 = android.text.format.DateFormat.is24HourFormat(context)
     val locale = Locale.getDefault()
     val timeFormat = remember(is24, locale) { SimpleDateFormat(if (is24) "HH:mm" else "h:mm a", locale) }
+    val weekdayName = remember(locale) { SimpleDateFormat("EEE", locale) }
     val at = data.nextAlarmMs
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         IdleWidgetIcon(IdleWidgetKind.NextAlarm, frame, size = 26.dp)
         Column {
             Text(
-                text = timeFormat.format(Date(at)),
+                // An alarm on another day names it ("Tue 06:00"), since the island now opens for alarms more than 12 h away too.
+                text = (if (sameCalendarDay(at, data.nowMs)) "" else weekdayName.format(Date(at)) + " ") + timeFormat.format(Date(at)),
                 color = ORANGE,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
@@ -329,9 +376,10 @@ private fun AlarmIslandBody(frame: IdleWidgetFrame) {
 @Composable
 private fun SpeedIslandBody(frame: IdleWidgetFrame) {
     val data = frame.data
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        SpeedRow(Icons.Rounded.ArrowDownward, SKY, WidgetIslandContent.speedText(data.downBytesPerSecond))
+    // Side by side: upload on the left, download on the right.
+    Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
         SpeedRow(Icons.Rounded.ArrowUpward, ORANGE, WidgetIslandContent.speedText(data.upBytesPerSecond))
+        SpeedRow(Icons.Rounded.ArrowDownward, SKY, WidgetIslandContent.speedText(data.downBytesPerSecond))
     }
 }
 
@@ -385,15 +433,15 @@ private fun NotificationsIslandBody(frame: IdleWidgetFrame) {
 
 /** An app's own icon, small; a bell when it cannot be loaded. */
 @Composable
-private fun AppIcon(packageName: String) {
+private fun AppIcon(packageName: String, size: Dp = 16.dp) {
     val context = LocalContext.current
     val icon: ImageBitmap? = remember(packageName) {
         runCatching { context.packageManager.getApplicationIcon(packageName).toBitmap(48, 48).asImageBitmap() }.getOrNull()
     }
     if (icon != null) {
-        Image(bitmap = icon, contentDescription = null, modifier = Modifier.size(16.dp).clip(CircleShape))
+        Image(bitmap = icon, contentDescription = null, modifier = Modifier.size(size).clip(CircleShape))
     } else {
-        Icon(imageVector = Icons.Rounded.Notifications, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+        Icon(imageVector = Icons.Rounded.Notifications, contentDescription = null, tint = Color.White, modifier = Modifier.size(size))
     }
 }
 
@@ -443,23 +491,29 @@ private fun modeFallbackIcon(kind: ModeKind): ImageVector = when (kind) {
     ModeKind.Custom -> Icons.Rounded.NotificationsOff
 }
 
-/** The pill's left-slot glyph of the count: a soft badge with the number. It ticks (heavy clock tick, downwards) when the number changes. */
+/** The pill's left-slot glyph of the count: the icon of the app with the most notifications. It ticks (heavy clock tick, downwards) when another app takes the lead. */
 @Composable
-private fun NotificationCountGlyph(frame: IdleWidgetFrame) {
-    val text = NotificationCounts.badgeText(frame.data.notificationSummary.total)
-    VerticalTick(target = text, towardsDown = true) { shown ->
-        Box(
-            modifier = Modifier
-                .height((16f * frame.glyphScale).dp)
-                .defaultMinSize(minWidth = (16f * frame.glyphScale).dp)
-                .clip(RoundedCornerShape(percent = 50))
-                .background(Color.White.copy(alpha = 0.22f))
-                .padding(horizontal = 5.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            SlotText(shown, frame)
+private fun NotificationTopAppGlyph(frame: IdleWidgetFrame) {
+    val top = frame.data.notificationSummary.apps.firstOrNull()?.packageName
+    VerticalTick(target = top, towardsDown = true) { shown ->
+        if (shown == null) {
+            Icon(
+                imageVector = Icons.Rounded.Notifications,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size((15f * frame.glyphScale).dp)
+            )
+        } else {
+            AppIcon(shown, size = (16f * frame.glyphScale).dp)
         }
     }
+}
+
+/** The pill's right-slot value of the count: the number of notifications over all apps. It ticks (upwards) when the number changes. */
+@Composable
+private fun NotificationCountText(frame: IdleWidgetFrame) {
+    val text = NotificationCounts.badgeText(frame.data.notificationSummary.total)
+    VerticalTick(target = text, towardsDown = false) { shown -> SlotText(shown, frame) }
 }
 
 /** The pill's left-slot glyph of the mode: its icon; it ticks when another mode takes over. */
@@ -509,7 +563,7 @@ internal fun rememberIdleWidgetFrame(
     // A widget with nothing to show yet (no alarm set, weather not loaded, battery unread) sits out of the rotation.
     // The clock never takes a turn on the pill: the status bar has the time. Its hourly tick is HourChimeLayer's.
     // The battery widget (pill and island) only exists while charging: the status bar has the level the rest of the time.
-    val visible = kinds.filter { isAvailable(it, data) }
+    val visible = kinds.filter { isAvailable(it, data, settings.idleAlarmHideBeyond12h) }
         .ifEmpty { kinds.filter { it !in NEEDS_CONTENT_KINDS } }
     var step by remember { mutableIntStateOf(0) }
     val cycleMs = settings.idleWidgetCycleSeconds * 1000L
@@ -590,6 +644,19 @@ internal fun rememberIdleWidgetFrame(
     val glyphFont = remember(settings.idleGlyphFont) {
         if (settings.idleGlyphFont.isEmpty()) null else islandFontFamily(context, settings.idleGlyphFont)
     }
+    val led = remember(settings.idleTickStyle, settings.ledTickPattern, settings.ledTickPaceMs, settings.ledTickFont, settings.ledTickColor, settings.ledTickStagger) {
+        if (settings.idleTickStyle == com.agupta07505.smartisland.model.LedTick.STYLE_LED) {
+            com.agupta07505.smartisland.model.LedTickConfig(
+                pattern = com.agupta07505.smartisland.model.LedTick.parsePattern(settings.ledTickPattern),
+                paceMs = com.agupta07505.smartisland.model.LedTick.normalizePace(settings.ledTickPaceMs),
+                fontId = settings.ledTickFont,
+                colorId = settings.ledTickColor,
+                stagger = settings.ledTickStagger
+            )
+        } else {
+            null
+        }
+    }
     return IdleWidgetFrame(
         kind = kind,
         data = data,
@@ -599,7 +666,9 @@ internal fun rememberIdleWidgetFrame(
         glyphFont = glyphFont,
         glyphScale = settings.idleGlyphScale / 100f,
         autoSwitch = autoSwitched,
-        tickPeriodMs = IdleSlots.tickPeriodMs(settings.idleGlyphTickSeconds)
+        tickPeriodMs = IdleSlots.tickPeriodMs(settings.idleGlyphTickSeconds),
+        led = led,
+        windUnit = IdleWidgets.resolveWindUnit(settings.idleWidgetWindUnit, country)
     )
 }
 
@@ -608,12 +677,15 @@ private val NEEDS_CONTENT_KINDS = setOf(
     IdleWidgetKind.Clock, IdleWidgetKind.DayMoments, IdleWidgetKind.Battery, IdleWidgetKind.Notifications, IdleWidgetKind.Modes
 )
 
-private fun isAvailable(kind: IdleWidgetKind, data: IdleWidgetData): Boolean = when (kind) {
+private fun isAvailable(kind: IdleWidgetKind, data: IdleWidgetData, hideFarAlarm: Boolean = false): Boolean = when (kind) {
     IdleWidgetKind.Clock, IdleWidgetKind.DayMoments -> false
     IdleWidgetKind.Notifications -> data.notificationSummary.total > 0
     IdleWidgetKind.Modes -> data.mode.active
-    IdleWidgetKind.NextAlarm -> data.nextAlarmMs > System.currentTimeMillis()
+    IdleWidgetKind.NextAlarm -> System.currentTimeMillis().let { now ->
+        if (hideFarAlarm) WidgetIslandContent.alarmInWindow(data.nextAlarmMs, now) else data.nextAlarmMs > now
+    }
     IdleWidgetKind.Weather -> data.weather != null
+    IdleWidgetKind.Wind -> (data.weather?.windKmh ?: -1f) >= 0f
     IdleWidgetKind.Battery -> data.batteryPercent >= 0 && data.charging
     else -> true
 }
@@ -654,6 +726,12 @@ internal fun IdleWidgetSlot(frame: IdleWidgetFrame?, right: Boolean) {
 
 @Composable
 private fun IdleWidgetSlotFace(kind: IdleWidgetKind, frame: IdleWidgetFrame, right: Boolean) {
+    // The LED footsteps tick draws the slot on an LED grid instead (ui/LedTickSlot.kt); widgets it cannot draw keep the smooth tick.
+    val led = frame.led
+    if (led != null && ledSlotSupported(kind, right)) {
+        androidx.compose.runtime.key(led.fontId, led.colorId) { LedSlot(kind, frame, right, led) }
+        return
+    }
     // True while the slot's own change tick (weather) is playing: the 2.5 s sideways tick leaves it alone.
     val ownTick = remember { mutableStateOf(false) }
     SideTickBox(kind, right, frame, ownTickRunning = { ownTick.value }) {
@@ -729,17 +807,16 @@ private fun IdleWidgetSlotBody(kind: IdleWidgetKind, frame: IdleWidgetFrame, rig
                     delay(TICK_MS + 80L)
                     ownTick.value = false
                 }
-                VerticalTick(target = face, towardsDown = !right) { shown ->
-                    if (right) {
-                        SlotText(shown.temp, frame)
-                    } else {
-                        Icon(
-                            imageVector = weatherIcon(shown.look, shown.isDay).first,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size((15f * frame.glyphScale).dp)
-                        )
-                    }
+                if (right) {
+                    VerticalTick(target = face, towardsDown = false) { shown -> SlotText(shown.temp, frame) }
+                } else {
+                    // The glyph morphs into the new one only when the look really changes (phase 7); a new temperature alone leaves it be.
+                    MorphingWeatherGlyph(
+                        look = face.look,
+                        isDay = face.isDay,
+                        windKmh = snapshot.windKmh,
+                        size = (15f * frame.glyphScale).dp
+                    )
                 }
             }
         }
@@ -767,8 +844,9 @@ private fun IdleWidgetSlotBody(kind: IdleWidgetKind, frame: IdleWidgetFrame, rig
             }
         }
         IdleWidgetKind.NetSpeed -> NetSpeedSlot(frame, right)
+        // The app with the most notifications as the glyph on the left, the count over all apps on the right.
+        IdleWidgetKind.Notifications -> if (right) NotificationCountText(frame) else NotificationTopAppGlyph(frame)
         // One glyph on the left; the right slot stays empty.
-        IdleWidgetKind.Notifications -> if (!right) NotificationCountGlyph(frame)
         IdleWidgetKind.Modes -> if (!right) ModeGlyph(frame)
         else -> if (right) IdleWidgetValue(kind, frame, compact = false, monochrome = true) else IdleWidgetIcon(kind, frame)
     }
@@ -796,13 +874,13 @@ private fun NetSpeedSlot(frame: IdleWidgetFrame, right: Boolean) {
         }
     }
     val upload = lead == IdleSlots.SpeedLead.Upload
+    val fast = rememberFastSpeed(data.speedBytesPerSecond)
     VerticalTick(target = owns && arrow, towardsDown = !upload) { showArrow ->
         if (showArrow) {
-            Icon(
-                imageVector = if (upload) Icons.Rounded.ArrowUpward else Icons.Rounded.ArrowDownward,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size((15f * frame.glyphScale).dp)
+            AttentionGlyph(
+                icon = if (upload) Icons.Rounded.ArrowUpward else Icons.Rounded.ArrowDownward,
+                attention = AttentionStates.forWidget(IdleWidgetKind.NetSpeed, fast, alarmSoon = false, animationsOff = SystemAnimScale.animationsOff()),
+                size = (15f * frame.glyphScale).dp
             )
         } else {
             SlotText(IdleWidgets.shortSpeed(if (right) data.downBytesPerSecond else data.upBytesPerSecond), frame)
@@ -914,6 +992,7 @@ internal fun IdleWidgetIcon(kind: IdleWidgetKind, frame: IdleWidgetFrame, size: 
             if (snapshot == null) Icons.Rounded.Cloud to SOFT_WHITE
             else weatherIcon(weatherLook(snapshot.weatherCode), snapshot.isDay)
         }
+        IdleWidgetKind.Wind -> Icons.Rounded.Air to SOFT_WHITE
         IdleWidgetKind.Battery -> batteryIcon(data.batteryPercent, data.charging)
         IdleWidgetKind.NextAlarm -> Icons.Rounded.Alarm to ORANGE
         IdleWidgetKind.NetSpeed ->
@@ -921,12 +1000,215 @@ internal fun IdleWidgetIcon(kind: IdleWidgetKind, frame: IdleWidgetFrame, size: 
         IdleWidgetKind.Notifications -> Icons.Rounded.Notifications to SOFT_WHITE
         IdleWidgetKind.Modes -> modeFallbackIcon(data.mode.kind) to SOFT_WHITE
     }
-    Icon(
-        imageVector = icon,
-        contentDescription = null,
-        tint = Color.White,
-        modifier = Modifier.size(size)
+    val snapshot = data.weather
+    if (kind == IdleWidgetKind.Weather && snapshot != null) {
+        MorphingWeatherGlyph(weatherLook(snapshot.weatherCode), snapshot.isDay, snapshot.windKmh, size)
+        return
+    }
+    val attention = AttentionStates.forWidget(
+        kind = kind,
+        fastSpeed = if (kind == IdleWidgetKind.NetSpeed) rememberFastSpeed(data.speedBytesPerSecond) else false,
+        alarmSoon = if (kind == IdleWidgetKind.NextAlarm) rememberAlarmSoon(data.nextAlarmMs) else false,
+        animationsOff = SystemAnimScale.animationsOff()
     )
+    if (attention != GlyphAttention.None) {
+        AttentionGlyph(icon = icon, attention = attention, size = size)
+        return
+    }
+    val motion = GlyphMotions.forWidget(
+        kind = kind,
+        look = snapshot?.let { weatherLook(it.weatherCode) },
+        isDay = snapshot?.isDay ?: true,
+        windKmh = snapshot?.windKmh ?: -1f,
+        animationsOff = SystemAnimScale.animationsOff()
+    )
+    MotionGlyph(icon = icon, motion = motion, size = size)
+}
+
+/** A weather glyph: the look and whether it is day. */
+private data class WeatherGlyph(val look: WeatherLook, val isDay: Boolean)
+
+/**
+ * The weather glyph with its morph (phase 7). When the glyph really changes ([WeatherMorph.changed]) the old one turns and
+ * shrinks away while the new one turns in and grows, cross-fading; a refresh with the same look does nothing. The ambient
+ * motions of phase 6 ([MotionGlyph]) only start once the morph has ended. With the system's "remove animations" on, the
+ * glyph swaps at once. Only runs while composed, i.e. while the island shows it.
+ */
+@Composable
+private fun MorphingWeatherGlyph(look: WeatherLook, isDay: Boolean, windKmh: Float, size: Dp) {
+    val animationsOff = SystemAnimScale.animationsOff()
+    val target = WeatherGlyph(look, isDay)
+    // [shown] is the glyph the morph arrives at (or rests on); [outgoing] is the one fading away, null when no morph runs.
+    var shown by remember { mutableStateOf(target) }
+    var outgoing by remember { mutableStateOf<WeatherGlyph?>(null) }
+    val progress = remember { Animatable(1f) }
+    LaunchedEffect(target, animationsOff) {
+        if (target == shown) return@LaunchedEffect
+        val from = shown
+        shown = target
+        if (animationsOff || !WeatherMorph.changed(from.look, from.isDay, target.look, target.isDay)) {
+            outgoing = null
+            progress.snapTo(1f)
+            return@LaunchedEffect
+        }
+        outgoing = from
+        progress.snapTo(0f)
+        progress.animateTo(1f, tween(WeatherMorph.MORPH_MS, easing = LinearEasing))
+        outgoing = null
+    }
+    val leaving = outgoing
+    if (leaving == null) {
+        MotionGlyph(
+            icon = weatherIcon(shown.look, shown.isDay).first,
+            motion = GlyphMotions.forWidget(IdleWidgetKind.Weather, shown.look, shown.isDay, windKmh, animationsOff),
+            size = size
+        )
+        return
+    }
+    Box(modifier = Modifier.size(size), contentAlignment = Alignment.Center) {
+        // The tint of both glyphs is white, so there is no colour to blend; the cross-fade carries the change.
+        for ((glyph, incoming) in listOf(leaving to false, shown to true)) {
+            Icon(
+                imageVector = weatherIcon(glyph.look, glyph.isDay).first,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(size).graphicsLayer {
+                    val f = WeatherMorph.frame(progress.value)
+                    val layer = if (incoming) f.incoming else f.outgoing
+                    alpha = layer.alpha
+                    scaleX = layer.scale
+                    scaleY = layer.scale
+                    rotationZ = layer.rotationDegrees
+                }
+            )
+        }
+    }
+}
+
+/**
+ * Whether the net speed counts as fast (phase 8), with hysteresis: it turns on at 1 MB/s and only off again below 0.8 MB/s.
+ * The latch lives as long as the glyph is composed; the rule gives the same answer when run again on the same speed.
+ */
+@Composable
+private fun rememberFastSpeed(bytesPerSecond: Long): Boolean {
+    val latch = remember { booleanArrayOf(false) }
+    val fast = AttentionStates.isFastSpeed(bytesPerSecond, latch[0])
+    latch[0] = fast
+    return fast
+}
+
+/**
+ * Whether the next alarm is under 10 minutes away (phase 8). It wakes up only when the window opens and when the alarm rings,
+ * so nothing ticks while the alarm is far off; it stops when the alarm fires or is cleared.
+ */
+@Composable
+private fun rememberAlarmSoon(nextAlarmMs: Long): Boolean {
+    var now by remember(nextAlarmMs) { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(nextAlarmMs) {
+        while (true) {
+            now = System.currentTimeMillis()
+            delay(AttentionStates.alarmRecheckDelayMs(nextAlarmMs, now) ?: break)
+        }
+    }
+    return AttentionStates.isAlarmSoon(nextAlarmMs, now)
+}
+
+/**
+ * A glyph in an attention state (phase 8): the speed arrow breathes in size, the alarm glyph sits on a soft orange halo that
+ * breathes. The loop only runs while this is composed, i.e. while the island shows it.
+ */
+@Composable
+private fun AttentionGlyph(icon: ImageVector, attention: GlyphAttention, size: Dp) {
+    if (attention == GlyphAttention.None) {
+        Icon(imageVector = icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(size))
+        return
+    }
+    val transition = rememberInfiniteTransition(label = "glyphAttention")
+    val phase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(AttentionStates.periodMs(attention), easing = LinearEasing)),
+        label = "attentionPhase"
+    )
+    Box(modifier = Modifier.size(size), contentAlignment = Alignment.Center) {
+        if (attention == GlyphAttention.AlarmGlow) {
+            // The halo is larger than the glyph but takes no layout room of its own.
+            Box(
+                modifier = Modifier
+                    .requiredSize(size * 1.6f)
+                    .graphicsLayer {
+                        val breath = AttentionStates.breath(phase)
+                        alpha = AttentionStates.glowAlpha(breath)
+                        scaleX = AttentionStates.glowScale(breath)
+                        scaleY = AttentionStates.glowScale(breath)
+                    }
+                    .background(Brush.radialGradient(listOf(ORANGE, Color.Transparent)), CircleShape)
+            )
+        }
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(size).graphicsLayer {
+                if (attention == GlyphAttention.SpeedPulse) {
+                    val s = AttentionStates.pulseScale(AttentionStates.breath(phase))
+                    scaleX = s
+                    scaleY = s
+                }
+            }
+        )
+    }
+}
+
+/**
+ * One glyph with its ambient motion (phase 6): the sun turns slowly, raindrops fall, the wind glyph sways faster in
+ * stronger wind. With no motion it is the plain white icon. The loop only runs while this is composed, i.e. while the
+ * island shows it.
+ */
+@Composable
+private fun MotionGlyph(icon: ImageVector, motion: GlyphMotion, size: Dp) {
+    if (!motion.isRunning) {
+        Icon(imageVector = icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(size))
+        return
+    }
+    val transition = rememberInfiniteTransition(label = "glyphMotion")
+    // A new loop length (the wind changed) restarts the loop at the new speed.
+    val phase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(motion.periodMs, easing = LinearEasing)),
+        label = "glyphPhase"
+    )
+    when (motion.kind) {
+        GlyphMotionKind.SunSpin -> Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(size).graphicsLayer { rotationZ = GlyphMotions.sunAngle(phase) }
+        )
+        GlyphMotionKind.WindSway -> Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(size).graphicsLayer { translationX = GlyphMotions.windOffsetShare(phase) * this.size.width }
+        )
+        GlyphMotionKind.RainFall -> Box(modifier = Modifier.size(size).clipToBounds(), contentAlignment = Alignment.Center) {
+            // Two small drops, half a loop apart, each fading in at the top and out at the bottom.
+            for (shift in floatArrayOf(0f, 0.5f)) {
+                val drop = GlyphMotions.drop(phase + shift)
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(size * 0.6f).graphicsLayer {
+                        translationY = drop.offsetShare * this.size.height
+                        alpha = drop.alpha
+                    }
+                )
+            }
+        }
+        GlyphMotionKind.None -> Unit
+    }
 }
 
 @Composable
@@ -952,6 +1234,7 @@ internal fun IdleWidgetValue(kind: IdleWidgetKind, frame: IdleWidgetFrame, compa
             val snapshot = data.weather
             text = if (snapshot == null) "--\u00B0" else IdleWidgets.displayTemp(snapshot.temperatureC, frame.fahrenheit)
         }
+        IdleWidgetKind.Wind -> text = IdleWidgets.displayWind(data.weather?.windKmh ?: -1f, frame.windUnit)
         IdleWidgetKind.Battery -> {
             val pct = data.batteryPercent
             text = if (pct < 0) "--" else if (compact) "$pct" else "$pct%"
@@ -981,7 +1264,7 @@ internal fun IdleWidgetValue(kind: IdleWidgetKind, frame: IdleWidgetFrame, compa
     }
     if (monochrome) color = Color.White
     val size = if (!compact) (11f * frame.glyphScale).sp else when (kind) {
-        IdleWidgetKind.Date, IdleWidgetKind.Weather, IdleWidgetKind.Battery -> 10.sp
+        IdleWidgetKind.Date, IdleWidgetKind.Weather, IdleWidgetKind.Wind, IdleWidgetKind.Battery -> 10.sp
         else -> 8.sp
     }
     Text(
@@ -997,7 +1280,14 @@ internal fun IdleWidgetValue(kind: IdleWidgetKind, frame: IdleWidgetFrame, compa
 
 private const val DAY_MS = 24 * 60 * 60 * 1000L
 
-private fun weatherIcon(look: WeatherLook, isDay: Boolean): Pair<ImageVector, Color> = when (look) {
+private fun sameCalendarDay(a: Long, b: Long): Boolean {
+    val first = java.util.Calendar.getInstance().apply { timeInMillis = a }
+    val second = java.util.Calendar.getInstance().apply { timeInMillis = b }
+    return first.get(java.util.Calendar.YEAR) == second.get(java.util.Calendar.YEAR) &&
+        first.get(java.util.Calendar.DAY_OF_YEAR) == second.get(java.util.Calendar.DAY_OF_YEAR)
+}
+
+internal fun weatherIcon(look: WeatherLook, isDay: Boolean): Pair<ImageVector, Color> = when (look) {
     WeatherLook.Clear -> if (isDay) Icons.Rounded.WbSunny to AMBER else Icons.Rounded.NightsStay to SOFT_WHITE
     WeatherLook.PartlyCloudy -> Icons.Rounded.WbCloudy to (if (isDay) AMBER else SOFT_WHITE)
     WeatherLook.Cloudy, WeatherLook.Fog -> Icons.Rounded.Cloud to SOFT_WHITE

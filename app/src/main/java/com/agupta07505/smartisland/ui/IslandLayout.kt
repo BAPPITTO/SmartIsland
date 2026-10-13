@@ -28,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.agupta07505.smartisland.data.SmartIslandSettings
@@ -86,14 +87,12 @@ internal class IslandLayout(
     private val originX: () -> Dp,
     private val originY: () -> Dp,
     /** 0 = pill, 1 = card, on the same spring as the island's width; the shell's colour follows it (pill colour to the light surface). */
-    private val expandProgressState: State<Float>,
-    private val hidingAlphaState: State<Float>
+    private val expandProgressState: State<Float>
 ) {
     val expandProgress: Float get() = expandProgressState.value
     val singleSurfaceAlpha: Float get() = singleSurfaceAlphaState.value
     /** The single island's shadow: it still fades in (the card island's shadow is off by then), the surface does not. */
     val singleShadowAlpha: Float get() = singleShadowAlphaState.value
-    val hidingAlpha: Float get() = hidingAlphaState.value
     val width: Dp get() = widthState.value
     val height: Dp get() = heightState.value
     val yOffset: Dp get() = originY()
@@ -103,8 +102,8 @@ internal class IslandLayout(
     val expandedAlpha: Float get() = expandedAlphaState.value
     val contentScale: Float get() = contentScaleState.value
     val contentSlideY: Dp get() = contentSlideYState.value
-    val safeWidth: Dp get() = (if (isHiding && hidingAlphaState.value <= 0.01f) 0.dp else widthState.value).coerceAtLeast(0.dp)
-    val safeHeight: Dp get() = (if (isHiding && hidingAlphaState.value <= 0.01f) 0.dp else heightState.value).coerceAtLeast(0.dp)
+    val safeWidth: Dp get() = widthState.value.coerceAtLeast(0.dp)
+    val safeHeight: Dp get() = heightState.value.coerceAtLeast(0.dp)
     val safeRadius: Dp get() = radiusState.value.coerceAtLeast(0.dp)
     /** The pill's own content layer is composed (its fade is above 0). Only changes when that flips, so reading it in composition is cheap. */
     val collapsedShown: Boolean get() = collapsedShownState.value
@@ -176,8 +175,16 @@ internal fun CollapsedContentLayer(
     }
     Box(
         modifier = modifier
-            .width(settings.width.dp)
-            .height(settings.height.dp)
+            // While the pill stretches or shrinks the content is laid out at the shell's width, so it grows and shrinks with it.
+            // Otherwise (expanding, collapsing, hidden) it keeps the settled width, as before.
+            .layout { measurable, constraints ->
+                val settled = settings.width.dp.roundToPx()
+                val follow = layout.expandProgress <= 0.001f && !layout.isHiding
+                val w = if (follow) layout.width.roundToPx().coerceAtLeast(0) else settled
+                val h = settings.height.dp.roundToPx()
+                val placeable = measurable.measure(androidx.compose.ui.unit.Constraints.fixed(w, h))
+                this.layout(w, h) { placeable.place(0, 0) }
+            }
             .graphicsLayer {
                 val slide = ui.pillContentDragX + ui.pillEnter.value
                 translationX = slide
@@ -212,6 +219,17 @@ internal const val PILL_ENTER_DISTANCE_FRACTION = 0.6f
 /** How much of its opacity the incoming card starts without (0 = no fade). */
 internal const val PILL_ENTER_FADE = 0.35f
 
+/** The collapsed pill's stretch / shrink between its idle and with-content widths: a little bounce on the way out, settles on the way back. */
+internal const val PILL_STRETCH_DAMPING = 0.72f
+internal const val PILL_STRETCH_STIFFNESS = 420f
+
+/** Arrival pulse of the collapsed pill: +5 % width (of the with-content width), a little taller (20 % of the height, at most 8 dp, inside the window's slack), out fast, back soft. */
+internal const val PILL_PULSE_WIDTH_FRACTION = 0.05f
+internal const val PILL_PULSE_HEIGHT_FRACTION = 0.2f
+internal const val PILL_PULSE_HEIGHT_MAX_DP = 8f
+internal const val PILL_PULSE_OUT_STIFFNESS = 600f
+internal const val PILL_PULSE_BACK_STIFFNESS = 380f
+
 /** The shell's height follow when the island stays expanded and the card's height changes (no overshoot; a little stiffer than the card's own slide-in so the two end together). */
 internal const val HEIGHT_FOLLOW_STIFFNESS = 900f
 
@@ -245,7 +263,9 @@ internal fun rememberIslandLayout(
     /** Kept for the callers; collapsed geometry never glides any more, so it has no effect. */
     @Suppress("UNUSED_PARAMETER") snapGeometry: Boolean = false,
     /** True while a swipe's card swap is in flight: the shell's height then runs on the slide's own spring, so the two finish together. */
-    cardSwitching: () -> Boolean = { false }
+    cardSwitching: () -> Boolean = { false },
+    /** Landscape: the pill stays on the island to carry the idle widgets, so a card arriving or leaving stretches / shrinks it in place. */
+    landscapePillStretch: Boolean = false
 ): IslandLayout {
     val expandedWidth = calculateExpandedWidth(
         isLandscape = isLandscape,
@@ -380,14 +400,6 @@ internal fun rememberIslandLayout(
     val expandedTopOffset = if (launcherOpen) (expandedTopOffsetBase - LAUNCHER_EXPANDED_LIFT_DP.dp).coerceAtLeast(0.dp) else expandedTopOffsetBase
     // While the screen is shared the main cutout stays on screen next to the cast bubble.
     val isHiding = settings.autoHidePill && isAutoHidden && !privacyState.hasAnything
-    val hidingAlphaState = animateFloatAsState(
-        targetValue = if (isHiding) 0f else 1f,
-        animationSpec = tween(
-            durationMillis = animSpeed.durationMs(alphaMs),
-            easing = FastOutSlowInEasing
-        ),
-        label = "hidingAlpha"
-    )
     val pillBackgroundColor = Color(settings.pillColor)
     // 0 while the two separate islands draw their own surfaces, 1 for the single island.
     val singleSurfaceAlphaState = animateFloatAsState(
@@ -413,7 +425,7 @@ internal fun rememberIslandLayout(
     // A collapse that lands on a visible pill uses one shared motion in both orientations
     // (width bounces a little, height / radius / vertical progress settle without overshoot). A collapse onto an
     // auto-hidden pill keeps the old springs. Landscape's idle-circle close has its own, bounce-free, slower one (below).
-    val collapseOnPill = !isHiding || hidingAlphaState.value > 0.01f
+    val collapseOnPill = !isHiding
     // The expand spring as it really runs (speed-scaled), which the expand fades are read off.
     val expandStiffness = animSpeed.stiffness(islandSpringStiffness(isLandscape))
     val expandDamping = islandSpringDamping(isLandscape)
@@ -442,8 +454,20 @@ internal fun rememberIslandLayout(
         stiffness = closeStiffness
     )
 
-    val widthState = transition.animateDp(transitionSpec = { if (initialState == targetState) settleOrSnap else if (!targetState && collapseOnPill) collapseWidthSpec else sizeSpec }, label = "islandWidth") {
-        if (it) expandedWidth else settings.width.dp
+    // The collapsed pill stretching to its with-content width and shrinking back (portrait): a card arriving, a tap that brings the stored
+    // cards back, and the idle timeout putting them away all change the pill's width while the island stays collapsed. The same soft
+    // spring runs both ways. Landscape keeps its own slide, and a rotation snaps (the width then changes for another reason).
+    val lastLandscape = remember { BooleanArray(1) { isLandscape } }
+    val orientationFlipped = lastLandscape[0] != isLandscape
+    lastLandscape[0] = isLandscape
+    val stretchSpec: androidx.compose.animation.core.FiniteAnimationSpec<androidx.compose.ui.unit.Dp> =
+        if ((isLandscape && !landscapePillStretch) || orientationFlipped) androidx.compose.animation.core.snap()
+        else spring(
+            dampingRatio = PILL_STRETCH_DAMPING,
+            stiffness = animSpeed.stiffness(PILL_STRETCH_STIFFNESS)
+        )
+    val widthState = transition.animateDp(transitionSpec = { if (initialState == targetState) stretchSpec else if (!targetState && collapseOnPill) collapseWidthSpec else sizeSpec }, label = "islandWidth") {
+        if (it) expandedWidth else if (isHiding) 0.dp else settings.width.dp
     }
     // The height of an island that STAYS expanded (another card is swiped in, a text opens, a step finishes). The
     // transition's segment still reads "collapsed -> expanded" at rest, so the expand spring (which also rings a little) used to
@@ -472,7 +496,7 @@ internal fun rememberIslandLayout(
         else if (!targetState && collapseOnPill) collapseSettleSpec
         else heightSpec
     }, label = "islandHeight") {
-        if (it) expandedHeight else settings.height.dp
+        if (it) expandedHeight else if (isHiding) 0.dp else settings.height.dp
     }
     // Landscape only: lowers the collapsed cutouts inside a window that starts at the screen top.
     val collapsedTopShift = collapsedTopShiftDp(isLandscape, settings.enableNotchMode, settings.yOffset).dp
@@ -480,7 +504,7 @@ internal fun rememberIslandLayout(
         if (it) 0.dp else collapsedTopShift
     }
     val radiusState = transition.animateDp(transitionSpec = { if (initialState == targetState) settleOrSnap else if (!targetState && collapseOnPill) collapseSettleSpec else sizeSpec }, label = "islandRadius") {
-        if (it) 34.dp else settings.cornerRadius.dp
+        if (it) 34.dp else if (isHiding) 0.dp else settings.cornerRadius.dp
     }
 
     // Expanding: the collapsed content leaves quickly while the card grows, then the card content
@@ -604,6 +628,27 @@ internal fun rememberIslandLayout(
     val collapsedShownState = remember(collapsedAlphaState) { derivedStateOf { collapsedAlphaState.value > 0f } }
     val expandedShownState = remember(expandedAlphaState) { derivedStateOf { expandedAlphaState.value > 0.01f } }
 
+    // Arrival pulse: a notification or quick event arriving on the collapsed pill grows it to +5 % of its with-content width and a little
+    // taller, then it shrinks back to its normal height and with-content width. The base springs above keep running underneath, so the
+    // pill still stretches to the with-content width on the first card; the pulse is only added on top of them.
+    val pulse = remember { androidx.compose.animation.core.Animatable(0f) }
+    val seenKeys = remember { HashSet<String>().apply { notifications.forEach { add(it.key) } } }
+    seenKeys.retainAll(notifications.map { it.key }.toSet())
+    val arrivalKey = notifications.firstOrNull { seenKeys.add(it.key) }?.key
+    LaunchedEffect(arrivalKey) {
+        if (arrivalKey == null || expanded || (isLandscape && !landscapePillStretch)) return@LaunchedEffect
+        pulse.snapTo(0f)
+        pulse.animateTo(1f, spring(dampingRatio = 0.6f, stiffness = animSpeed.stiffness(PILL_PULSE_OUT_STIFFNESS)))
+        pulse.animateTo(0f, spring(dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy, stiffness = animSpeed.stiffness(PILL_PULSE_BACK_STIFFNESS)))
+    }
+    LaunchedEffect(expanded) { if (expanded) pulse.snapTo(0f) }
+    val pulseWidthState = remember(widthState, pulse, settings.width) {
+        derivedStateOf { widthState.value + (settings.width * PILL_PULSE_WIDTH_FRACTION * pulse.value).dp }
+    }
+    val pulseHeightState = remember(heightState, pulse, settings.height) {
+        derivedStateOf { heightState.value + (minOf(settings.height * PILL_PULSE_HEIGHT_FRACTION, PILL_PULSE_HEIGHT_MAX_DP) * pulse.value).dp }
+    }
+
     return IslandLayout(
         miniPillWidth = miniPillWidth,
         circleSize = circleSize,
@@ -629,8 +674,8 @@ internal fun rememberIslandLayout(
         singleExpandedWidth = singleExpandedWidth,
         pickerLeftFraction = pickerLeftFraction,
         pickerEdgeFraction = pickerEdgeFraction,
-        widthState = widthState,
-        heightState = heightState,
+        widthState = pulseWidthState,
+        heightState = pulseHeightState,
         radiusState = radiusState,
         topShiftState = topShiftState,
         collapsedAlphaState = collapsedAlphaState,
@@ -643,8 +688,7 @@ internal fun rememberIslandLayout(
         expandedShownState = expandedShownState,
         originX = originX,
         originY = originY,
-        expandProgressState = expandProgressState,
-        hidingAlphaState = hidingAlphaState
+        expandProgressState = expandProgressState
     )
 }
 
