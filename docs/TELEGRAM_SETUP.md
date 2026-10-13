@@ -76,7 +76,7 @@ Add the following:
 
 ## 6. Workflow Triggers
 
-- **Push / Merge to `main` or Tag `v*`:**
+- **Tag `v*` or manual `workflow_dispatch`:**
   Builds and signs the release APK (`SmartIsland-v*.apk`), publishes the GitHub release, and forwards the APK to your Release Topic.
 - **Push to `dev` or manual `workflow_dispatch`:**
   Builds `app-debug.apk` and forwards it to your Debug Topic.
