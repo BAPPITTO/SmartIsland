@@ -64,7 +64,7 @@ jobs:
           retention-days: 14
 
       - name: Upload debug APK
-        if: ${{ github.event_name == 'pull_request' || github.ref == 'refs/heads/dev' }}
+        if: ${{ github.event_name == 'pull_request' || github.ref == 'refs/heads/dev' || github.event_name == 'workflow_dispatch' }}
         uses: actions/upload-artifact@v4
         with:
           name: SmartIsland-Debug-apk
@@ -72,11 +72,21 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Forward Debug APK to Telegram
+        if: ${{ (github.ref == 'refs/heads/dev' || github.event_name == 'workflow_dispatch') && !cancelled() }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_TOPIC_ID: ${{ secrets.TELEGRAM_TOPIC_ID }}
+          TELEGRAM_DEBUG_TOPIC_ID: ${{ secrets.TELEGRAM_DEBUG_TOPIC_ID }}
+        run: |
+          chmod +x ./scripts/send-telegram.sh
+          ./scripts/send-telegram.sh "app/build/outputs/apk/debug/app-debug.apk" "Debug"
+
   release:
     name: Build signed release
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      github.ref == 'refs/heads/main' ||
       startsWith(github.ref, 'refs/tags/v')
     needs: verify
     runs-on: ubuntu-latest
@@ -163,7 +173,9 @@ jobs:
 
   publish:
     name: Publish GitHub release
-    if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      startsWith(github.ref, 'refs/tags/v')
     needs: release
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -171,6 +183,9 @@ jobs:
       contents: write
 
     steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
       - name: Download release APK
         uses: actions/download-artifact@v4
         with:
@@ -222,3 +237,15 @@ jobs:
               --notes "$RELEASE_INTRO" \
               --generate-notes
           fi
+
+      - name: Forward Release APK to Telegram
+        if: ${{ !cancelled() }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_TOPIC_ID: ${{ secrets.TELEGRAM_TOPIC_ID }}
+          TELEGRAM_RELEASE_TOPIC_ID: ${{ secrets.TELEGRAM_RELEASE_TOPIC_ID }}
+          VERSION_TAG: ${{ needs.release.outputs.version_tag }}
+        run: |
+          chmod +x ./scripts/send-telegram.sh
+          ./scripts/send-telegram.sh "${{ needs.release.outputs.apk_name }}" "Release"
