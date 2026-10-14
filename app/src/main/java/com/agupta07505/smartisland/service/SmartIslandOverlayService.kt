@@ -1643,7 +1643,11 @@ class SmartIslandOverlayService : AccessibilityService() {
         )
         blur.show(key)
         // The island's shell turns into a tint only while a blur is really there (not while the island is still a pill, or unsupported).
-        viewModel.liveBlurShown.value = key != null && blur.isSupported()
+        val shownNow = key != null && blur.isSupported()
+        if (viewModel.liveBlurShown.value != shownNow) {
+            com.agupta07505.smartisland.util.AppLogRecorder.i(TAG, "Live blur tint ${if (shownNow) "on" else "off"} (key=${key?.joinToString(",")})")
+        }
+        viewModel.liveBlurShown.value = shownNow
     }
 
     private fun collapsedParams(settings: SmartIslandSettings): WindowManager.LayoutParams {

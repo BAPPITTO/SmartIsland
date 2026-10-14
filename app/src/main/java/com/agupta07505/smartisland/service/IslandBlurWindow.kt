@@ -43,6 +43,8 @@ internal class IslandBlurWindow(
     private var lastKey: IntArray? = null
     /** What support was last written to the diagnostic log, so that it is logged when it changes, not on every frame. */
     private var lastLoggedSupport: Boolean? = null
+    /** When the placement was last written to the diagnostic log (it moves every frame while the island opens). */
+    private var lastPlacementLogMs = 0L
 
     /** True where the system can blur behind a window now (API 31+, and not turned off by battery saver, the OEM or a developer option). */
     fun isSupported(): Boolean =
@@ -57,7 +59,8 @@ internal class IslandBlurWindow(
             d.setContentView(View(context))
             val w = d.window ?: return@runCatchingLogged null
             w.setType(WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY)
-            w.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            // Not fully transparent: a window that draws nothing can be skipped by the compositor, blur included. 1/255 alpha is invisible.
+            w.setBackgroundDrawable(ColorDrawable(Color.argb(1, 0, 0, 0)))
             w.setFormat(PixelFormat.TRANSLUCENT)
             w.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
             // Same flags as the island window so that y means the same screen row in both, but never touchable or focusable.
@@ -140,10 +143,22 @@ internal class IslandBlurWindow(
             win.attributes = lp
             // Background blur: only the window's own rectangle is blurred, whatever is behind that rectangle.
             win.setBackgroundBlurRadius(blurRadiusPx)
+            val now = android.os.SystemClock.uptimeMillis()
+            if (blurRadiusPx > 0 && now - lastPlacementLogMs >= PLACEMENT_LOG_INTERVAL_MS) {
+                lastPlacementLogMs = now
+                val decor = win.decorView
+                AppLogRecorder.i(
+                    TAG,
+                    "Live blur placement: x=$x y=$y w=$w h=$h radius=${blurRadiusPx}px " +
+                        "attached=${decor.isAttachedToWindow} decorSize=${decor.width}x${decor.height} " +
+                        "translucent=${win.attributes.format == PixelFormat.TRANSLUCENT}"
+                )
+            }
         }
     }
 
     private companion object {
         const val TAG = "IslandBlurWindow"
+        const val PLACEMENT_LOG_INTERVAL_MS = 400L
     }
 }
