@@ -401,7 +401,8 @@ internal fun rememberIslandLayout(
     }
     val expandedTopOffset = if (launcherOpen) (expandedTopOffsetBase - LAUNCHER_EXPANDED_LIFT_DP.dp).coerceAtLeast(0.dp) else expandedTopOffsetBase
     // While the screen is shared the main cutout stays on screen next to the cast bubble.
-    val isHiding = settings.autoHidePill && isAutoHidden && !privacyState.hasAnything
+    val isIdleHiding = settings.hideWhenIdle && notifications.isEmpty()
+    val isHiding = (isIdleHiding || (settings.autoHidePill && isAutoHidden)) && !privacyState.hasAnything
     val hidingAlphaState = animateFloatAsState(
         targetValue = if (isHiding) 0f else 1f,
         animationSpec = tween(

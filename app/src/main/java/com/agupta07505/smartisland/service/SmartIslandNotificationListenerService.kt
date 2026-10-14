@@ -1133,6 +1133,48 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
             if (mode == IslandMode.IncomingCall) CallStyleExtras.withCallIntents(notification, base) else base
         }
 
+        val isMiuiRom = com.agupta07505.smartisland.util.OemDeviceRules.isMiuiOrHyperOs(settings.deviceType)
+
+        @Suppress("DEPRECATION")
+        val focusActions: List<IslandNotificationAction> = if (isMiuiRom) {
+            extras.getBundle("miui.focus.actions")
+                ?.let { focusBundle ->
+                    runCatching {
+                        focusBundle.keySet().mapNotNull { actionKey ->
+                            val focusAction =
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    focusBundle.getParcelable(
+                                        actionKey,
+                                        Notification.Action::class.java
+                                    )
+                                } else {
+                                    focusBundle.getParcelable<Notification.Action>(
+                                        actionKey
+                                    )
+                                } ?: return@mapNotNull null
+
+                            focusAction.title?.toString()?.let { title ->
+                                val remoteInput = focusAction.remoteInputs?.firstOrNull()
+
+                                IslandNotificationAction(
+                                    title = title,
+                                    pendingIntent = focusAction.actionIntent,
+                                    isQuickReply = remoteInput != null ||
+                                        title.lowercase().contains("reply"),
+                                    remoteInputKey =
+                                        remoteInput?.resultKey ?: "key_text_reply"
+                                )
+                            }
+                        }
+                    }.getOrNull()
+                }.orEmpty()
+        } else {
+            emptyList()
+        }
+
+        val baseActions = (standardActions + focusActions)
+            .distinctBy { it.title.trim().lowercase() to it.pendingIntent }
+
         // Some clocks and recorders keep the running time and their Pause / Stop buttons inside a custom
         // notification view instead of the standard fields. Read those views for the cards that need them.
         val usesCustomViews = mode == IslandMode.Stopwatch ||
@@ -1147,7 +1189,7 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
         val actions = if (
             viewInfo != null && viewInfo.buttons.isNotEmpty() &&
             (mode == IslandMode.ScreenRecording || mode == IslandMode.AudioRecording) &&
-            standardActions.none {
+            baseActions.none {
                 it.pendingIntent != null &&
                     com.agupta07505.smartisland.ui.expanded.classifyAction(it.title) in
                     arrayOf(
@@ -1157,9 +1199,9 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
             }
         ) {
             // The shade shows a Pause button the standard actions do not have: take the view's buttons.
-            standardActions.filter { it.pendingIntent != null } + viewInfo.buttons
+            baseActions.filter { it.pendingIntent != null } + viewInfo.buttons
         } else {
-            standardActions
+            baseActions
         }
         val isNowRinging = actions.any { VoipCallDetector.classifyCallAction(it.title) == CallActionRole.Answer } ||
             (mode == IslandMode.IncomingCall && CallStyleExtras.looksRinging(notification))
@@ -1240,6 +1282,59 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
             null
         }
 
+        val stopwatchElapsedSeconds: Long?
+        val stopwatchChronometerBase: Long?
+        val timerRemainingSeconds: Long?
+
+        if (isMiuiRom) {
+            val stopwatchIsPaused = mode == IslandMode.Stopwatch &&
+                com.agupta07505.smartisland.util.TimerStopwatchParser.isStopwatchPaused(notification)
+
+            stopwatchElapsedSeconds = if (stopwatchIsPaused) {
+                val previousStopwatch = existingNotif?.takeIf { it.mode == IslandMode.Stopwatch }
+                val parsedElapsed = com.agupta07505.smartisland.util.TimerStopwatchParser
+                    .parseStopwatchElapsedSeconds(notification)
+
+                parsedElapsed
+                    ?: previousStopwatch?.stopwatchElapsedSeconds
+                    ?: previousStopwatch?.let { previous ->
+                        ((System.currentTimeMillis() - previous.timeMillis) / 1000L).coerceAtLeast(0L)
+                    }
+            } else {
+                null
+            }
+
+            stopwatchChronometerBase = if (mode == IslandMode.Stopwatch && !stopwatchIsPaused) {
+                runCatching {
+                    notification.extras?.getLong("android.chronometerBase", 0L)
+                }.getOrNull()?.takeIf { it > 0L }
+            } else {
+                null
+            }
+
+            val nowMillis = System.currentTimeMillis()
+            val timerIsPaused = mode == IslandMode.Timer &&
+                com.agupta07505.smartisland.util.TimerStopwatchParser.isTimerPaused(notification)
+
+            timerRemainingSeconds = if (timerIsPaused) {
+                val previousTimer = existingNotif?.takeIf { it.mode == IslandMode.Timer }
+
+                previousTimer?.timerRemainingSeconds
+                    ?: previousTimer?.let { old ->
+                        ((old.timeMillis - nowMillis + 999L) / 1000L).coerceAtLeast(0L)
+                    }
+                    ?: notification.`when`.takeIf { it > nowMillis }?.let { deadline ->
+                        ((deadline - nowMillis + 999L) / 1000L).coerceAtLeast(0L)
+                    }
+            } else {
+                null
+            }
+        } else {
+            stopwatchElapsedSeconds = null
+            stopwatchChronometerBase = null
+            timerRemainingSeconds = null
+        }
+
         val voipLive = com.agupta07505.smartisland.util.VoipCallSignal.active
         val computedTimeMillis = when {
             recordingState != null -> recordingState.startMillis
@@ -1260,18 +1355,41 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
                 com.agupta07505.smartisland.util.VoipCallSignal.sinceMillis
             mode == IslandMode.Timer && timerFrozenMs != null -> System.currentTimeMillis() + timerFrozenMs
             mode == IslandMode.Timer -> {
-                val remSec = com.agupta07505.smartisland.util.TimerStopwatchParser.parseTimerRemainingSeconds(notification)
-                val target = if (remSec != null && remSec > 0) {
-                    System.currentTimeMillis() + remSec * 1000L
-                } else if (notification.`when` > System.currentTimeMillis()) {
-                    notification.`when`
-                } else if (existingNotif != null && existingNotif.mode == IslandMode.Timer && existingNotif.timeMillis > System.currentTimeMillis()) {
-                    existingNotif.timeMillis
+                if (isMiuiRom) {
+                    val preciseDeadline = com.agupta07505.smartisland.util.TimerStopwatchParser
+                        .parseTimerDeadlineMillis(notification)
+                    if (preciseDeadline != null) {
+                        lastTimerTargets[sbn.packageName] = preciseDeadline
+                        preciseDeadline
+                    } else {
+                        val remSec = com.agupta07505.smartisland.util.TimerStopwatchParser
+                            .parseTimerRemainingSeconds(notification)
+                        val target = if (remSec != null && remSec > 0) {
+                            System.currentTimeMillis() + remSec * 1000L
+                        } else if (notification.`when` > System.currentTimeMillis()) {
+                            notification.`when`
+                        } else if (existingNotif != null && existingNotif.mode == IslandMode.Timer && existingNotif.timeMillis > System.currentTimeMillis()) {
+                            existingNotif.timeMillis
+                        } else {
+                            System.currentTimeMillis()
+                        }
+                        lastTimerTargets[sbn.packageName] = target
+                        target
+                    }
                 } else {
-                    System.currentTimeMillis()
+                    val remSec = com.agupta07505.smartisland.util.TimerStopwatchParser.parseTimerRemainingSeconds(notification)
+                    val target = if (remSec != null && remSec > 0) {
+                        System.currentTimeMillis() + remSec * 1000L
+                    } else if (notification.`when` > System.currentTimeMillis()) {
+                        notification.`when`
+                    } else if (existingNotif != null && existingNotif.mode == IslandMode.Timer && existingNotif.timeMillis > System.currentTimeMillis()) {
+                        existingNotif.timeMillis
+                    } else {
+                        System.currentTimeMillis()
+                    }
+                    lastTimerTargets[sbn.packageName] = target
+                    target
                 }
-                lastTimerTargets[sbn.packageName] = target
-                target
             }
             mode == IslandMode.Stopwatch -> {
                 val elSec = com.agupta07505.smartisland.util.TimerStopwatchParser.parseStopwatchElapsedSeconds(notification)
@@ -1393,6 +1511,9 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
                 },
                 mode = mode,
                 contentIntent = notification.contentIntent,
+                stopwatchElapsedSeconds = stopwatchElapsedSeconds,
+                stopwatchChronometerBase = stopwatchChronometerBase,
+                timerRemainingSeconds = timerRemainingSeconds,
                 transferKind = if (mode == IslandMode.DownloadUpload) {
                     notification.transferKind(sbn.packageName)
                 } else {
@@ -1424,25 +1545,42 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
                     ""
                 }
             ),
-            autoExpand = if (!isInitialSync && !repostOfShownPost && shouldIslandOnly && AppEventRules.mayAutoExpand(
-                    globalAutoExpand = settings.autoExpandOnNotification,
-                    noAutoExpandPackages = settings.noAutoExpandPackages,
-                    autoExpandPackages = settings.autoExpandPackages,
-                    noExpandPackages = settings.noExpandPackages,
-                    packageName = sbn.packageName,
-                    mode = mode,
-                    isLoud = !(mode == IslandMode.Notification && isSilentNotification(sbn))
-                )
-            ) {
-                val now = SystemClock.elapsedRealtime()
-                if (now - lastAutoExpandTimeMs >= AUTO_EXPAND_DEBOUNCE_MS) {
-                    lastAutoExpandTimeMs = now
-                    true
+            autoExpand = if (isMiuiRom) {
+                when {
+                    isInitialSync -> false
+                    mode == IslandMode.Timer || mode == IslandMode.Stopwatch -> true
+                    shouldIslandOnly && settings.autoExpandOnNotification -> {
+                        val now = SystemClock.elapsedRealtime()
+                        if (now - lastAutoExpandTimeMs >= AUTO_EXPAND_DEBOUNCE_MS) {
+                            lastAutoExpandTimeMs = now
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    else -> false
+                }
+            } else {
+                if (!isInitialSync && !repostOfShownPost && shouldIslandOnly && AppEventRules.mayAutoExpand(
+                        globalAutoExpand = settings.autoExpandOnNotification,
+                        noAutoExpandPackages = settings.noAutoExpandPackages,
+                        autoExpandPackages = settings.autoExpandPackages,
+                        noExpandPackages = settings.noExpandPackages,
+                        packageName = sbn.packageName,
+                        mode = mode,
+                        isLoud = !(mode == IslandMode.Notification && isSilentNotification(sbn))
+                    )
+                ) {
+                    val now = SystemClock.elapsedRealtime()
+                    if (now - lastAutoExpandTimeMs >= AUTO_EXPAND_DEBOUNCE_MS) {
+                        lastAutoExpandTimeMs = now
+                        true
+                    } else {
+                        false
+                    }
                 } else {
                     false
                 }
-            } else {
-                false
             }
         )
 

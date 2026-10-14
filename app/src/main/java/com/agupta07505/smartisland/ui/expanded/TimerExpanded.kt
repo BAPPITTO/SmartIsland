@@ -55,10 +55,328 @@ import com.agupta07505.smartisland.model.IslandNotification
 import com.agupta07505.smartisland.ui.bounceClick
 import com.agupta07505.smartisland.util.TimerStopwatchParser
 import androidx.compose.runtime.getValue
+import android.widget.Toast
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.setValue
 
 @Composable
 fun TimerExpanded(
+    notification: IslandNotification?,
+    bottomPadding: Dp,
+    onOpenNotification: () -> Unit = {},
+    onCollapse: () -> Unit = {},
+    settings: SmartIslandSettings = SmartIslandSettings.Default
+) {
+    if (com.agupta07505.smartisland.util.OemDeviceRules.isMiuiOrHyperOs()) {
+        TimerExpandedMiui(
+            notification = notification,
+            bottomPadding = bottomPadding,
+            onOpenNotification = onOpenNotification,
+            onCollapse = onCollapse,
+            settings = settings
+        )
+    } else {
+        TimerExpandedCurrent(
+            notification = notification,
+            bottomPadding = bottomPadding,
+            onOpenNotification = onOpenNotification,
+            onCollapse = onCollapse,
+            settings = settings
+        )
+    }
+}
+
+@Composable
+private fun TimerExpandedMiui(
+    notification: IslandNotification?,
+    bottomPadding: Dp,
+    onOpenNotification: () -> Unit = {},
+    onCollapse: () -> Unit = {},
+    settings: SmartIslandSettings = SmartIslandSettings.Default
+) {
+    val context = LocalContext.current
+    val timerColor = Color(settings.timerColor)
+
+    val resumeKeywords = remember {
+        listOf("resume", "start", "play", "continue", "unpause", "reanudar", "reprendre", "weiter", "riprendi", "continuar", "शुरू", "继续", "再開", "возобновить")
+    }
+    val pauseKeywords = remember {
+        listOf("pause", "pausa", "pausar", "sospendi", "interrompi", "onderbreek", "stoppa", "रोकें", "暂停", "一時停止", "пауза")
+    }
+    val pausedKeywords = remember {
+        listOf("paused", "pause", "en pause", "pausado", "pausada", "angehalten", "sospeso", "sospesa", "रोक दिया गया", "已暂停", "一時停止中", "приостановлено")
+    }
+    val destructiveKeywords = remember {
+        listOf("stop", "reset", "cancel", "delete", "dismiss", "clear", "annuler", "abbrechen", "eliminar", "borrar")
+    }
+
+    val isNotificationPaused = remember(notification?.key, notification?.actionIntents, notification?.text, notification?.title) {
+        val actions = notification?.actionIntents.orEmpty()
+        actions.any { act ->
+            val t = act.title.lowercase()
+            resumeKeywords.any { t.contains(it) }
+        } || pausedKeywords.any {
+            notification?.text?.contains(it, ignoreCase = true) == true ||
+            notification?.title?.contains(it, ignoreCase = true) == true
+        }
+    }
+
+    var isPaused by remember(notification?.key, isNotificationPaused) {
+        mutableStateOf(isNotificationPaused)
+    }
+
+    var targetTime by remember(notification?.key, notification?.timeMillis) {
+        mutableLongStateOf(notification?.timeMillis ?: (System.currentTimeMillis() + 300000L))
+    }
+
+    var remainingSec by remember(notification?.key) {
+        val parsed = notification?.let { TimerStopwatchParser.parseTimerRemainingSeconds(it) }
+        val rem = if (parsed != null && parsed > 0) {
+            parsed
+        } else {
+            val t = notification?.timeMillis ?: (System.currentTimeMillis() + 300000L)
+            if (t > System.currentTimeMillis()) {
+                ((t - System.currentTimeMillis() + 999L) / 1000L).coerceAtLeast(0L)
+            } else {
+                0L
+            }
+        }
+        mutableLongStateOf(rem)
+    }
+
+    LaunchedEffect(
+        notification?.text,
+        notification?.title,
+        notification?.timerRemainingSeconds
+    ) {
+        if (isPaused && notification != null) {
+            val pausedRemaining = notification.timerRemainingSeconds
+                ?: TimerStopwatchParser.parseTimerRemainingSeconds(notification)
+
+            if (pausedRemaining != null && pausedRemaining >= 0L) {
+                remainingSec = pausedRemaining
+            }
+        }
+    }
+
+    LaunchedEffect(
+        notification?.key,
+        targetTime,
+        isPaused,
+        notification?.timerRemainingSeconds
+    ) {
+        if (isPaused) {
+            notification?.timerRemainingSeconds?.let {
+                remainingSec = it
+            }
+        } else {
+            while (true) {
+                val now = System.currentTimeMillis()
+                val rem = if (targetTime > now) {
+                    ((targetTime - now + 999L) / 1000L).coerceAtLeast(0L)
+                } else {
+                    0L
+                }
+                remainingSec = rem
+                if (rem <= 0L) break
+                kotlinx.coroutines.delay(100L)
+            }
+        }
+    }
+
+    val displayTime = remember(remainingSec) {
+        TimerStopwatchParser.formatTime(remainingSec)
+    }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "timerPulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 0.95f,
+        targetValue = 1.06f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "timerPulseScale"
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onOpenNotification() }
+            .padding(start = 18.dp, top = 14.dp, end = 18.dp, bottom = bottomPadding),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Left: Hourglass / Timer Glyph
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(timerColor.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.HourglassBottom,
+                    contentDescription = "Timer",
+                    tint = timerColor,
+                    modifier = Modifier
+                        .size(22.dp)
+                        .graphicsLayer {
+                            if (!isPaused && remainingSec > 0) {
+                                scaleX = pulseScale
+                                scaleY = pulseScale
+                            }
+                        }
+                )
+            }
+
+            Column {
+                Text(
+                    text = displayTime,
+                    color = Color.White,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp
+                )
+                Spacer(Modifier.height(2.dp))
+                val timerSubtitle = if (remainingSec == 0L && !isPaused) {
+                    "Time's up!"
+                } else if (isPaused) {
+                    "Paused"
+                } else {
+                    val notifTitle = notification?.title.orEmpty()
+                    val notifText = notification?.text.orEmpty()
+                    if (notifTitle.isNotBlank() && !notifTitle.equals("Timer", ignoreCase = true) && !notifTitle.matches(ClockOnlyRegex)) {
+                        notifTitle
+                    } else if (notifText.isNotBlank() && !notifText.equals("Timer", ignoreCase = true) && !notifText.matches(ClockOnlyRegex)) {
+                        notifText
+                    } else {
+                        "Timer Active"
+                    }
+                }
+                Text(
+                    text = timerSubtitle,
+                    color = if (remainingSec == 0L && !isPaused) Color(0xFFEF4444) else timerColor,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+
+        // Right: Interactive Quick Actions (Pause/Resume, Stop/Reset)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // 1. Pause / Resume Button
+            val pauseAction = if (isPaused) {
+                notification?.actionIntents?.firstOrNull { act ->
+                    val t = act.title.lowercase()
+                    resumeKeywords.any { t.contains(it) }
+                } ?: notification?.actionIntents?.firstOrNull { act ->
+                    val t = act.title.lowercase()
+                    !destructiveKeywords.any { t.contains(it) } && !t.contains("+1") && !t.contains("add")
+                }
+            } else {
+                notification?.actionIntents?.firstOrNull { act ->
+                    val t = act.title.lowercase()
+                    pauseKeywords.any { t.contains(it) }
+                } ?: notification?.actionIntents?.firstOrNull { act ->
+                    val t = act.title.lowercase()
+                    !destructiveKeywords.any { t.contains(it) } && !t.contains("+1") && !t.contains("add")
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(timerColor)
+                    .bounceClick {
+                        val currentNotification = notification
+                        val action = pauseAction
+                        val pendingIntent = action?.pendingIntent
+
+                        if (
+                            currentNotification == null ||
+                            action == null ||
+                            pendingIntent == null
+                        ) {
+                            android.util.Log.w(
+                                "TimerExpanded",
+                                "No real Clock Pause/Resume action is available"
+                            )
+
+                            Toast.makeText(
+                                context,
+                                "Clock Pause/Resume action unavailable",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        } else {
+                            android.util.Log.d(
+                                "TimerExpanded",
+                                "Sending Clock action: ${action.title}"
+                            )
+
+                            triggerAction(
+                                context,
+                                currentNotification.packageName,
+                                pendingIntent,
+                                action.title,
+                                currentNotification.contentIntent
+                            )
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (isPaused) {
+                        Icons.Rounded.PlayArrow
+                    } else {
+                        Icons.Rounded.Pause
+                    },
+                    contentDescription = if (isPaused) "Resume" else "Pause",
+                    tint = Color.Black,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            // 2. Reset / Stop / Cancel Button
+            val stopAction = notification?.actionIntents?.firstOrNull { act ->
+                val t = act.title.lowercase()
+                destructiveKeywords.any { t.contains(it) }
+            }
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF27272A))
+                    .bounceClick {
+                        if (stopAction?.pendingIntent != null && notification != null) {
+                            triggerAction(context, notification.packageName, stopAction.pendingIntent, stopAction.title, notification.contentIntent)
+                        }
+                        val repository = SmartIslandRepositories.notificationRepository(context)
+                        notification?.key?.let { repository.removeNotification(it) }
+                        onCollapse()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Stop,
+                    contentDescription = "Stop",
+                    tint = Color(0xFFEF4444),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TimerExpandedCurrent(
     notification: IslandNotification?,
     bottomPadding: Dp,
     onOpenNotification: () -> Unit = {},

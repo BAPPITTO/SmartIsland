@@ -1207,7 +1207,8 @@ class SmartIslandOverlayService : AccessibilityService() {
                     val settingsVal = viewModel.displaySettings.value
                     val notificationsCount = viewModel.visibleNotifications.value.size
                     val privacyNow = viewModel.privacy.value
-                    if (isGone) {
+                    val isIdleHidden = settingsVal.hideWhenIdle && notificationsCount == 0 && !privacyNow.hasAnything && !settingsVal.enableAppShortcuts
+                    if (isGone || isIdleHidden) {
                         setTouchableInsetsMethod.invoke(insets, TOUCHABLE_INSETS_REGION)
                         val region = touchableRegionField.get(insets) as android.graphics.Region
                         region.setEmpty()

@@ -79,10 +79,21 @@ class SmartIslandNotificationRepository : INotificationRepository {
      * island nor cancelled from the system shade.
      */
     override fun removeNotificationsForPackage(packageName: String) {
-        val matching = _notifications.value.filter { it.packageName == packageName && it.mode == IslandMode.Notification }
+        val matching = if (com.agupta07505.smartisland.util.OemDeviceRules.isMiuiOrHyperOs()) {
+            _notifications.value.filter { notif ->
+                notif.packageName == packageName &&
+                    notif.mode != IslandMode.Music &&
+                    notif.mode != IslandMode.Timer &&
+                    notif.mode != IslandMode.Stopwatch
+            }
+        } else {
+            _notifications.value.filter { it.packageName == packageName && it.mode == IslandMode.Notification }
+        }
         if (matching.isEmpty()) return
+
+        val keysToRemove = matching.mapTo(mutableSetOf()) { it.key }
         _notifications.update { list ->
-            list.filterNot { it.packageName == packageName && it.mode == IslandMode.Notification }
+            list.filterNot { it.key in keysToRemove }
         }
         for (notif in matching) {
             _commands.tryEmit(SmartIslandCommand.CancelNotification(notif.key))

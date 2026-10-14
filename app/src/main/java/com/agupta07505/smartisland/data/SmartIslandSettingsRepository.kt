@@ -80,6 +80,7 @@ class SmartIslandSettingsRepository(private val context: Context) {
         val DisabledNotificationPackages = stringSetPreferencesKey("disabled_notification_packages")
         val DisabledSoundPackages = stringSetPreferencesKey("disabled_sound_packages")
         val DisabledEvents = stringSetPreferencesKey("disabled_events")
+        val HideWhenIdle = booleanPreferencesKey("hide_when_idle")
         val AutoHidePill = booleanPreferencesKey("auto_hide_pill")
         val AutoHideTimeoutSeconds = intPreferencesKey("auto_hide_timeout_seconds")
         val ShowInLandscape = booleanPreferencesKey("show_in_landscape")
@@ -339,6 +340,7 @@ class SmartIslandSettingsRepository(private val context: Context) {
                     ?.filter { it.isNotBlank() && it.length <= 64 }
                     ?.toSet()
                     ?: defaults.disabledEvents,
+                hideWhenIdle = prefs[Keys.HideWhenIdle] ?: defaults.hideWhenIdle,
                 autoHidePill = prefs[Keys.AutoHidePill] ?: defaults.autoHidePill,
                 autoHideTimeoutSeconds = prefs[Keys.AutoHideTimeoutSeconds] ?: defaults.autoHideTimeoutSeconds,
                 showInLandscape = prefs[Keys.ShowInLandscape] ?: defaults.showInLandscape,
@@ -773,6 +775,9 @@ class SmartIslandSettingsRepository(private val context: Context) {
             .asSequence()
             .filter { pkg -> pkg.isNotBlank() && pkg.length <= MAX_PACKAGE_NAME_LENGTH }
             .toSet()
+    }
+    suspend fun setHideWhenIdle(value: Boolean) = editSafely {
+        it[Keys.HideWhenIdle] = value
     }
     suspend fun setAutoHidePill(value: Boolean) = editSafely {
         it[Keys.AutoHidePill] = value
@@ -1265,6 +1270,7 @@ class SmartIslandSettingsRepository(private val context: Context) {
             .asSequence()
             .filter { it.isNotBlank() && it.length <= MAX_PACKAGE_NAME_LENGTH }
             .toSet()
+        prefs[Keys.HideWhenIdle] = settings.hideWhenIdle
         prefs[Keys.AutoHidePill] = settings.autoHidePill
         prefs[Keys.AutoHideTimeoutSeconds] = settings.autoHideTimeoutSeconds.coerceIn(1, 120)
         prefs[Keys.ShowInLandscape] = settings.showInLandscape
