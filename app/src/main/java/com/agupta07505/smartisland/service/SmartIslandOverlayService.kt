@@ -266,8 +266,16 @@ class SmartIslandOverlayService : AccessibilityService() {
                 )
             }
         } ?: return false
-        val picked = com.agupta07505.smartisland.util.ForegroundApp.pick(appWindows) { pkg ->
+        val ignoredPackage: (String) -> Boolean = { pkg ->
             pkg == packageName || pkg == com.agupta07505.smartisland.util.ShadeDetector.SYSTEM_UI || isInputMethodPackage(pkg)
+        }
+        var picked = com.agupta07505.smartisland.util.ForegroundApp.pick(appWindows, ignoredPackage)
+        // Some apps (ChatGPT, Authenticator) hide their window from the accessibility window list, so there is no application
+        // window at all and no window event with their package. Ask the usage stats which app last came to the front instead.
+        var fromUsage = false
+        if (picked == null && !locked && appWindows.none { it.isApplicationType }) {
+            picked = usageForeground.current(ignoredPackage)
+            fromUsage = picked != null
         }
         // The app window the user is in exists but its root (so its package) cannot be read yet: the caller falls back to the
         // package of the window event, instead of keeping the previous app (which left an exempt app not recognised).
@@ -277,7 +285,7 @@ class SmartIslandOverlayService : AccessibilityService() {
         val next = picked ?: if (locked) null else viewModel.foregroundPackage.value
         android.util.Log.i(
             "SmartIslandExempt",
-            "scan picked=$picked next=$next was=${viewModel.foregroundPackage.value} locked=$locked windows=" +
+            "scan picked=$picked usage=$fromUsage next=$next was=${viewModel.foregroundPackage.value} locked=$locked windows=" +
                 appWindows.joinToString { "[${it.packageName} app=${it.isApplicationType} act=${it.isActive} foc=${it.isFocused}]" }
         )
         if (next != viewModel.foregroundPackage.value) {
@@ -313,6 +321,9 @@ class SmartIslandOverlayService : AccessibilityService() {
      * is asked once per window.
      */
     private val windowPackageCache = HashMap<Int, String>()
+
+    /** Foreground app from the usage stats, for apps that hide their window from the accessibility window list. */
+    private val usageForeground by lazy { com.agupta07505.smartisland.util.UsageForegroundSource(applicationContext) }
 
     private fun windowPackage(w: android.view.accessibility.AccessibilityWindowInfo): String? {
         windowPackageCache[w.id]?.let { return it }
