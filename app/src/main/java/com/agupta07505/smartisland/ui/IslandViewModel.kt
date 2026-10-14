@@ -720,6 +720,17 @@ class IslandViewModel(
         initialValue = com.agupta07505.smartisland.model.CardDepth.First
     )
 
+    /**
+     * The depth of the shown card right now, read from the same state [cardDepth] is built from. [cardDepth] is a flow that lags a few
+     * coroutine hops behind a step change, so the auto-collapse timer reads this instead: a countdown that ends in that gap must not
+     * close a card the user has just opened deeper.
+     */
+    private fun cardDepthNow(): com.agupta07505.smartisland.model.CardDepth {
+        val picture = expandedMedia.value
+        val card = visibleNotifications.value.getOrNull(selectedIndex.value)
+        return cardStepState.value.steps(card?.key, picture?.first, picture?.second ?: 0).depth
+    }
+
     /** Sets the steps of a card (the arrow on the card, or a swipe). The picture is written to [expandedMedia]. */
     fun setCardSteps(key: String, steps: com.agupta07505.smartisland.model.CardSteps) {
         val old = cardStepState.value
@@ -1390,14 +1401,22 @@ class IslandViewModel(
 
     private fun startAutoCollapseTimer() {
         autoCollapseJob?.cancel()
-        if (isInputActive.value || autoCollapsePaused.value || siblingPickerOpen.value || autoCollapseHeld.value || appsLauncherOpen.value ||
-            cardDepth.value != com.agupta07505.smartisland.model.CardDepth.First
-        ) return
+        if (autoCollapseBlocked()) return
         autoCollapseJob = viewModelScope.launch {
             delay(AUTO_COLLAPSE_DELAY_MS)
+            // Checked again against the live state: a step opened while the countdown ran must hold it, even if the pause
+            // collector has not cancelled this job yet.
+            if (autoCollapseBlocked()) return@launch
+            com.agupta07505.smartisland.util.AppLogRecorder.i(TAG, "Open island closed: auto-collapse timer (depth=${cardDepthNow()})")
             collapse()
         }
     }
+
+    /** True while something holds the auto-collapse countdown (typing, the reader or any deeper step, the pickers, a finger on the pull). */
+    private fun autoCollapseBlocked(): Boolean =
+        isInputActive.value || autoCollapsePaused.value || siblingPickerOpen.value || autoCollapseHeld.value || appsLauncherOpen.value ||
+            cardDepthNow() != com.agupta07505.smartisland.model.CardDepth.First ||
+            cardDepth.value != com.agupta07505.smartisland.model.CardDepth.First
 
     private fun stopAutoCollapseTimer() {
         autoCollapseJob?.cancel()
