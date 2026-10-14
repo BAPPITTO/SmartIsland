@@ -233,6 +233,7 @@ class SmartIslandOverlayService : AccessibilityService() {
                     }
                     // The window list decides the foreground app; the opened window's package is only the fallback
                     // when the list cannot be read (a dialog or floating window must not replace the real app).
+                    android.util.Log.i("SmartIslandExempt", "event opened=$openedPackage fromWindows=$foregroundFromWindows")
                     if (!foregroundFromWindows) viewModel.foregroundPackage.value = openedPackage
                     updateWindowLayoutParams(isWindowExpanded, viewModel.displaySettings.value)
                     // Only ordinary alerts are dropped; running timers, recorders, calls, downloads
@@ -274,6 +275,11 @@ class SmartIslandOverlayService : AccessibilityService() {
             appWindows.any { it.isApplicationType && it.packageName.isNullOrEmpty() && (it.isFocused || it.isActive) }
         ) return false
         val next = picked ?: if (locked) null else viewModel.foregroundPackage.value
+        android.util.Log.i(
+            "SmartIslandExempt",
+            "scan picked=$picked next=$next was=${viewModel.foregroundPackage.value} locked=$locked windows=" +
+                appWindows.joinToString { "[${it.packageName} app=${it.isApplicationType} act=${it.isActive} foc=${it.isFocused}]" }
+        )
         if (next != viewModel.foregroundPackage.value) {
             com.agupta07505.smartisland.util.AppLogRecorder.i(
                 "Foreground",
@@ -738,6 +744,11 @@ class SmartIslandOverlayService : AccessibilityService() {
             runSuspendCatchingLogged(TAG, "Exempt-app visibility collector failed") {
                 // The island's window is hidden (off) or dead (static: no touches, nothing on it) while an exempt app is in the foreground.
                 viewModel.islandExemption.collectLatest { mode ->
+                    // Plain logcat too: it ends up in the exported report even when "record logs" is off.
+                    android.util.Log.i(
+                        "SmartIslandExempt",
+                        "mode=$mode foreground=${viewModel.foregroundPackage.value} off=${viewModel.settingsSnapshot().islandExemptApps}"
+                    )
                     com.agupta07505.smartisland.util.AppLogRecorder.i(
                         "Exempt",
                         "mode=$mode foreground=${viewModel.foregroundPackage.value} " +
