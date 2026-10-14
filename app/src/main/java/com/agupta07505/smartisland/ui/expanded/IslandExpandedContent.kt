@@ -850,8 +850,10 @@ fun IslandExpandedContent(
             val overscanPalette = LocalIslandPalette.current
             if (overscanPalette.isLight && currentNotification != null) {
                 val overscanFromDp = pageHeights[currentNotification.key] ?: targetHeight
-                val overscanColor = if (notificationHasPictureBackdrop(currentNotification, settings)) {
-                    Color.Black.copy(alpha = 0.85f * cardScrimScale(settings))
+                val overscanHasPicture = notificationHasPictureBackdrop(currentNotification, settings)
+                val overscanScrimScale = cardScrimScale(settings)
+                val overscanColor = if (overscanHasPicture) {
+                    Color.Black.copy(alpha = 0.85f * overscanScrimScale)
                 } else {
                     overscanPalette.scrim.copy(alpha = 0.45f)
                 }
@@ -864,6 +866,32 @@ fun IslandExpandedContent(
                                 topLeft = Offset(0f, overscanFromDp.toPx()),
                                 size = androidx.compose.ui.geometry.Size(size.width, 300.dp.toPx())
                             )
+                            // The same gap at the sides: while the island opens, the shell is a few pixels wider than the page for a
+                            // frame or two, and the pale shell showed as a thin white sliver at both ends of a dark picture card.
+                            // The picture backdrop's dim (black, 0.35 at the top to 0.85 at the bottom) is carried on past the page's
+                            // left and right edges; the shell's own clip cuts it at the island's edge.
+                            if (overscanHasPicture) {
+                                val pageHeightPx = overscanFromDp.toPx()
+                                val sideWidthPx = 48.dp.toPx()
+                                val dim = Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Black.copy(alpha = 0.35f * overscanScrimScale),
+                                        Color.Black.copy(alpha = 0.85f * overscanScrimScale)
+                                    ),
+                                    startY = 0f,
+                                    endY = pageHeightPx
+                                )
+                                drawRect(
+                                    brush = dim,
+                                    topLeft = Offset(-sideWidthPx, 0f),
+                                    size = androidx.compose.ui.geometry.Size(sideWidthPx, pageHeightPx)
+                                )
+                                drawRect(
+                                    brush = dim,
+                                    topLeft = Offset(size.width, 0f),
+                                    size = androidx.compose.ui.geometry.Size(sideWidthPx, pageHeightPx)
+                                )
+                            }
                         }
                 )
             }
