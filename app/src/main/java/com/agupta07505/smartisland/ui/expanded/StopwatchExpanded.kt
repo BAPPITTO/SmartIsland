@@ -36,6 +36,7 @@ import com.agupta07505.smartisland.ui.IslandText as Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -128,7 +129,7 @@ private fun StopwatchExpandedMiui(
         frozenElapsedSeconds,
         chronometerBase
     ) {
-        mutableStateOf(
+        mutableLongStateOf(
             frozenElapsedSeconds
                 ?: chronometerBase?.let { base ->
                     (
@@ -155,7 +156,7 @@ private fun StopwatchExpandedMiui(
     }
 
     var lapCount by remember(notification?.key) {
-        mutableStateOf(notificationLapCount)
+        mutableIntStateOf(notificationLapCount)
     }
 
     LaunchedEffect(
