@@ -74,14 +74,6 @@ data class SmartIslandSettings(
     val expandedBlurEnabled: Boolean = true,
     val expandedBlurRadius: Float = 24f,
     /**
-     * Live blur: blurs whatever is behind the open island (system window blur, API 31+, heavier) and draws it as the
-     * island's background. Only the island's own rectangle is blurred. It is one of three choices with the card blur
-     * ([expandedBlurEnabled]) and off, see [expandedBlurMode]; the two are never both on. Both use [expandedBlurRadius].
-     * The media card's own blur ([mediaBlurEnabled]) is separate and not touched by this choice,
-     * and live blur is never drawn on the media card ([forMedia] turns it off).
-     */
-    val liveBlurEnabled: Boolean = false,
-    /**
      * The media (music) card has its own blur and opacity. A phone or backup saved before this
      * existed starts from the shared values above (see the loaders), so nothing changes until the owner moves them.
      */
@@ -423,7 +415,6 @@ data class SmartIslandSettings(
         settingsObj.put("enableShadow", enableShadow)
         settingsObj.put("expandedBlurEnabled", expandedBlurEnabled)
         settingsObj.put("expandedBlurRadius", expandedBlurRadius.toDouble())
-        settingsObj.put("liveBlurEnabled", liveBlurEnabled)
         settingsObj.put("mediaBlurEnabled", mediaBlurEnabled)
         settingsObj.put("mediaBlurRadius", mediaBlurRadius.toDouble())
         settingsObj.put("mediaOpacity", mediaOpacity.toDouble())
@@ -583,24 +574,18 @@ data class SmartIslandSettings(
         val settingsCount: Int
     )
 
-    /** Which of the three blur choices is active (live wins if both flags were ever set). */
+    /** Which blur choice is active: the card's own artwork blur, or none. */
     val expandedBlurMode: ExpandedBlurMode
-        get() = when {
-            liveBlurEnabled -> ExpandedBlurMode.Live
-            expandedBlurEnabled -> ExpandedBlurMode.Card
-            else -> ExpandedBlurMode.Off
-        }
+        get() = if (expandedBlurEnabled) ExpandedBlurMode.Card else ExpandedBlurMode.Off
 
     /**
      * The settings the media (music) card draws with: the shared blur and opacity fields hold the media values, so
-     * every existing helper (`cardBackgroundBlur`, `islandSurface`, the blur window) works unchanged on this copy.
+     * every existing helper (`cardBackgroundBlur`, `islandSurface`) works unchanged on this copy.
      */
     fun forMedia(): SmartIslandSettings = copy(
         opacity = mediaOpacity,
         expandedBlurEnabled = mediaBlurEnabled,
-        expandedBlurRadius = mediaBlurRadius,
-        // Live blur never touches the media card: it keeps its own blur and its normal background.
-        liveBlurEnabled = false
+        expandedBlurRadius = mediaBlurRadius
     )
 
     /** [forMedia] when [media] is true (the shown card is a music card), else these settings. */
@@ -789,12 +774,8 @@ data class SmartIslandSettings(
                 autoExpandOnNotification = obj.optBoolean("autoExpandOnNotification", defaults.autoExpandOnNotification),
                 autoExpandOnLockScreen = obj.optBoolean("autoExpandOnLockScreen", defaults.autoExpandOnLockScreen),
                 enableShadow = obj.optBoolean("enableShadow", defaults.enableShadow),
-                // Only one of card blur and live blur can be on; live wins if a file says both.
-                expandedBlurEnabled = obj.optBoolean("expandedBlurEnabled", defaults.expandedBlurEnabled) &&
-                    !obj.optBoolean("liveBlurEnabled", defaults.liveBlurEnabled),
+                expandedBlurEnabled = obj.optBoolean("expandedBlurEnabled", defaults.expandedBlurEnabled),
                 expandedBlurRadius = safeFloat("expandedBlurRadius", defaults.expandedBlurRadius, MIN_EXPANDED_BLUR, MAX_EXPANDED_BLUR),
-                // Old backups have no live-blur key: it stays off.
-                liveBlurEnabled = obj.optBoolean("liveBlurEnabled", defaults.liveBlurEnabled),
                 // Old backups have no media keys: the media card starts from the shared blur and opacity.
                 mediaBlurEnabled = obj.optBoolean("mediaBlurEnabled", obj.optBoolean("expandedBlurEnabled", defaults.mediaBlurEnabled)),
                 mediaBlurRadius = safeFloat(
@@ -985,5 +966,5 @@ data class SmartIslandSettings(
         }
     }
 }
-/** The expanded island's blur choice: nothing, the card's own artwork blur, or the live blur of what is behind the island. */
-enum class ExpandedBlurMode { Off, Card, Live }
+/** The expanded island's blur choice: nothing, or the card's own artwork blur. */
+enum class ExpandedBlurMode { Off, Card }

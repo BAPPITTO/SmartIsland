@@ -89,7 +89,6 @@ class SmartIslandSettingsRepository(private val context: Context) {
         val EnableShadow = booleanPreferencesKey("enable_shadow")
         val ExpandedBlurEnabled = booleanPreferencesKey("expanded_blur_enabled")
         val ExpandedBlurRadius = floatPreferencesKey("expanded_blur_radius")
-        val LiveBlurEnabled = booleanPreferencesKey("live_blur_enabled")
         val MediaBlurEnabled = booleanPreferencesKey("media_blur_enabled")
         val MediaBlurRadius = floatPreferencesKey("media_blur_radius")
         val MediaOpacity = floatPreferencesKey("media_opacity")
@@ -347,12 +346,9 @@ class SmartIslandSettingsRepository(private val context: Context) {
                 autoExpandOnNotification = prefs[Keys.AutoExpandOnNotification] ?: defaults.autoExpandOnNotification,
                 autoExpandOnLockScreen = prefs[Keys.AutoExpandOnLockScreen] ?: defaults.autoExpandOnLockScreen,
                 enableShadow = prefs[Keys.EnableShadow] ?: defaults.enableShadow,
-                // Only one of card blur and live blur can be on; live wins if both were ever stored.
-                expandedBlurEnabled = (prefs[Keys.ExpandedBlurEnabled] ?: defaults.expandedBlurEnabled) &&
-                    !(prefs[Keys.LiveBlurEnabled] ?: defaults.liveBlurEnabled),
+                expandedBlurEnabled = prefs[Keys.ExpandedBlurEnabled] ?: defaults.expandedBlurEnabled,
                 expandedBlurRadius = (prefs[Keys.ExpandedBlurRadius] ?: defaults.expandedBlurRadius)
                     .coerceIn(SmartIslandSettings.MIN_EXPANDED_BLUR, SmartIslandSettings.MAX_EXPANDED_BLUR),
-                liveBlurEnabled = prefs[Keys.LiveBlurEnabled] ?: defaults.liveBlurEnabled,
                 // Media keys fall back to the shared values until the owner sets them.
                 mediaBlurEnabled = prefs[Keys.MediaBlurEnabled] ?: prefs[Keys.ExpandedBlurEnabled] ?: defaults.mediaBlurEnabled,
                 mediaBlurRadius = (prefs[Keys.MediaBlurRadius] ?: prefs[Keys.ExpandedBlurRadius] ?: defaults.mediaBlurRadius)
@@ -561,7 +557,7 @@ class SmartIslandSettingsRepository(private val context: Context) {
     suspend fun setEnableShadow(value: Boolean) = editSafely { it[Keys.EnableShadow] = value }
     suspend fun setExpandedBlurEnabled(value: Boolean) = editSafely { it[Keys.ExpandedBlurEnabled] = value }
     /**
-     * Picks Off, Card blur or Live blur: writes both flags together so they are never both on.
+     * Picks Off or Card blur.
      * The media card inherits the shared blur until the owner sets its own, so those two are pinned to what the
      * media card shows now first; changing this choice then never changes the media card.
      */
@@ -574,7 +570,6 @@ class SmartIslandSettingsRepository(private val context: Context) {
                 .coerceIn(SmartIslandSettings.MIN_EXPANDED_BLUR, SmartIslandSettings.MAX_EXPANDED_BLUR)
         }
         it[Keys.ExpandedBlurEnabled] = mode == ExpandedBlurMode.Card
-        it[Keys.LiveBlurEnabled] = mode == ExpandedBlurMode.Live
     }
     suspend fun setMediaBlurEnabled(value: Boolean) = editSafely { it[Keys.MediaBlurEnabled] = value }
     suspend fun setMediaBlurRadius(value: Float) = editSafely {
@@ -1277,10 +1272,9 @@ class SmartIslandSettingsRepository(private val context: Context) {
         prefs[Keys.AutoExpandOnNotification] = settings.autoExpandOnNotification
         prefs[Keys.AutoExpandOnLockScreen] = settings.autoExpandOnLockScreen
         prefs[Keys.EnableShadow] = settings.enableShadow
-        prefs[Keys.ExpandedBlurEnabled] = settings.expandedBlurEnabled && !settings.liveBlurEnabled
+        prefs[Keys.ExpandedBlurEnabled] = settings.expandedBlurEnabled
         prefs[Keys.ExpandedBlurRadius] = settings.expandedBlurRadius
             .coerceIn(SmartIslandSettings.MIN_EXPANDED_BLUR, SmartIslandSettings.MAX_EXPANDED_BLUR)
-        prefs[Keys.LiveBlurEnabled] = settings.liveBlurEnabled
         prefs[Keys.MediaBlurEnabled] = settings.mediaBlurEnabled
         prefs[Keys.MediaBlurRadius] = settings.mediaBlurRadius
             .coerceIn(SmartIslandSettings.MIN_EXPANDED_BLUR, SmartIslandSettings.MAX_EXPANDED_BLUR)
