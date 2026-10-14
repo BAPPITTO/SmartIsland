@@ -115,6 +115,7 @@ class SmartIslandSettingsTest {
             disabledNotificationPackages = setOf("com.spam.app"),
             disabledSoundPackages = setOf("com.noisy.app"),
             disabledEvents = setOf("wifi", "battery_low"),
+            hideWhenIdle = true,
             autoHidePill = true,
             autoHideTimeoutSeconds = 10,
             showInLandscape = true,

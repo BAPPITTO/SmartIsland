@@ -54,6 +54,15 @@ object OemDeviceRules {
     )
 
     private val XIAOMI_SCREEN_RECORDER_PACKAGES = setOf(
+        "com.miui.screenrecorder"
+    )
+
+    private val XIAOMI_VOICE_RECORDER_PACKAGES = setOf(
+        "com.miui.soundrecorder",
+        "com.android.soundrecorder"
+    )
+
+    private val XIAOMI_SCREEN_RECORDER_PACKAGES_LEGACY = setOf(
         "com.miui.screenrecorder",
         "com.miui.soundrecorder",
         "com.android.soundrecorder"
@@ -211,24 +220,67 @@ object OemDeviceRules {
         return runCatching { OemDeviceType.valueOf(deviceTypeSetting) }.getOrDefault(detectCurrentDevice())
     }
 
+    fun isMiuiOrHyperOs(device: OemDeviceType = detectCurrentDevice()): Boolean {
+        if (device == OemDeviceType.XIAOMI_REDMI_POCO) return true
+        val brand = (runCatching { Build.BRAND }.getOrNull() ?: "").lowercase()
+        val manufacturer = (runCatching { Build.MANUFACTURER }.getOrNull() ?: "").lowercase()
+        if (brand.contains("xiaomi") || brand.contains("redmi") || brand.contains("poco") ||
+            brand.contains("blackshark") || manufacturer.contains("xiaomi")
+        ) {
+            return true
+        }
+        val miuiProp = getSystemProperty("ro.miui.ui.version.name")
+        if (!miuiProp.isNullOrBlank()) return true
+        val hyperOsProp = getSystemProperty("ro.mi.os.version.name")
+        if (!hyperOsProp.isNullOrBlank()) return true
+        return false
+    }
+
+    fun isMiuiOrHyperOs(deviceTypeSetting: String?): Boolean {
+        return isMiuiOrHyperOs(resolveEffectiveDevice(deviceTypeSetting))
+    }
+
+    private fun getSystemProperty(key: String): String? {
+        return runCatching {
+            val c = Class.forName("android.os.SystemProperties")
+            val get = c.getMethod("get", String::class.java)
+            (get.invoke(null, key) as? String)?.takeIf { it.isNotBlank() }
+        }.getOrNull()
+    }
+
     fun isScreenRecording(
         packageName: String,
         titleText: String,
         device: OemDeviceType = detectCurrentDevice()
     ): Boolean {
+        if (isMiuiOrHyperOs(device)) {
+            if (packageName in XIAOMI_VOICE_RECORDER_PACKAGES) return false
+        }
         val lowerText = titleText.lowercase()
         val isKeywordMatch = SCREEN_RECORDING_KEYWORDS.any { lowerText.contains(it) }
 
         val isPackageMatch = when (device) {
             OemDeviceType.SAMSUNG -> packageName in SAMSUNG_SCREEN_RECORDER_PACKAGES || packageName in ALL_OEM_RECORDER_PACKAGES
-            OemDeviceType.XIAOMI_REDMI_POCO -> packageName in XIAOMI_SCREEN_RECORDER_PACKAGES || packageName in ALL_OEM_RECORDER_PACKAGES
+            OemDeviceType.XIAOMI_REDMI_POCO -> {
+                if (isMiuiOrHyperOs(device)) {
+                    packageName in XIAOMI_SCREEN_RECORDER_PACKAGES
+                } else {
+                    packageName in XIAOMI_SCREEN_RECORDER_PACKAGES_LEGACY || packageName in ALL_OEM_RECORDER_PACKAGES
+                }
+            }
             OemDeviceType.VIVO_IQOO -> packageName in VIVO_SCREEN_RECORDER_PACKAGES || packageName in ALL_OEM_RECORDER_PACKAGES
             OemDeviceType.REALME_OPPO_ONEPLUS -> packageName in REALME_OPPO_SCREEN_RECORDER_PACKAGES || packageName in ALL_OEM_RECORDER_PACKAGES
             OemDeviceType.HUAWEI_HONOR -> packageName in HUAWEI_SCREEN_RECORDER_PACKAGES || packageName in ALL_OEM_RECORDER_PACKAGES
             OemDeviceType.MOTOROLA -> packageName in MOTOROLA_SCREEN_RECORDER_PACKAGES || packageName in ALL_OEM_RECORDER_PACKAGES
             OemDeviceType.TRANSSION -> packageName in TRANSSION_SCREEN_RECORDER_PACKAGES || packageName in ALL_OEM_RECORDER_PACKAGES
             OemDeviceType.NUBIA -> packageName in NUBIA_SCREEN_RECORDER_PACKAGES || packageName in ALL_OEM_RECORDER_PACKAGES
-            else -> packageName in ALL_OEM_RECORDER_PACKAGES
+            else -> {
+                if (isMiuiOrHyperOs(device)) {
+                    (ALL_OEM_RECORDER_PACKAGES - XIAOMI_VOICE_RECORDER_PACKAGES).contains(packageName)
+                } else {
+                    packageName in ALL_OEM_RECORDER_PACKAGES
+                }
+            }
         }
 
         return isPackageMatch || isKeywordMatch

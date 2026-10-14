@@ -63,6 +63,7 @@ data class SmartIslandSettings(
     val disabledNotificationPackages: Set<String> = emptySet(),
     val disabledSoundPackages: Set<String> = emptySet(),
     val disabledEvents: Set<String> = emptySet(),
+    val hideWhenIdle: Boolean = false,
     val autoHidePill: Boolean = false,
     val autoHideTimeoutSeconds: Int = 5,
     val showInLandscape: Boolean = true,
@@ -404,6 +405,7 @@ data class SmartIslandSettings(
         disabledEvents.forEach { disabledEventsArray.put(it) }
         settingsObj.put("disabledEvents", disabledEventsArray)
 
+        settingsObj.put("hideWhenIdle", hideWhenIdle)
         settingsObj.put("autoHidePill", autoHidePill)
         settingsObj.put("autoHideTimeoutSeconds", autoHideTimeoutSeconds)
         settingsObj.put("showInLandscape", showInLandscape)
@@ -759,6 +761,7 @@ data class SmartIslandSettings(
                 disabledNotificationPackages = safeStringSet("disabledNotificationPackages", defaults.disabledNotificationPackages),
                 disabledSoundPackages = safeStringSet("disabledSoundPackages", defaults.disabledSoundPackages),
                 disabledEvents = safeStringSet("disabledEvents", defaults.disabledEvents),
+                hideWhenIdle = obj.optBoolean("hideWhenIdle", defaults.hideWhenIdle),
                 autoHidePill = obj.optBoolean("autoHidePill", defaults.autoHidePill),
                 autoHideTimeoutSeconds = obj.optInt("autoHideTimeoutSeconds", defaults.autoHideTimeoutSeconds).coerceIn(1, 120),
                 showInLandscape = obj.optBoolean("showInLandscape", defaults.showInLandscape),

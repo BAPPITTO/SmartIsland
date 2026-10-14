@@ -338,6 +338,51 @@ object TimerStopwatchParser {
     }
 
     /**
+     * Reads the precise timer deadline from HyperOS timer metadata.
+     * Reads the most reliable future deadline from a timer notification.
+     * Prefers the notification's deadline before HyperOS-specific fallbacks.
+     */
+    fun parseTimerDeadlineMillis(notification: Notification): Long? {
+        if (isTimerPaused(notification)) return null
+
+        val now = System.currentTimeMillis()
+
+        // 1. Prefer the actual deadline exposed by the notification.
+        val notificationDeadline = runCatching {
+            notification.`when`
+        }.getOrDefault(0L)
+
+        if (notificationDeadline > now) {
+            return notificationDeadline
+        }
+
+        // 2. Try reconstructing the deadline from HyperOS timer metadata.
+        val rawParam = runCatching {
+            notification.extras?.getString("miui.focus.param")
+        }.getOrNull() ?: return null
+
+        val json = runCatching {
+            org.json.JSONObject(rawParam)
+        }.getOrNull() ?: return null
+
+        val timerSystemCurrent = json.optLong("timerSystemCurrent", 0L)
+        val timerTotal = json.optLong("timerTotal", 0L)
+
+        if (timerSystemCurrent > 0L && timerTotal > 0L) {
+            val reconstructedDeadline = timerSystemCurrent + timerTotal
+
+            if (reconstructedDeadline > now) {
+                return reconstructedDeadline
+            }
+        }
+
+        // 3. Last resort: the HyperOS timerWhen field.
+        val timerWhen = json.optLong("timerWhen", 0L)
+
+        return timerWhen.takeIf { it > now }
+    }
+
+    /**
      * Extracts the remaining time in seconds from a timer notification.
      */
     fun parseTimerRemainingSeconds(notification: Notification): Long? {

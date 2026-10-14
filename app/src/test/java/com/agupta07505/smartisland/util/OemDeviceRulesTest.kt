@@ -39,8 +39,29 @@ class OemDeviceRulesTest {
 
     @Test
     fun testXiaomiScreenRecordingIdentification() {
-        assertTrue(OemDeviceRules.isScreenRecording("com.miui.screenrecorder", "Screen Recorder", OemDeviceType.XIAOMI_REDMI_POCO))
-        assertTrue(OemDeviceRules.isScreenRecording("com.miui.soundrecorder", "Sound Recorder", OemDeviceType.XIAOMI_REDMI_POCO))
+        assertTrue(
+            OemDeviceRules.isScreenRecording(
+                "com.miui.screenrecorder",
+                "Screen Recorder",
+                OemDeviceType.XIAOMI_REDMI_POCO
+            )
+        )
+
+        assertFalse(
+            OemDeviceRules.isScreenRecording(
+                "com.miui.soundrecorder",
+                "Sound Recorder",
+                OemDeviceType.XIAOMI_REDMI_POCO
+            )
+        )
+
+        assertFalse(
+            OemDeviceRules.isScreenRecording(
+                "com.android.soundrecorder",
+                "Recorder Recording",
+                OemDeviceType.XIAOMI_REDMI_POCO
+            )
+        )
     }
 
     @Test

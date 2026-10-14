@@ -64,7 +64,13 @@ data class IslandNotification(
     /** Wall-clock time the app last posted this card (0 = unknown). Transfer cards use it to expire when it goes quiet. */
     val lastPostedMs: Long = 0L,
     /** Music cards: the notification's own small (monochrome) icon, which the shade tints. Null when unavailable. */
-    val smallIcon: Bitmap? = null
+    val smallIcon: Bitmap? = null,
+    /** Frozen elapsed seconds while the Clock stopwatch is paused. */
+    val stopwatchElapsedSeconds: Long? = null,
+    /** Android's monotonic chronometer base while the stopwatch is running. */
+    val stopwatchChronometerBase: Long? = null,
+    /** Frozen remaining seconds while a Clock timer is paused. */
+    val timerRemainingSeconds: Long? = null
 ) {
     /**
      * A loud notification is any card that is not silent: the system does not list it under "Silent"

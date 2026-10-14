@@ -265,4 +265,50 @@ class SmartIslandNotificationRepositoryTest {
         assertEquals(listOf<SmartIslandCommand>(SmartIslandCommand.CancelNotification("alert")), received)
         job.cancel()
     }
+
+    @Test
+    fun testRemoveNotificationsForPackageKeepsTimerAndStopwatch() {
+        val repository = SmartIslandNotificationRepository()
+        val now = System.currentTimeMillis()
+
+        val regular = IslandNotification(
+            key = "regular",
+            packageName = "com.android.deskclock",
+            appName = "Clock",
+            title = "Clock notification",
+            text = "Reminder",
+            mode = IslandMode.Notification,
+            timeMillis = now
+        )
+
+        val timer = IslandNotification(
+            key = "timer",
+            packageName = "com.android.deskclock",
+            appName = "Clock",
+            title = "Timer",
+            text = "Running",
+            mode = IslandMode.Timer,
+            timeMillis = now + 60_000L
+        )
+
+        val stopwatch = IslandNotification(
+            key = "stopwatch",
+            packageName = "com.android.deskclock",
+            appName = "Clock",
+            title = "Stopwatch running",
+            text = "Running",
+            mode = IslandMode.Stopwatch,
+            timeMillis = now
+        )
+
+        repository.postNotification(regular)
+        repository.postNotification(timer)
+        repository.postNotification(stopwatch)
+
+        repository.removeNotificationsForPackage("com.android.deskclock")
+
+        val remainingKeys = repository.notifications.value.map { it.key }.toSet()
+
+        assertEquals(setOf("timer", "stopwatch"), remainingKeys)
+    }
 }
