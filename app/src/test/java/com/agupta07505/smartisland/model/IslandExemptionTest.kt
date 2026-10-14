@@ -3,7 +3,7 @@ package com.agupta07505.smartisland.model
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class IslandExemptionTest {
+class IslandExemptModeTest {
     private val off = setOf("a.off")
     private val stat = setOf("a.static")
     private val land = setOf("a.land", "a.static")
