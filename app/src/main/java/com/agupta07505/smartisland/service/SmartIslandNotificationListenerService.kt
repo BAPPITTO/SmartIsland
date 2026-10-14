@@ -1334,59 +1334,6 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
             timerRemainingSeconds = null
         }
 
-        val stopwatchElapsedSeconds: Long?
-        val stopwatchChronometerBase: Long?
-        val timerRemainingSeconds: Long?
-
-        if (isMiuiRom) {
-            val stopwatchIsPaused = mode == IslandMode.Stopwatch &&
-                com.agupta07505.smartisland.util.TimerStopwatchParser.isStopwatchPaused(notification)
-
-            stopwatchElapsedSeconds = if (stopwatchIsPaused) {
-                val previousStopwatch = existingNotif?.takeIf { it.mode == IslandMode.Stopwatch }
-                val parsedElapsed = com.agupta07505.smartisland.util.TimerStopwatchParser
-                    .parseStopwatchElapsedSeconds(notification)
-
-                parsedElapsed
-                    ?: previousStopwatch?.stopwatchElapsedSeconds
-                    ?: previousStopwatch?.let { previous ->
-                        ((System.currentTimeMillis() - previous.timeMillis) / 1000L).coerceAtLeast(0L)
-                    }
-            } else {
-                null
-            }
-
-            stopwatchChronometerBase = if (mode == IslandMode.Stopwatch && !stopwatchIsPaused) {
-                runCatching {
-                    notification.extras?.getLong("android.chronometerBase", 0L)
-                }.getOrNull()?.takeIf { it > 0L }
-            } else {
-                null
-            }
-
-            val nowMillis = System.currentTimeMillis()
-            val timerIsPaused = mode == IslandMode.Timer &&
-                com.agupta07505.smartisland.util.TimerStopwatchParser.isTimerPaused(notification)
-
-            timerRemainingSeconds = if (timerIsPaused) {
-                val previousTimer = existingNotif?.takeIf { it.mode == IslandMode.Timer }
-
-                previousTimer?.timerRemainingSeconds
-                    ?: previousTimer?.let { old ->
-                        ((old.timeMillis - nowMillis + 999L) / 1000L).coerceAtLeast(0L)
-                    }
-                    ?: notification.`when`.takeIf { it > nowMillis }?.let { deadline ->
-                        ((deadline - nowMillis + 999L) / 1000L).coerceAtLeast(0L)
-                    }
-            } else {
-                null
-            }
-        } else {
-            stopwatchElapsedSeconds = null
-            stopwatchChronometerBase = null
-            timerRemainingSeconds = null
-        }
-
         val voipLive = com.agupta07505.smartisland.util.VoipCallSignal.active
         val computedTimeMillis = when {
             recordingState != null -> recordingState.startMillis
