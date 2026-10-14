@@ -54,11 +54,18 @@ internal class IslandBlurWindow(
     fun attach() {
         if (dialog != null || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
         val created = runCatchingLogged(TAG, "Blur window create failed") {
-            val d = Dialog(context, android.R.style.Theme_Translucent_NoTitleBar)
+            // An application overlay window (Draw over other apps) when allowed, from the plain application context: it always stacks
+            // under the island's accessibility overlay, and it is a window type the system's blur is known to handle. The accessibility
+            // overlay is the fallback when the permission is missing.
+            val overlayAllowed = runCatching { android.provider.Settings.canDrawOverlays(context) }.getOrDefault(false)
+            val d = Dialog(if (overlayAllowed) context.applicationContext else context, android.R.style.Theme_Translucent_NoTitleBar)
             d.setCancelable(false)
             d.setContentView(View(context))
             val w = d.window ?: return@runCatchingLogged null
-            w.setType(WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY)
+            w.setType(
+                if (overlayAllowed) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                else WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+            )
             // Not fully transparent: a window that draws nothing can be skipped by the compositor, blur included. 1/255 alpha is invisible.
             w.setBackgroundDrawable(ColorDrawable(Color.argb(1, 0, 0, 0)))
             w.setFormat(PixelFormat.TRANSLUCENT)
@@ -83,6 +90,7 @@ internal class IslandBlurWindow(
             w.attributes = lp
             w.setBackgroundBlurRadius(0)
             d.show()
+            AppLogRecorder.i(TAG, "Blur window created: type=${if (overlayAllowed) "application overlay" else "accessibility overlay"}")
             d
         }
         if (created != null) dialog = created
