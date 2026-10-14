@@ -45,13 +45,14 @@ In Telegram Desktop, Android, iOS, or Web:
 
 ## 4. Recommended Multi-Topic Setup
 
-Most communities prefer keeping official releases separate from dev test builds. You can set up:
+Most communities prefer keeping different event types in separate topics:
 
-| Channel / Topic | Purpose | Secret to Set |
+| Topic | Purpose | Secret to Set |
 |---|---|---|
-| `#releases` or `#announcements` | Signed official release APKs | `TELEGRAM_RELEASE_TOPIC_ID` |
-| `#dev-builds` or `#testing` | Nightly / snapshot debug APKs | `TELEGRAM_DEBUG_TOPIC_ID` |
-| General (Single Topic) | All builds go to the same topic | `TELEGRAM_TOPIC_ID` |
+| `#releases` | Signed official release APKs | `TELEGRAM_RELEASE_TOPIC_ID` |
+| `#dev-builds` | Dev/testing debug APKs | `TELEGRAM_DEBUG_TOPIC_ID` |
+| `#github-activity` | Issues, PRs, stars notifications | `TELEGRAM_EVENTS_TOPIC_ID` |
+| General (fallback) | Everything in one topic | `TELEGRAM_TOPIC_ID` |
 
 ---
 
@@ -69,16 +70,24 @@ Add the following:
 | `TELEGRAM_BOT_TOKEN` | **Yes** | `123456789:ABCdef...` | Token from @BotFather |
 | `TELEGRAM_CHAT_ID` | **Yes** | `-1002345678901` | Your supergroup ID |
 | `TELEGRAM_TOPIC_ID` | Optional | `1` | Fallback / default topic ID |
-| `TELEGRAM_RELEASE_TOPIC_ID` | Optional | `10` | Specific topic ID for Release APKs |
-| `TELEGRAM_DEBUG_TOPIC_ID` | Optional | `42` | Specific topic ID for Debug APKs |
+| `TELEGRAM_RELEASE_TOPIC_ID` | Optional | `10` | Topic for Release APKs |
+| `TELEGRAM_DEBUG_TOPIC_ID` | Optional | `42` | Topic for Debug APKs |
+| `TELEGRAM_EVENTS_TOPIC_ID` | Optional | `55` | Topic for issues, PRs, and stars |
 
 ---
 
-## 6. Workflow Triggers
+## 6. What Gets Forwarded
 
-- **Tag `v*` or manual `workflow_dispatch`:**
-  Builds and signs the release APK (`SmartIsland-v*.apk`), publishes the GitHub release, and forwards the APK to your Release Topic.
-- **Push to `dev` or manual `workflow_dispatch`:**
-  Builds `app-debug.apk` and forwards it to your Debug Topic.
-- **Safe Fallback:**
-  If the secrets are not set yet, the workflow logs an informational notice and completes without failing.
+### Build Artifacts (`.github/workflows/android.yml`)
+- **Release APKs** — On tag `v*` or manual dispatch: signed APK with version, changelog link, recent commits, download links, and project info.
+- **Debug APKs** — On `dev` push or manual dispatch: debug APK with branch, author, recent commits, and CI run links.
+
+### GitHub Events (`.github/workflows/telegram-notifications.yml`)
+- **🐛 New Issue** — Issue number, title, author profile link, type detection (Bug / Feature / Question), labels, and description preview.
+- **🔀 New PR** — PR number, title, author, target branch, additions/deletions/files changed, labels, and description preview.
+- **✅ PR Merged** — PR number, title, author, who merged it, target branch, commit count, and diff stats.
+- **⭐ New Star** — Who starred, their bio/location/followers/repos, current total star count, and milestone alerts (10, 25, 50, 100, 250, 500, 1000+).
+
+### Safe Fallback
+If the Telegram secrets are not configured, all workflows gracefully skip notifications without failing CI.
+
