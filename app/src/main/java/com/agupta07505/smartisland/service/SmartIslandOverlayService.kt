@@ -89,8 +89,6 @@ class SmartIslandOverlayService : AccessibilityService() {
     private var widgetWindowJob: kotlinx.coroutines.Job? = null
     private var collapseJob: kotlinx.coroutines.Job? = null
     private var lastParams: WindowManager.LayoutParams? = null
-    /** Live blur: the empty window under the island that the system blurs the screen behind (see IslandBlurWindow). */
-    private var blurWindow: IslandBlurWindow? = null
 
     private val torchCallback = object : android.hardware.camera2.CameraManager.TorchCallback() {
         override fun onTorchModeChanged(cameraId: String, enabled: Boolean) {
@@ -800,19 +798,6 @@ class SmartIslandOverlayService : AccessibilityService() {
         }
 
         serviceScope.launch {
-            runSuspendCatchingLogged(TAG, "Live blur collector failed") {
-                // The blur window follows the island's rect and every input that decides whether it shows.
-                kotlinx.coroutines.flow.combine(
-                    viewModel.expandedSurfaceBounds,
-                    viewModel.expanded,
-                    viewModel.shownCardIsMedia,
-                    viewModel.displaySettings,
-                    viewModel.islandOffForApp
-                ) { _, _, _, _, _ -> Unit }.collect { refreshBlurWindow() }
-            }
-        }
-
-        serviceScope.launch {
             runSuspendCatchingLogged(TAG, "Expanded-state collector failed") {
                 viewModel.expanded.collectLatest { expanded ->
                     if (destroyed || !viewModel.displaySettings.value.enabled) {
@@ -1145,19 +1130,14 @@ class SmartIslandOverlayService : AccessibilityService() {
 
                 setupTouchableRegion(this)
             }
-            // The blur window goes in first: windows of one type stack in the order they were added, and it must sit under the island.
-            if (blurWindow == null) blurWindow = IslandBlurWindow(this, windowManager)
-            blurWindow?.attach()
             runCatchingLogged(TAG, "windowManager.addView failed") {
                 windowManager.addView(islandView, collapsedParams(viewModel.displaySettings.value))
             } ?: run {
                 islandView = null
-                blurWindow?.detach()
             }
         } catch (e: Exception) {
             android.util.Log.e(TAG, "ensureCollapsedWindow fatal", e)
             islandView = null
-            blurWindow?.detach()
         }
     }
 
@@ -1474,7 +1454,6 @@ class SmartIslandOverlayService : AccessibilityService() {
         val targetVisibility = if (isHidden) android.view.View.GONE else android.view.View.VISIBLE
         if (view.visibility != targetVisibility) {
             view.visibility = targetVisibility
-            refreshBlurWindow()
         }
 
         val isSplitMode = !isStatic && com.agupta07505.smartisland.model.hasSecondaryCutout(
@@ -1609,46 +1588,6 @@ class SmartIslandOverlayService : AccessibilityService() {
                 windowManager.removeViewImmediate(view)
             }
         }
-        blurWindow?.detach()
-        blurWindow = null
-        if (::viewModel.isInitialized) viewModel.liveBlurShown.value = false
-    }
-
-    /**
-     * Live blur: puts the blur window under the expanded island, or hides it. It shows only while the single expanded island is open
-     * with Live blur chosen, the system can blur behind a window, the island is visible and the shown card is not a music card
-     * (the media card keeps its own blur). The island reports its rect in its own window's pixels; the window starts at the screen
-     * top (full width, x = 0 while expanded), so the screen row is the reported top plus the window's y.
-     */
-    private fun refreshBlurWindow() {
-        val blur = blurWindow
-        if (blur == null) { if (::viewModel.isInitialized) viewModel.liveBlurShown.value = false; return }
-        if (destroyed || !::viewModel.isInitialized) { blur.show(null); return }
-        val view = islandView
-        val settings = viewModel.displaySettings.value
-        val bounds = viewModel.expandedSurfaceBounds.value
-        val wanted = view != null && view.visibility == android.view.View.VISIBLE && settings.enabled &&
-            settings.expandedBlurMode == com.agupta07505.smartisland.data.ExpandedBlurMode.Live &&
-            viewModel.expanded.value && !viewModel.shownCardIsMedia.value && bounds != null
-        if (!wanted || bounds == null) { blur.show(null); viewModel.liveBlurShown.value = false; return }
-        val density = resources.displayMetrics.density
-        val isLandscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-        val windowY = if (settings.enableNotchMode || isLandscape) 0 else settings.yOffset.dpToPx()
-        val key = com.agupta07505.smartisland.util.BlurFollow.layoutKey(
-            left = bounds.left,
-            top = bounds.top + windowY,
-            right = bounds.right,
-            bottom = bounds.bottom + windowY,
-            radiusPx = com.agupta07505.smartisland.util.BlurFollow.EXPANDED_CORNER_DP * density,
-            blurRadiusPx = (settings.expandedBlurRadius * density).toInt()
-        )
-        blur.show(key)
-        // The island's shell turns into a tint only while a blur is really there (not while the island is still a pill, or unsupported).
-        val shownNow = key != null && blur.isSupported()
-        if (viewModel.liveBlurShown.value != shownNow) {
-            com.agupta07505.smartisland.util.AppLogRecorder.i(TAG, "Live blur tint ${if (shownNow) "on" else "off"} (key=${key?.joinToString(",")})")
-        }
-        viewModel.liveBlurShown.value = shownNow
     }
 
     private fun collapsedParams(settings: SmartIslandSettings): WindowManager.LayoutParams {
