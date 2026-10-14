@@ -7,6 +7,7 @@
 
 package com.agupta07505.smartisland.util
 
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.content.ComponentName
 import android.content.Context
@@ -240,6 +241,7 @@ object OemDeviceRules {
         return isMiuiOrHyperOs(resolveEffectiveDevice(deviceTypeSetting))
     }
 
+    @SuppressLint("PrivateApi", "DiscouragedPrivateApi")
     private fun getSystemProperty(key: String): String? {
         return runCatching {
             val c = Class.forName("android.os.SystemProperties")
