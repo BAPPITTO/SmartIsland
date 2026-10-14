@@ -22,7 +22,7 @@ import com.agupta07505.smartisland.ui.expanded.expandedGradientBrush
 
 /**
  * The visible island shell: animated size, the finger-follow and merge swell transform, shadow, clip, the
- * expanded-surface bounds report for the blur window, and the background surface. Gestures are added by the caller.
+ * expanded-surface bounds report (for the touch region), and the background surface. Gestures are added by the caller.
  */
 internal fun Modifier.islandPillSurface(
     settings: SmartIslandSettings,
@@ -43,14 +43,8 @@ internal fun Modifier.islandPillSurface(
     /** The shell's opacity, read while drawing so a fade between the media and the shared value does not recompose. */
     shellOpacity: () -> Float = { settings.opacity },
     /**
-     * Live blur, 0..1, read while drawing: 0 = the normal solid shell, 1 = the translucent tint over the blur window
-     * (`BlurFollow.shellAlpha`). Stays 0 wherever the blur is not showing, which is the fallback look.
-     */
-    liveBlur: () -> Float = { 0f },
-    /**
-     * The single island reports its rect for the blur window only while this is true. Landscape's two islands hand over to the single
-     * island with a 160 ms surface fade; the blur window (a plain rectangle) used to come back before that fade was done and showed
-     * as a grey box with square corners around a still see-through island.
+     * The single island reports its rect (used for the touch region) only while this is true. Landscape's two islands hand over to the
+     * single island with a 160 ms surface fade, so the rect is held back until that fade is done.
      */
     reportBounds: Boolean = true,
     /** Read while drawing: true while the island closes onto the idle circle (landscape, the last card gone). The shell is not drawn then. */
@@ -168,7 +162,7 @@ internal fun Modifier.islandPillSurface(
         .then(if (twoIslandsDrawn) Modifier else Modifier.islandShellClip({ layout.safeRadius }, squareTop))
         .then(
             if (cb.currentExpanded && !pickerSideBySide && reportBounds) {
-                // Reports the island's rect (after scale and drag) so the blur window can follow it.
+                // Reports the island's rect (after scale and drag) for the touch region.
                 Modifier.onGloballyPositioned { coords ->
                     val b = coords.boundsInWindow()
                     cb.currentOnExpandedSurfaceBounds(
@@ -189,7 +183,7 @@ internal fun Modifier.islandPillSurface(
             expandedFraction = { layout.expandProgress },
             // The cards no longer slide under the finger (the island leans with them inside it) and the two cards of a swap are one
             // card apart, so there is no strip of bare shell to cover: the shell keeps its own opacity.
-            alpha = { com.agupta07505.smartisland.util.BlurFollow.shellAlpha(shellOpacity(), liveBlur()) * layout.singleSurfaceAlpha }
+            alpha = { shellOpacity() * layout.singleSurfaceAlpha }
         )
         .lockCueOutline(
             shape = { islandShellShape(layout.safeRadius.toPx(), squareTop) },

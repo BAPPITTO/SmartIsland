@@ -693,11 +693,6 @@ class IslandViewModel(
     /** The open step (preview / reader) of the shown card; the open picture is [expandedMedia]. See model/CardDepth.kt. */
     val cardStepState = MutableStateFlow(com.agupta07505.smartisland.model.CardStepState())
 
-    /** True while the shown card is a music card: the blur window then uses the media blur settings. */
-    val shownCardIsMedia: StateFlow<Boolean> = combine(visibleNotifications, selectedIndex) { list, index ->
-        list.getOrNull(index)?.mode == IslandMode.Music
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
-
     private fun shownCard(): IslandNotification? = visibleNotifications.value.getOrNull(selectedIndex.value)
 
     /** The card the island is showing right now (what a floating-window pull should open). */
@@ -774,16 +769,9 @@ class IslandViewModel(
 
     /**
      * Where the single expanded island is on the overlay window, in window pixels (null while
-     * collapsed or while two separate islands are shown). The service puts the blur window here.
+     * collapsed or while two separate islands are shown). The service uses it for the touch region.
      */
     val expandedSurfaceBounds = MutableStateFlow<android.graphics.Rect?>(null)
-
-    /**
-     * True while the blur window is really showing under the expanded island (Live blur chosen AND the system can blur behind a window).
-     * The island draws its shell as a translucent tint only then; otherwise (blur off, unsupported, media card) it keeps its normal solid
-     * background, which is the fallback. Set by the service in `refreshBlurWindow`.
-     */
-    val liveBlurShown = MutableStateFlow(false)
 
     val isInputActive = MutableStateFlow(false)
 

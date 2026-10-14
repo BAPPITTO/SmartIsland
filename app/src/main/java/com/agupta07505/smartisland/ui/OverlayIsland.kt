@@ -38,7 +38,6 @@ fun OverlayIsland(
     val idleSuppressed by viewModel.idleWidgetsSuppressed.collectAsState()
     val settings by viewModel.displaySettings.collectAsState()
     val expanded by viewModel.expanded.collectAsState()
-    val liveBlurShown by viewModel.liveBlurShown.collectAsState()
     val widgetIslandOpen by viewModel.widgetIslandOpen.collectAsState()
     val widgetIslandSnap by viewModel.widgetIslandSnap.collectAsState()
     val appsLauncherOpen by viewModel.appsLauncherOpen.collectAsState()
@@ -202,7 +201,6 @@ fun OverlayIsland(
     IslandOverlayView(
         settings = settings,
         expanded = expanded && !staticPill,
-        liveBlurShown = liveBlurShown && !staticPill,
         // The Open Apps shortcut shows the quick-launch grid, which is what the island draws for an empty list.
         notifications = if (staticPill || (appsLauncherOpen && expanded)) emptyList() else processedNotifications,
         selectedIndex = selectedIndex,
@@ -241,10 +239,13 @@ fun OverlayIsland(
         onSwitchSibling = { forward -> viewModel.switchSibling(forward) },
         onTogglePillHidden = { viewModel.togglePillHidden() },
         // The island reports its rect on every frame of a size animation. A change of 2 px or less is skipped (no new
-        // flow value, no blur or touch-region work); the 8 dp touch pad and the blur window's inset hide the difference.
+        // flow value, no touch-region work); the 8 dp touch pad hides the difference.
         onExpandedSurfaceBounds = { next ->
             val last = viewModel.expandedSurfaceBounds.value
-            if (next == null || last == null || com.agupta07505.smartisland.util.BlurFollow.rectMoved(last, next)) {
+            if (next == null || last == null ||
+                kotlin.math.abs(last.left - next.left) > 2 || kotlin.math.abs(last.top - next.top) > 2 ||
+                kotlin.math.abs(last.right - next.right) > 2 || kotlin.math.abs(last.bottom - next.bottom) > 2
+            ) {
                 viewModel.expandedSurfaceBounds.value = next
             }
         },
