@@ -328,7 +328,7 @@ fun CustomizationsSection(
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f), modifier = Modifier.padding(vertical = 2.dp))
 
-                // Background blur: Off, Card blur or Live blur. One strength slider serves both; the media card keeps its own blur below.
+                // Background blur: Off or Card blur. The strength slider applies to Card blur; the media card keeps its own blur below.
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         text = stringResource(R.string.toggle_expanded_blur_title),
@@ -345,13 +345,6 @@ fun CustomizationsSection(
                         selected = settings.expandedBlurMode,
                         onSelected = { mode -> scope.launch { repository.setExpandedBlurMode(mode) } }
                     )
-                    AnimatedVisibility(visible = settings.expandedBlurMode == ExpandedBlurMode.Live) {
-                        Text(
-                            text = stringResource(R.string.blur_mode_live_desc),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
                 }
                 AnimatedVisibility(visible = settings.expandedBlurMode != ExpandedBlurMode.Off) {
                     SliderSettingItem(
@@ -858,13 +851,12 @@ private fun ExpandedThemeSelector(selected: String, onSelected: (String) -> Unit
 }
 
 
-/** Segmented Off / Card blur / Live blur switch for the expanded island's background blur. */
+/** Segmented Off / Card blur switch for the expanded island's background blur. */
 @Composable
 private fun ExpandedBlurModeSelector(selected: ExpandedBlurMode, onSelected: (ExpandedBlurMode) -> Unit) {
     val options = listOf(
         ExpandedBlurMode.Off to stringResource(R.string.blur_mode_off),
-        ExpandedBlurMode.Card to stringResource(R.string.blur_mode_card),
-        ExpandedBlurMode.Live to stringResource(R.string.blur_mode_live)
+        ExpandedBlurMode.Card to stringResource(R.string.blur_mode_card)
     )
     Row(
         modifier = Modifier
