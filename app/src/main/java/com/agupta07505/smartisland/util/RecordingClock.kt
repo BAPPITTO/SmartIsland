@@ -64,6 +64,26 @@ object RecordingClock {
     }
 
     /**
+     * The state a post continues from: the card's own, or, for a paused post, the app's last one. A running post
+     * never borrows another card's clock.
+     */
+    fun continuation(own: State?, lastForApp: State?, paused: Boolean): State? =
+        own ?: lastForApp?.takeIf { paused }
+
+    /**
+     * Whether a post is paused, remembering that a paused clock stays paused. Clock apps cancel the notification when
+     * their screen opens and post a new one when it is left; that post may carry neither a "Resume" button nor the word
+     * "paused", so [detected] alone would call it running and the clock would go on from the moment the app was left.
+     * A post counts as running again only when the app offers "Pause" (or, with no readable buttons, never).
+     */
+    fun resolvePaused(detected: Boolean, lastForApp: State?, actionTitles: List<String>): Boolean {
+        if (detected) return true
+        if (lastForApp?.frozenMs == null) return false
+        val offersPause = actionTitles.any { t -> PAUSE_WORDS.any { t.lowercase().contains(it) } }
+        return !offersPause
+    }
+
+    /**
      * The next clock state.
      * @param previous the state kept for this recording, if any
      * @param parsedMs the time read from the notification text
@@ -80,6 +100,10 @@ object RecordingClock {
         fallbackFrozenMs: Long? = null
     ): State {
         val previousElapsed = previous?.elapsedMs(nowMillis)
+        if (paused && !finished && previous?.frozenMs != null) {
+            // Already frozen: the value it froze at is the truth, whatever a later paused post prints.
+            return previous
+        }
         if (paused || finished) {
             // A paused post often carries no time, or a bogus "00:00". Prefer a real positive reading, then the
             // clock that was running up to the pause, then the notification view's own chronometer.

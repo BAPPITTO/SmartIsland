@@ -144,8 +144,8 @@ internal fun Modifier.islandPillSurface(
             }
             // Keep the top edge in place: the stretch reaches down only.
             translationY += com.agupta07505.smartisland.util.SwipeDownPull.topAnchorShiftPx(pullScaleY, size.height)
-            // Only the pill exit fades the layer. The swipe lock cue used to dim it too, but a layer alpha covers the whole subtree
-            // (the card's backdrop and content), so the card went see-through for the 400 ms of the lock. The cue is the outline below.
+            // Only the pill exit fades the layer. The swipe lock cue does not dim it, because a layer alpha covers the whole subtree
+            // (the card's backdrop and content) and the card would go see-through for the 400 ms of the lock. The cue is the outline below.
             alpha = if (shellHidden()) 0f else (pillExit.shellAlpha() * layout.hidingAlpha)
         }
         .then(
@@ -181,7 +181,7 @@ internal fun Modifier.islandPillSurface(
             // Light look: the shell eases from the pill colour to the pale surface as the island opens (and back on collapse).
             expandedColor = if (palette.isLight) palette.surface else null,
             expandedFraction = { layout.expandProgress },
-            // The cards no longer slide under the finger (the island leans with them inside it) and the two cards of a swap are one
+            // The cards do not slide under the finger (the island leans with them inside it) and the two cards of a swap are one
             // card apart, so there is no strip of bare shell to cover: the shell keeps its own opacity.
             alpha = { shellOpacity() * layout.singleSurfaceAlpha }
         )

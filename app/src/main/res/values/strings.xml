@@ -701,7 +701,8 @@
     <string name="detail_title_timing">Timing</string>
     <string name="timing_intro">Fine-tune how long things stay on the island. Changes apply straight away and the defaults match the old fixed values.</string>
     <string name="timing_idle_label">Idle timeout</string>
-    <string name="timing_idle_hint">How long cards stay before the island returns to its idle cutout: ordinary notifications, and live events (music, navigation, timers ...) that appeared by themselves. Live events you open with a tap on the idle cutout stay until you close them. Calls never time out.</string>
+    <string name="timing_never">Never</string>
+    <string name="timing_idle_hint">How long cards stay before the island returns to its idle cutout: ordinary notifications, and live events (music, navigation, timers ...) that appeared by themselves. Live events you open with a tap on the idle cutout stay until you close them. Calls never time out. Slide to the end for Never: cards stay until they are dismissed.</string>
     <string name="timing_battery_label">Battery warning length</string>
     <string name="timing_battery_hint">How long Low battery, Battery saver and Fully charged cards stay.</string>
     <string name="timing_popup_label">Popup length</string>

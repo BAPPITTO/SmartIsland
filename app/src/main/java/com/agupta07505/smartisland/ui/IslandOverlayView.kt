@@ -224,9 +224,9 @@ fun IslandOverlayView(
             sideBySideHold = false
         }
     }
-    // The hold also ends the moment the content has left the two-island layout (it reports that in splitShown). The flag used to drop
-    // 40 ms later and the surface faded in over another 60 ms, and for those frames the single-layout card was drawn without a surface
-    // in the wide, unclipped two-island shell: the square-cornered slab at the end of the picker close.
+    // The hold also ends the moment the content has left the two-island layout (it reports that in splitShown). The flag must not drop
+    // 40 ms later with the surface fading in over another 60 ms, because for those frames the single-layout card would be drawn without a surface
+    // in the wide, unclipped two-island shell: a square-cornered slab at the end of the picker close.
     val pickerSideBySideRaw = pickerSideBySideNow || (sideBySideHold && isLandscape && expanded && stepDragForHold.splitShown)
     // Set by the watchdog below when the flag was still on with nothing open. It drops the flag until the next picker / picture.
     var forceSingle by remember { mutableStateOf(false) }

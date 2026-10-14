@@ -86,4 +86,50 @@ class RecordingClockTest {
         val paused = RecordingClock.next(null, 50_000L, paused = true, finished = false, parsedMs = null, chronometerBaseMs = null, fallbackFrozenMs = 7_000L)
         assertEquals(7_000L, paused.frozenMs)
     }
+
+    @Test
+    fun pausedRepostAfterTheCardWasRemovedKeepsTheFrozenTime() {
+        val running = RecordingClock.next(null, 104_000L, paused = false, finished = false, parsedMs = null, chronometerBaseMs = 100_000L)
+        val paused = RecordingClock.next(running, 104_050L, paused = true, finished = false, parsedMs = null, chronometerBaseMs = null)
+        // The clock app's screen is open for a minute, then it posts the paused notification again.
+        val previous = RecordingClock.continuation(own = null, lastForApp = paused, paused = true)
+        val reposted = RecordingClock.next(previous, 164_050L, paused = true, finished = false, parsedMs = null, chronometerBaseMs = null)
+        assertEquals(4_050L, reposted.frozenMs)
+        assertEquals(4_050L, reposted.elapsedMs(170_000L))
+    }
+
+    @Test
+    fun runningPostDoesNotBorrowTheAppsLastClock() {
+        val frozen = RecordingClock.State(startMillis = 0L, frozenMs = 4_000L)
+        assertNull(RecordingClock.continuation(own = null, lastForApp = frozen, paused = false))
+        assertEquals(frozen, RecordingClock.continuation(own = null, lastForApp = frozen, paused = true))
+    }
+
+    @Test
+    fun pausedStopwatchStaysPausedWhenTheAppRepostsWithoutAResumeButton() {
+        val frozen = RecordingClock.State(startMillis = 0L, frozenMs = 4_000L)
+        // Clock app reposts after its screen was left: no readable buttons, nothing says "paused".
+        assertTrue(RecordingClock.resolvePaused(detected = false, lastForApp = frozen, actionTitles = emptyList()))
+        assertTrue(RecordingClock.resolvePaused(detected = false, lastForApp = frozen, actionTitles = listOf("Lap", "Reset")))
+    }
+
+    @Test
+    fun pausedStopwatchRunsAgainOnlyWhenPauseIsOffered() {
+        val frozen = RecordingClock.State(startMillis = 0L, frozenMs = 4_000L)
+        assertFalse(RecordingClock.resolvePaused(detected = false, lastForApp = frozen, actionTitles = listOf("Pause", "Lap")))
+        // Never paused before: a plain running post stays running.
+        val running = RecordingClock.State(startMillis = 0L, frozenMs = null)
+        assertFalse(RecordingClock.resolvePaused(detected = false, lastForApp = running, actionTitles = emptyList()))
+        assertFalse(RecordingClock.resolvePaused(detected = false, lastForApp = null, actionTitles = emptyList()))
+        assertTrue(RecordingClock.resolvePaused(detected = true, lastForApp = null, actionTitles = emptyList()))
+    }
+
+    @Test
+    fun frozenClockIgnoresADifferentTimeInALaterPausedPost() {
+        val frozen = RecordingClock.State(startMillis = 0L, frozenMs = 4_000L)
+        // The app's repost prints a time that grew by the minute the app screen was open: not the stopwatch's.
+        val reposted = RecordingClock.next(frozen, 164_000L, paused = true, finished = false, parsedMs = 64_000L, chronometerBaseMs = null)
+        assertEquals(4_000L, reposted.frozenMs)
+        assertEquals(4_000L, reposted.elapsedMs(999_000L))
+    }
 }

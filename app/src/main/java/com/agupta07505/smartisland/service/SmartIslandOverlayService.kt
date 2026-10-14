@@ -179,8 +179,8 @@ class SmartIslandOverlayService : AccessibilityService() {
         runCatchingLogged(TAG, "onAccessibilityEvent failed") {
             if (destroyed || !::viewModel.isInitialized) return@runCatchingLogged
             // Content-change events arrive in the hundreds per second while any app draws (a playing
-            // video or music app, a scrolling list, this island's own animation). Each one used to cost a keyguard
-            // binder call on the main thread. They are only a fallback for the lock state now, checked at most once
+            // video or music app, a scrolling list, this island's own animation). Each one would cost a keyguard
+            // binder call on the main thread. They are only a fallback for the lock state, checked at most once
             // per KEYGUARD_POLL_MS; nothing else here looks at them.
             val eventType = event?.eventType
             val nowMs = android.os.SystemClock.elapsedRealtime()
@@ -1828,7 +1828,6 @@ class SmartIslandOverlayService : AccessibilityService() {
         val started = runCatchingLogged(TAG, "Failed to launch app in a floating window") {
             startActivity(launchIntent, systemFreeformBundle())
         } != null
-        freeformDiag("launcher: system freeform for $packageName started=$started")
         return started
     }
 
@@ -1847,7 +1846,6 @@ class SmartIslandOverlayService : AccessibilityService() {
         val sent = runCatchingLogged(TAG, "Failed to ask LMO Freeform for a window") {
             sendBroadcast(lmo.startIntent(component))
         } != null
-        freeformDiag("launcher: lmo freeform for $packageName sent=$sent")
         return sent
     }
 
@@ -1898,35 +1896,20 @@ class SmartIslandOverlayService : AccessibilityService() {
             .toSet()
     } ?: emptySet()
 
-    /** Floating-window trace lines for the in-app diagnostic log (tag FreeformDiag). */
-    private fun freeformDiag(message: String) {
-        com.agupta07505.smartisland.util.AppLogRecorder.i("FreeformDiag", message)
-    }
-
     private fun openCurrentNotificationInFloatingWindow() {
         // Floating window off in settings: the handle is already gone, and the Floating window swipe action does nothing.
         val route = com.agupta07505.smartisland.model.floatingWindowRoute(
             viewModel.settings.value.floatingWindowEnabled,
             viewModel.settings.value.floatingWindowMode
         )
-        freeformDiag(
-            "swipe: route=$route mode=${viewModel.settings.value.floatingWindowMode} " +
-                "enabled=${viewModel.settings.value.floatingWindowEnabled} sdk=${Build.VERSION.SDK_INT}"
-        )
         if (route == com.agupta07505.smartisland.model.FloatingWindowRoute.Off) return
         // The card on screen: selectedIndex indexes the island's own list (filtered, priority-ordered), not the raw repository list.
         val notification = viewModel.currentShownNotification()
-        if (notification == null) freeformDiag("swipe: no card on screen, nothing to open")
         if (notification != null) {
-            freeformDiag(
-                "swipe: card pkg=${notification.packageName} key=${notification.key} mode=${notification.mode} " +
-                    "hasContentIntent=${notification.contentIntent != null}"
-            )
             val launched = when (route) {
                 com.agupta07505.smartisland.model.FloatingWindowRoute.Lmo -> openInLmoFreeform(notification)
                 else -> openInSystemFreeform(notification)
             }
-            freeformDiag("swipe: launcher returned launched=$launched (LMO main path returns true before the task is moved)")
             // Only an ordinary alert is consumed by opening it. Cancelling a running timer,
             // recorder, call or download notification would kill its buttons.
             if (launched && notification.mode == com.agupta07505.smartisland.model.IslandMode.Notification) {
@@ -1975,7 +1958,6 @@ class SmartIslandOverlayService : AccessibilityService() {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
         }
         var started = false
-        freeformDiag("system: sending ${if (notification.contentIntent != null) "contentIntent" else "launch intent"} with windowingMode=$WINDOWING_MODE_FREEFORM")
         if (notification.contentIntent != null) {
             runCatchingLogged(TAG, "Failed to send content intent") {
                 notification.contentIntent.send(this, 0, fillInIntent, null, null, null, bundle)
@@ -1993,7 +1975,6 @@ class SmartIslandOverlayService : AccessibilityService() {
                 }
             }
         }
-        freeformDiag("system: started=$started")
         return started
     }
 
@@ -2011,25 +1992,14 @@ class SmartIslandOverlayService : AccessibilityService() {
         }
         val pending = notification.contentIntent
         val canMoveTask = pending != null && com.agupta07505.smartisland.util.ShizukuManager.hasPermission()
-        freeformDiag(
-            "lmo: pkg=${notification.packageName} contentIntent=${pending != null} " +
-                "shizukuPermission=${com.agupta07505.smartisland.util.ShizukuManager.hasPermission()} -> " +
-                if (canMoveTask) "main path (open chat, then move its task)" else "FALLBACK path (LMO launches the activity itself, no fullscreen launch)"
-        )
         if (!canMoveTask) return openInLmoFallback(notification)
         // Task snapshot first, so the chat's task can be told apart from tasks the app already had.
         serviceScope.launch {
             // Preferred: open the chat straight on LMO's own display, so it never covers the foreground app.
             if (openInLmoDisplay(notification, pending!!)) return@launch
-            freeformDiag("lmo: direct display launch not possible -> old path (open, then move task)")
             val beforeOut = com.agupta07505.smartisland.util.ShizukuManager.runShellForOutput(lmo.LIST_TASKS_COMMAND).getOrDefault("")
             val beforeTasks = lmo.parseTasks(beforeOut)
             val before = beforeTasks.map { it.taskId }.toSet()
-            freeformDiag(
-                "lmo: before: ${beforeTasks.size} tasks parsed, ${notification.packageName} tasks=" +
-                    lmo.summarize(beforeTasks, notification.packageName) + " " +
-                    lmo.rawLinesFor(beforeOut, notification.packageName)
-            )
             val sent = runCatchingLogged(TAG, "Failed to open the notification's chat") {
                 val fill = Intent().addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
                 val options = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -2037,12 +2007,9 @@ class SmartIslandOverlayService : AccessibilityService() {
                         setPendingIntentBackgroundActivityStartMode(ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED)
                     }.toBundle()
                 } else null
-                freeformDiag("lmo: sending contentIntent with NO windowing options, so the chat opens fullscreen first by design")
                 pending!!.send(this@SmartIslandOverlayService, 0, fill, null, null, null, options)
             } != null
-            freeformDiag("lmo: contentIntent sent=$sent")
             if (!sent) {
-                freeformDiag("lmo: send failed -> fallback")
                 openInLmoFallback(notification)
                 return@launch
             }
@@ -2058,46 +2025,21 @@ class SmartIslandOverlayService : AccessibilityService() {
                 )
                 task = lmo.pickTask(after, before, notification.packageName)
                     ?.takeIf { it.taskId !in before } // wait for a genuinely new task while polling
-                freeformDiag("lmo: poll $pollsUsed ${notification.packageName} tasks=${lmo.summarize(after, notification.packageName)} newTask=${task?.taskId}")
                 if (task == null) kotlinx.coroutines.delay(LMO_TASK_POLL_MS)
             }
             // No new task appeared: the app reused one it had, so take its front-most task.
             if (task == null) {
                 val reusedOut = com.agupta07505.smartisland.util.ShizukuManager.runShellForOutput(lmo.LIST_TASKS_COMMAND).getOrDefault("")
                 task = lmo.pickTask(lmo.parseTasks(reusedOut), before, notification.packageName)
-                freeformDiag(
-                    "lmo: no new task after $pollsUsed polls (app reused a task?) -> front-most of the package = ${task?.taskId} " +
-                        lmo.rawLinesFor(reusedOut, notification.packageName)
-                )
             }
             val found = task
             if (found == null) {
                 Log.w(TAG, "LMO: no task found for ${notification.packageName}; falling back to launching it in LMO")
-                freeformDiag("lmo: NO task found -> FALLBACK launch (the fullscreen copy already opened stays, a second copy floats)")
                 openInLmoFallback(notification)
             } else {
-                freeformDiag("lmo: moving task ${found.taskId} (${found.className}, user ${found.userId}) into a window, taskId in broadcast=${found.taskId}")
                 runCatchingLogged(TAG, "Failed to ask LMO Freeform to move task ${found.taskId}") {
                     sendBroadcast(lmo.startIntent(found.component, found.userId, found.taskId))
                 }
-                // Where did it end up? Look again after LMO had time to act: one task or two, window mode and bounds.
-                kotlinx.coroutines.delay(1500)
-                val finalOut = com.agupta07505.smartisland.util.ShizukuManager.runShellForOutput(lmo.LIST_TASKS_COMMAND).getOrDefault("")
-                val finalTasks = lmo.parseTasks(finalOut)
-                freeformDiag(
-                    "lmo: after broadcast (+1.5s): ${notification.packageName} tasks=${lmo.summarize(finalTasks, notification.packageName)} " +
-                        "movedTaskStillListed=${finalTasks.any { it.taskId == found.taskId }} " +
-                        lmo.rawLinesFor(finalOut, notification.packageName)
-                )
-                // For the next step (opening the chat straight onto LMO's window, no full-screen first): which
-                // display the moved task is on and what LMO's display looks like.
-                val rootLines = finalOut.lineSequence().map { it.trim() }.filter { "RootTask id=" in it }.take(6)
-                    .joinToString(" | ") { it.take(160) }
-                val displays = com.agupta07505.smartisland.util.ShizukuManager
-                    .runShellForOutput("dumpsys display 2>/dev/null | grep -E 'mBaseDisplayInfo=DisplayInfo' | cut -c1-420")
-                    .getOrDefault("").trim().lineSequence().take(4).joinToString(" | ")
-                freeformDiag("lmo: root tasks: $rootLines")
-                freeformDiag("lmo: displays: $displays")
             }
         }
         return true
@@ -2116,7 +2058,6 @@ class SmartIslandOverlayService : AccessibilityService() {
         val pkg = notification.packageName
         val component = lmo.pendingIntentActivity(pending) ?: lmo.launcherComponent(packageManager, pkg)
         if (component == null) {
-            freeformDiag("lmo-display: no target activity for $pkg")
             return false
         }
         val knownDisplays = lmo.parseDisplayIds(shizuku.runShellForOutput(lmo.LIST_DISPLAYS_COMMAND).getOrDefault(""), pkg)
@@ -2133,10 +2074,8 @@ class SmartIslandOverlayService : AccessibilityService() {
             if (displayId == null) kotlinx.coroutines.delay(LMO_TASK_POLL_MS)
         }
         if (displayId == null) {
-            freeformDiag("lmo-display: no new lmo-freeform display for $pkg within ${LMO_DISPLAY_WAIT_MS}ms")
             return false
         }
-        freeformDiag("lmo-display: window display=$displayId, sending contentIntent onto it")
         val options = ActivityOptions.makeBasic().apply {
             setLaunchDisplayId(displayId)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -2147,7 +2086,6 @@ class SmartIslandOverlayService : AccessibilityService() {
             pending.send(this, 0, Intent().addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), null, null, null, options)
         } != null
         if (!sent) {
-            freeformDiag("lmo-display: send failed")
             return true // the window exists; opening the chat again on display 0 would only cover the foreground app
         }
         // Did Android honour the display? A new task of this app on display 0 means it did not.
@@ -2155,10 +2093,8 @@ class SmartIslandOverlayService : AccessibilityService() {
         val out = shizuku.runShellForOutput(lmo.LIST_TASKS_COMMAND).getOrDefault("")
         val displays = lmo.taskDisplays(out)
         val tasks = lmo.parseTasks(out).filter { it.packageName == pkg }
-        freeformDiag("lmo-display: after send: " + tasks.joinToString { "${it.taskId}@display${displays[it.taskId]}" })
         val misplaced = tasks.filter { it.taskId !in before && displays[it.taskId] == 0 }.maxByOrNull { it.taskId }
         if (misplaced != null) {
-            freeformDiag("lmo-display: Android ignored the display, task ${misplaced.taskId} is on display 0 -> moving it")
             runCatchingLogged(TAG, "Failed to move task ${misplaced.taskId}") {
                 sendBroadcast(lmo.startIntent(misplaced.component, misplaced.userId, misplaced.taskId))
             }
@@ -2171,10 +2107,6 @@ class SmartIslandOverlayService : AccessibilityService() {
         val lmo = com.agupta07505.smartisland.util.LmoFreeform
         val component = notification.contentIntent?.let { lmo.pendingIntentActivity(it) }
             ?: lmo.launcherComponent(packageManager, notification.packageName)
-        freeformDiag(
-            "lmo fallback: target=${component?.flattenToShortString()} " +
-                "(from ${if (notification.contentIntent?.let { lmo.pendingIntentActivity(it) } != null) "contentIntent" else "launcher activity"}), taskId=-1 (new task)"
-        )
         if (component == null) {
             Toast.makeText(this, "Can't open ${notification.appName}", Toast.LENGTH_SHORT).show()
             return false

@@ -662,7 +662,9 @@ data class SmartIslandSettings(
 
         // Timing bounds (milliseconds) and the step the sliders move in.
         const val MIN_IDLE_TIMEOUT_MS = 1_000
-        const val MAX_IDLE_TIMEOUT_MS = 30_000
+        // The slider's last stop (one 500 ms step past 30 s) means "never": the idle timeout is off.
+        const val MAX_IDLE_TIMEOUT_MS = 30_500
+        const val IDLE_TIMEOUT_NEVER_MS = MAX_IDLE_TIMEOUT_MS
         const val MIN_BATTERY_WARNING_MS = 1_000
         const val MAX_BATTERY_WARNING_MS = 15_000
         const val MIN_POPUP_MS = 500

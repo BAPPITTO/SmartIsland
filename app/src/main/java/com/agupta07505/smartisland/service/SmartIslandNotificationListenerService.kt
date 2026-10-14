@@ -151,6 +151,10 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
                             is SmartIslandCommand.CancelNotification -> {
                                 forceCancelNotification(command.key)
                             }
+                            is SmartIslandCommand.TimerStopped -> {
+                                lastTimerFrozen.remove(command.packageName)
+                                lastTimerTargets.remove(command.packageName)
+                            }
                             is SmartIslandCommand.ReplySent -> {
                                 replyGraceUntil[command.key] = SystemClock.elapsedRealtime() + REPLY_GRACE_MS
                             }
@@ -349,13 +353,17 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
     private val recordingStates = ConcurrentHashMap<String, RecordingClock.State>()
 
     /**
-     * Last running clock per app and card type. Some clock apps cancel the stopwatch notification and post a
-     * new paused one on Pause, so the per-key state is gone; this keeps the time the stopwatch had.
+     * Last clock per app and card type, running or frozen. Some clock apps cancel the stopwatch notification and
+     * post a new paused one (on Pause, and again when their screen is left), so the per-key state is gone; this
+     * keeps the time the stopwatch had. A frozen entry stays frozen however long the app is open.
      */
-    private val lastRunningClocks = ConcurrentHashMap<String, RecordingClock.State>()
+    private val lastClocks = ConcurrentHashMap<String, RecordingClock.State>()
 
     /** Last known end time of a running timer per app, for the same cancel-and-repost case. */
     private val lastTimerTargets = ConcurrentHashMap<String, Long>()
+
+    /** Remaining time frozen at a timer's pause per app; survives the cancel-and-repost, cleared when the timer runs again. */
+    private val lastTimerFrozen = ConcurrentHashMap<String, Long>()
     private var recordingWatchdog: Job? = null
     private var transferExpiryJob: Job? = null
     /** Cards a reply was just sent from: an app removal inside this window keeps the card (the echo re-posts the key). */
@@ -426,8 +434,9 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
         mediaWatcher?.stop()
         mediaWatcher = null
         recordingStates.clear()
-        lastRunningClocks.clear()
+        lastClocks.clear()
         lastTimerTargets.clear()
+        lastTimerFrozen.clear()
         voipMonitor?.stop()
         voipMonitor = null
         isSystemConnected = false
@@ -531,7 +540,6 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
         val notification = sbn.notification
         callPostGuard.notePosted(sbn.key, sbn.postTime)
         tracePost(sbn, rankingMap)
-        logCallCandidate(sbn, rankingMap)
 
         // ── Group summary handling ────────────────────────────────────────────────────────────
         // Apps like WhatsApp post two kinds of notifications per conversation:
@@ -843,7 +851,7 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
             .filter { sbn ->
                 val mode = sbn.notification.toIslandMode(sbn, settings.liveActivitiesEnabled, settings.navigationEnabled, settings.deviceType)
                 // The same rule as the first pass: persistent live cards and loud notifications. The first pass can see an empty or
-                // half-ready shade right after the connect, and loud notifications used to be missed for good.
+                // half-ready shade right after the connect, and loud notifications would be missed for good.
                 isPersistentIslandMode(mode) || (mode == IslandMode.Notification && !isSilentNotification(sbn))
             }
             .sortedBy { it.postTime }
@@ -1033,26 +1041,6 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
         }
     }
 
-    /** Writes one diagnostic line per call-looking notification (only while the in-app log records). */
-    private fun logCallCandidate(sbn: StatusBarNotification, rankingMap: RankingMap?) {
-        if (!com.agupta07505.smartisland.util.AppLogRecorder.isRecording) return
-        runCatching {
-            val n = sbn.notification
-            if (!com.agupta07505.smartisland.util.CallDiagnostics.isCallLike(n)) return
-            val mode = n.toIslandMode(
-                sbn,
-                currentSettings.liveActivitiesEnabled,
-                currentSettings.navigationEnabled,
-                currentSettings.deviceType
-            )
-            com.agupta07505.smartisland.util.AppLogRecorder.i(
-                "CallDiag",
-                com.agupta07505.smartisland.util.CallDiagnostics.describe(sbn, mode, shouldSuppressFromIsland(sbn, rankingMap)) +
-                    " dndBlocked=${isBlockedByDoNotDisturb(sbn, rankingMap)}"
-            )
-        }
-    }
-
     private fun isIncomingCall(notification: Notification): Boolean =
         CallStyleExtras.isRinging(notification)
 
@@ -1223,13 +1211,19 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
             val rawBig = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
             val rawSub = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString()
             val nowMs = System.currentTimeMillis()
+            val clockKey = "${sbn.packageName}|${mode.name}"
             val clockPaused = if (isStopwatch) {
-                com.agupta07505.smartisland.util.TimerStopwatchParser.isStopwatchPaused(notification)
+                // A paused stopwatch stays paused across the cancel-and-repost a clock app does when its screen is
+                // opened and left, until the app offers "Pause" again.
+                RecordingClock.resolvePaused(
+                    detected = com.agupta07505.smartisland.util.TimerStopwatchParser.isStopwatchPaused(notification),
+                    lastForApp = recordingStates[sbn.key] ?: lastClocks[clockKey],
+                    actionTitles = actions.map { it.title }
+                )
             } else {
                 RecordingClock.isPaused(actions.map { it.title }, "$rawTitle $rawText $rawBig")
             }
-            val clockKey = "${sbn.packageName}|${mode.name}"
-            val previousState = recordingStates[sbn.key] ?: lastRunningClocks[clockKey]?.takeIf { clockPaused }
+            val previousState = RecordingClock.continuation(recordingStates[sbn.key], lastClocks[clockKey], clockPaused)
             // A chronometer inside the notification's own view knows the real elapsed time; `when` is only
             // the moment the notification was posted, which restarted the island's clock on every exit.
             val viewStartMs = viewInfo?.chronometerElapsedMs
@@ -1252,7 +1246,7 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
                 fallbackFrozenMs = viewInfo?.chronometerElapsedMs
             ).also {
                 recordingStates[sbn.key] = it
-                if (it.frozenMs == null) lastRunningClocks[clockKey] = it
+                lastClocks[clockKey] = it
             }
         } else {
             null
@@ -1272,14 +1266,72 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
                 ?.takeIf { it.mode == IslandMode.Timer && it.recordingPaused }
                 ?.recordingFrozenMs
             val clockTextSec = com.agupta07505.smartisland.util.TimerStopwatchParser.parseTimerRemainingSeconds(notification)
-            when {
-                runningTarget != null -> (runningTarget - nowMs).coerceAtLeast(0L)
-                keptFrozen != null -> keptFrozen
-                clockTextSec != null && clockTextSec > 0 -> clockTextSec * 1000L
-                else -> 0L
+            // The value frozen for this pause is kept per app: the clock app cancels the notification when its
+            // screen opens and re-posts it, often showing the full length, when it is left.
+            com.agupta07505.smartisland.util.TimerFreeze.remainingMs(
+                nowMs = nowMs,
+                rememberedFrozenMs = lastTimerFrozen[sbn.packageName],
+                runningTargetMs = runningTarget,
+                keptFrozenMs = keptFrozen,
+                textRemainingMs = clockTextSec?.let { it * 1000L }
+            ).also { lastTimerFrozen[sbn.packageName] = it }
+        } else {
+            // Running again, finished or stopped: the next pause freezes a new value.
+            if (mode == IslandMode.Timer) lastTimerFrozen.remove(sbn.packageName)
+            null
+        }
+
+        val stopwatchElapsedSeconds: Long?
+        val stopwatchChronometerBase: Long?
+        val timerRemainingSeconds: Long?
+
+        if (isMiuiRom) {
+            val stopwatchIsPaused = mode == IslandMode.Stopwatch &&
+                com.agupta07505.smartisland.util.TimerStopwatchParser.isStopwatchPaused(notification)
+
+            stopwatchElapsedSeconds = if (stopwatchIsPaused) {
+                val previousStopwatch = existingNotif?.takeIf { it.mode == IslandMode.Stopwatch }
+                val parsedElapsed = com.agupta07505.smartisland.util.TimerStopwatchParser
+                    .parseStopwatchElapsedSeconds(notification)
+
+                parsedElapsed
+                    ?: previousStopwatch?.stopwatchElapsedSeconds
+                    ?: previousStopwatch?.let { previous ->
+                        ((System.currentTimeMillis() - previous.timeMillis) / 1000L).coerceAtLeast(0L)
+                    }
+            } else {
+                null
+            }
+
+            stopwatchChronometerBase = if (mode == IslandMode.Stopwatch && !stopwatchIsPaused) {
+                runCatching {
+                    notification.extras?.getLong("android.chronometerBase", 0L)
+                }.getOrNull()?.takeIf { it > 0L }
+            } else {
+                null
+            }
+
+            val nowMillis = System.currentTimeMillis()
+            val timerIsPaused = mode == IslandMode.Timer &&
+                com.agupta07505.smartisland.util.TimerStopwatchParser.isTimerPaused(notification)
+
+            timerRemainingSeconds = if (timerIsPaused) {
+                val previousTimer = existingNotif?.takeIf { it.mode == IslandMode.Timer }
+
+                previousTimer?.timerRemainingSeconds
+                    ?: previousTimer?.let { old ->
+                        ((old.timeMillis - nowMillis + 999L) / 1000L).coerceAtLeast(0L)
+                    }
+                    ?: notification.`when`.takeIf { it > nowMillis }?.let { deadline ->
+                        ((deadline - nowMillis + 999L) / 1000L).coerceAtLeast(0L)
+                    }
+            } else {
+                null
             }
         } else {
-            null
+            stopwatchElapsedSeconds = null
+            stopwatchChronometerBase = null
+            timerRemainingSeconds = null
         }
 
         val stopwatchElapsedSeconds: Long?
@@ -1451,7 +1503,7 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
         }
         if (callPostGuard.isStale(sbn.key, sbn.postTime)) {
             // A newer post for this key, its removal, or the user's dismissal was already seen: this snapshot is out of date and
-            // must not bring the card back (it used to be checked for calls only; any slow handler could re-add a gone card).
+            // must not bring the card back (any slow handler could otherwise re-add a gone card).
             traceStage(sbn, "DROPPED", "stage=stale-post mode=$mode postTime=${sbn.postTime} (newer post, removal or dismissal already seen)")
             return
         }
@@ -1628,8 +1680,8 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
         }
 
         // Every ordinary notification keeps its own card, keyed by the system notification key.
-        // (An app's earlier cards used to be dropped here, which lost notifications that were
-        // still in the shade and left the same-app secondary cutout with nothing to show.)
+        // (Dropping an app's earlier cards here would lose notifications that are
+        // still in the shade and leave the same-app secondary cutout with nothing to show.)
 
         if (mode == IslandMode.Music) {
             val existing = notificationRepository.notifications.value
@@ -2018,7 +2070,7 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
         latePictureJobs.remove(key)?.cancel()
         val job = serviceScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             runSuspendCatchingLogged(TAG, "Late picture job failed") {
-                for ((attempt, waitMs) in com.agupta07505.smartisland.util.PictureRetryPlan.DELAYS_MS.withIndex()) {
+                for (waitMs in com.agupta07505.smartisland.util.PictureRetryPlan.DELAYS_MS) {
                     delay(waitMs)
                     if (callPostGuard.isStale(key, sbn.postTime)) return@runSuspendCatchingLogged
                     if (notificationRepository.notifications.value.none { it.key == key }) return@runSuspendCatchingLogged
@@ -2030,11 +2082,10 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
                             notification.readerTextWithoutPictures(notifText)
                         }.orEmpty()
                         notificationRepository.updateNotification(key) { it.copy(media = found, readerText = reader) }
-                        com.agupta07505.smartisland.util.AppLogRecorder.i("MediaDiag", "late picture for $key arrived on attempt ${attempt + 1}")
                         return@runSuspendCatchingLogged
                     }
                 }
-                com.agupta07505.smartisland.util.AppLogRecorder.w("MediaDiag", "no picture for $key after the last retry")
+                com.agupta07505.smartisland.util.AppLogRecorder.w(TAG, "no picture for $key after the last retry")
             }
         }
         latePictureJobs[key] = job

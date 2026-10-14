@@ -890,7 +890,7 @@ class IslandViewModel(
                             // selected index of the PREVIOUS list: the selection can be changed from
                             // outside (swipe, picker) between two list updates, so a key remembered
                             // at the last update would be stale (a popup ending on expand reorders
-                            // the list and used to jump to the card that held the popup).
+                            // the list, and the open card must not jump to the card that held the popup).
                             orderChanged -> previousKeys.getOrNull(currentSelected)
                                 ?.let { keys.indexOf(it) }
                                 ?.takeIf { it >= 0 }
@@ -979,6 +979,8 @@ class IslandViewModel(
                     else list.map { it.key }
                 }.distinctUntilChanged().collectLatest { keys ->
                     if (keys == null) return@collectLatest
+                    // Timeout set to "never": cards stay on the island until the app or the user removes them.
+                    if (settings.value.idleTimeoutMs >= SmartIslandSettings.IDLE_TIMEOUT_NEVER_MS) return@collectLatest
                     delay(settings.value.idleTimeoutMs.toLong() + IDLE_TIMER_EXTRA_MS)
                     val tokens = visibleNotifications.value
                         .filter { IslandPriority.canIdleOut(it) }
@@ -1002,6 +1004,8 @@ class IslandViewModel(
                         .takeIf { it.isNotEmpty() }
                 }.distinctUntilChanged().collectLatest { keys ->
                     if (keys == null) return@collectLatest
+                    // Timeout set to "never": cards stay on the island until the app or the user removes them.
+                    if (settings.value.idleTimeoutMs >= SmartIslandSettings.IDLE_TIMEOUT_NEVER_MS) return@collectLatest
                     delay(settings.value.idleTimeoutMs.toLong() + IDLE_TIMER_EXTRA_MS)
                     val tokens = visibleNotifications.value
                         .filter { it.key in keys && liveMayTimeOut(it) }

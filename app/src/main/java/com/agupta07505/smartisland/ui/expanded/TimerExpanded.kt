@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.agupta07505.smartisland.data.SmartIslandSettings
+import com.agupta07505.smartisland.data.SmartIslandCommand
 import com.agupta07505.smartisland.di.SmartIslandRepositories
 import com.agupta07505.smartisland.model.IslandNotification
 import com.agupta07505.smartisland.ui.bounceClick
@@ -622,9 +623,14 @@ private fun TimerExpandedCurrent(
                         .clip(CircleShape)
                         .background(LocalIslandPalette.current.pick(Color(0xFF27272A), Color(0xFFD9D8DB)))
                         .bounceClick {
-                            notification.fireAction(context, stopAction)
-                            SmartIslandRepositories.notificationRepository(context).removeNotification(notification.key)
-                            onCollapse()
+                            // The card only goes once the app's button was delivered; a replaced intent must not
+                            // make a timer that is still running vanish from the island.
+                            if (notification.fireAction(context, stopAction)) {
+                                val repository = SmartIslandRepositories.notificationRepository(context)
+                                repository.sendCommand(SmartIslandCommand.TimerStopped(notification.packageName))
+                                repository.removeNotification(notification.key)
+                                onCollapse()
+                            }
                         },
                     contentAlignment = Alignment.Center
                 ) {
