@@ -737,7 +737,13 @@ class SmartIslandOverlayService : AccessibilityService() {
         serviceScope.launch {
             runSuspendCatchingLogged(TAG, "Exempt-app visibility collector failed") {
                 // The island's window is hidden (off) or dead (static: no touches, nothing on it) while an exempt app is in the foreground.
-                viewModel.islandExemption.collectLatest {
+                viewModel.islandExemption.collectLatest { mode ->
+                    com.agupta07505.smartisland.util.AppLogRecorder.i(
+                        "Exempt",
+                        "mode=$mode foreground=${viewModel.foregroundPackage.value} " +
+                            "off=${viewModel.settingsSnapshot().islandExemptApps} static=${viewModel.settingsSnapshot().islandExemptAppsStatic} " +
+                            "offLandscape=${viewModel.settingsSnapshot().islandExemptAppsLandscape}"
+                    )
                     if (destroyed || !viewModel.displaySettings.value.enabled) return@collectLatest
                     // Back from an exempt app: the rotation / app switch may have changed the geometry meanwhile.
                     updateWindowLayoutParams(isWindowExpanded, viewModel.displaySettings.value)
