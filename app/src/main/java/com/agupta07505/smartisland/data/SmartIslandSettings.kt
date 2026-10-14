@@ -70,7 +70,7 @@ data class SmartIslandSettings(
     /** False: nothing opens the island by itself while the phone is locked (cards still show in the pill). */
     val autoExpandOnLockScreen: Boolean = true,
     val enableShadow: Boolean = true,
-    val expandedBlurEnabled: Boolean = false,
+    val expandedBlurEnabled: Boolean = true,
     val expandedBlurRadius: Float = 24f,
     /**
      * Live blur: blurs whatever is behind the open island (system window blur, API 31+, heavier) and draws it as the
@@ -139,18 +139,18 @@ data class SmartIslandSettings(
     val cameraCutoutWidth: Float = 40f,
     val cameraCutoutHeight: Float = 24f,
     val enableSwipeActions: Boolean = true,
-    val swipeUpAction: String = "DismissCurrent",
+    val swipeUpAction: String = "Collapse",
     val swipeHoldUpAction: String = "DismissAll",
     val swipeDownAction: String = "None",
     val swipeDownCollapsedAction: String = "Expand",
-    val swipeLeftAction: String = "None",
-    val swipeRightAction: String = "None",
+    val swipeLeftAction: String = "NextEvent",
+    val swipeRightAction: String = "PreviousEvent",
     val swipeHorizontalCollapsedAction: String = "NextPrevious",
     val enablePillSwipeActions: Boolean = true,
     val pillSwipeUpAction: String = "DismissCurrent",
     val pillSwipeDownAction: String = "Expand",
-    val pillSwipeLeftAction: String = "PreviousNotification",
-    val pillSwipeRightAction: String = "NextNotification",
+    val pillSwipeLeftAction: String = "NextEvent",
+    val pillSwipeRightAction: String = "PreviousEvent",
     // Long press on the collapsed pill. One real action (hide / show the pill) or "None" to turn it off.
     val longPressAction: String = "TogglePill",
     val circlePosition: String = CIRCLE_POSITION_RIGHT,
