@@ -16,6 +16,7 @@ import android.os.Build
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
+import com.agupta07505.smartisland.util.AppLogRecorder
 import com.agupta07505.smartisland.util.BlurFollow
 import com.agupta07505.smartisland.util.runCatchingLogged
 
@@ -40,6 +41,8 @@ internal class IslandBlurWindow(
     private var dialog: Dialog? = null
     /** What the window was last laid out as (null while hidden). See [BlurFollow.layoutKey]. */
     private var lastKey: IntArray? = null
+    /** What support was last written to the diagnostic log, so that it is logged when it changes, not on every frame. */
+    private var lastLoggedSupport: Boolean? = null
 
     /** True where the system can blur behind a window now (API 31+, and not turned off by battery saver, the OEM or a developer option). */
     fun isSupported(): Boolean =
@@ -99,13 +102,23 @@ internal class IslandBlurWindow(
      */
     fun show(key: IntArray?) {
         val d = dialog ?: return
-        if (key == null || !isSupported()) {
+        val supported = isSupported()
+        if (key != null && supported != lastLoggedSupport) {
+            // Without this the log cannot tell "the system cannot blur" from "the blur window failed": both look like nothing happening.
+            lastLoggedSupport = supported
+            AppLogRecorder.i(TAG, "Live blur wanted: crossWindowBlurEnabled=$supported (API ${Build.VERSION.SDK_INT})")
+        }
+        if (key == null || !supported) {
             hideNow(d)
             return
         }
         if (!BlurFollow.needsRelayout(lastKey, key) && lastKey != null) return
+        val firstShow = lastKey == null
         lastKey = key
         apply(d, key[2], key[3], key[0], key[1], key[4])
+        if (firstShow) {
+            AppLogRecorder.i(TAG, "Live blur window shown: x=${key[0]} y=${key[1]} w=${key[2]} h=${key[3]} radius=${key[4]}px")
+        }
     }
 
     private fun hideNow(d: Dialog) {
