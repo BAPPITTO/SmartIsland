@@ -312,13 +312,19 @@ class IslandViewModel(
 
     fun onIdleDotTapped(): com.agupta07505.smartisland.model.IdleDotTap {
         val shown = visibleNotifications.value
+        val raw = settings.value
         val action = com.agupta07505.smartisland.model.idleDotTapAction(
             hasCards = shown.isNotEmpty(),
-            hasIdleStoredCards = hasIdleStoredCards.value
+            hasIdleStoredCards = hasIdleStoredCards.value,
+            emptyPillAvailable = orientation.value.isLandscape && raw.enableAppShortcuts && !raw.enableNotchMode &&
+                !landscapeWidgetPill.value && !shadeOpen.value,
+            emptyPillShown = _emptyPillShown.value
         )
         when (action) {
             com.agupta07505.smartisland.model.IdleDotTap.RevealStored -> revealIdleCards()
             com.agupta07505.smartisland.model.IdleDotTap.PutAwayNow -> putAwayAllWithLead()
+            com.agupta07505.smartisland.model.IdleDotTap.ShowEmptyPill -> showEmptyPill()
+            com.agupta07505.smartisland.model.IdleDotTap.HideEmptyPill -> hideEmptyPill()
             com.agupta07505.smartisland.model.IdleDotTap.None -> Unit
         }
         com.agupta07505.smartisland.util.AppLogRecorder.i(
@@ -368,6 +374,27 @@ class IslandViewModel(
      * Landscape: a tick (hourly, day moment, weather change) needs the wide pill although a long press hid it or the widgets are held off.
      * While true the pill is on the island ([landscapeWidgetPill]); the tick layers set it (ui/TickPill.kt) and clear it when they are done.
      */
+    /** Landscape: the empty collapsed pill was asked for with a tap on the idle cutout. */
+    private val _emptyPillShown = MutableStateFlow(false)
+    private var emptyPillJob: Job? = null
+
+    /** Shows the pill with no card until the idle timeout. */
+    private fun showEmptyPill() {
+        _emptyPillShown.value = true
+        emptyPillJob?.cancel()
+        // "Never" keeps it until the next tap.
+        if (settings.value.idleTimeoutMs >= SmartIslandSettings.IDLE_TIMEOUT_NEVER_MS) return
+        emptyPillJob = viewModelScope.launch {
+            delay(settings.value.idleTimeoutMs.toLong() + IDLE_TIMER_EXTRA_MS)
+            _emptyPillShown.value = false
+        }
+    }
+
+    private fun hideEmptyPill() {
+        emptyPillJob?.cancel()
+        _emptyPillShown.value = false
+    }
+
     private val _tickHold = MutableStateFlow(false)
     val tickHold: StateFlow<Boolean> = _tickHold
 
@@ -523,8 +550,8 @@ class IslandViewModel(
         orientation,
         _pillHidden,
         shadeOpen,
-        combine(idleWidgetsSuppressed, _tickHold) { suppressed, hold -> suppressed to hold }
-    ) { raw, state, pillHidden, shade, (suppressed, hold) ->
+        combine(idleWidgetsSuppressed, _tickHold, _emptyPillShown) { suppressed, hold, empty -> Triple(suppressed, hold, empty) }
+    ) { raw, state, pillHidden, shade, (suppressed, hold, empty) ->
         landscapeWidgetPillWanted(
             isLandscape = state.isLandscape,
             widgetsEnabled = if (state.isLandscape) raw.idleWidgetsEnabledLandscape else raw.idleWidgetsEnabled,
@@ -532,7 +559,8 @@ class IslandViewModel(
             pillHidden = pillHidden,
             shadeOpen = shade,
             widgetsSuppressed = suppressed,
-            tickHold = hold
+            tickHold = hold,
+            emptyPillShown = empty
         )
     }.distinctUntilChanged().stateIn(
         scope = viewModelScope,
@@ -1296,6 +1324,7 @@ class IslandViewModel(
     fun openAppsLauncher() {
         if (!settings.value.enableAppShortcuts || shadeOpen.value || expanded.value) return
         if (exemptionNow() != ExemptMode.None) return
+        hideEmptyPill()
         appsLauncherOpen.value = true
         expanded.value = true
     }

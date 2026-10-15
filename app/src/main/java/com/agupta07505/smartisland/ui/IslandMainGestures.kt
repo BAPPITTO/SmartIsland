@@ -428,6 +428,9 @@ internal fun Modifier.islandMainGestures(
                                         ) {
                                             // The empty middle of the collapsed pill puts every card away (a glyph still expands).
                                             cb.currentOnIdleDotTap()
+                                        } else if (isLandscape && !settings.enableNotchMode && cb.currentNotifications.isEmpty()) {
+                                            // Landscape idle cutout: show / hide the empty pill.
+                                            cb.currentOnIdleDotTap()
                                         } else if (cb.currentNotifications.isNotEmpty()) {
                                             // (An empty island does not open the shortcuts on a tap: that is a long press.)
                                             cb.currentOnToggle()

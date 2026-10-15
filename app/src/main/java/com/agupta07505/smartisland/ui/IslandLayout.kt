@@ -225,8 +225,8 @@ internal const val PILL_ENTER_FADE = 0.35f
 internal const val PILL_STRETCH_DAMPING = 0.72f
 internal const val PILL_STRETCH_STIFFNESS = 420f
 
-/** Arrival pulse of the collapsed pill: +5 % width (of the with-content width), out fast, back soft. The height does not change. */
-internal const val PILL_PULSE_WIDTH_FRACTION = 0.05f
+/** Arrival pulse of the collapsed pill: +12.5 % width (of the with-content width), out fast, back soft. The height does not change. */
+internal const val PILL_PULSE_WIDTH_FRACTION = 0.125f
 internal const val PILL_PULSE_OUT_STIFFNESS = 600f
 internal const val PILL_PULSE_BACK_STIFFNESS = 380f
 
@@ -637,9 +637,7 @@ internal fun rememberIslandLayout(
     val collapsedShownState = remember(collapsedAlphaState) { derivedStateOf { collapsedAlphaState.value > 0f } }
     val expandedShownState = remember(expandedAlphaState) { derivedStateOf { expandedAlphaState.value > 0.01f } }
 
-    // Arrival pulse: a notification or quick event arriving on the collapsed pill grows it to +5 % of its with-content width, then it
-    // shrinks back to its with-content width. The height stays as it is. The base springs above keep running underneath, so the
-    // pill still stretches to the with-content width on the first card; the pulse is only added on top of them.
+    // Arrival pulse: the pill grows by PILL_PULSE_WIDTH_FRACTION and settles back, added on top of the base width springs.
     val pulse = remember { androidx.compose.animation.core.Animatable(0f) }
     val seenKeys = remember { HashSet<String>().apply { notifications.forEach { add(it.key) } } }
     seenKeys.retainAll(notifications.map { it.key }.toSet())
