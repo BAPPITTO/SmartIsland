@@ -11,56 +11,62 @@ import com.agupta07505.smartisland.model.IslandNotificationAction
 import com.agupta07505.smartisland.ui.expanded.ActionRole
 import com.agupta07505.smartisland.ui.expanded.classifyAction
 
-/** Builds the island's buttons for a clock timer / stopwatch so they match the shade: same buttons, same order. */
 object ShadeActions {
 
-    /** The shade draws at most this many of a notification's own buttons. */
     const val SHADE_ACTION_LIMIT = 3
 
-    /** Roles a clock card can use; any other clickable view is not a button. */
     private val CLOCK_ROLES = setOf(
         ActionRole.Pause, ActionRole.Resume, ActionRole.Stop, ActionRole.Reset, ActionRole.Lap, ActionRole.AddMinute
     )
 
-    /** Clocks whose button set per state is fixed, so it can be enforced. */
-    private val KNOWN_STATE_CLOCKS = setOf("com.google.android.deskclock", "com.android.deskclock")
+    private val END_WORD = Regex("""(?<![\p{L}])end(?![\p{L}])""")
 
-    fun hasKnownStates(packageName: String): Boolean = packageName.lowercase() in KNOWN_STATE_CLOCKS
+    private fun roleOf(title: String): ActionRole {
+        val role = classifyAction(title)
+        return if (role == ActionRole.Other && END_WORD.containsMatchIn(title.lowercase())) ActionRole.Stop else role
+    }
 
-    /**
-     * Drops buttons that cannot belong to the state the list announces (Pause = running, Resume = paused):
-     * running timer Pause + "+1:00", paused timer Resume + Stop, running stopwatch Pause + Lap, paused stopwatch
-     * Resume + Stop / Reset. A list with neither or both is returned as is.
-     */
     fun enforceState(actions: List<IslandNotificationAction>, kind: TimerStopwatchParser.ClockKind): List<IslandNotificationAction> {
-        val roles = actions.map { classifyAction(it.title) }
+        val roles = actions.map { roleOf(it.title) }
         val offersPause = ActionRole.Pause in roles
         val offersResume = ActionRole.Resume in roles
-        if (offersPause == offersResume) return actions // neither, or both: no reliable state
+        if (offersPause == offersResume) return actions
         val banned: Set<ActionRole> = when {
             offersPause && kind == TimerStopwatchParser.ClockKind.Timer ->
                 setOf(ActionRole.Stop, ActionRole.Reset, ActionRole.Resume, ActionRole.Lap)
             offersPause ->
                 setOf(ActionRole.Stop, ActionRole.Reset, ActionRole.Resume, ActionRole.AddMinute)
-            kind == TimerStopwatchParser.ClockKind.Timer -> setOf(ActionRole.Pause, ActionRole.Lap)
+            ActionRole.Reset in roles ->
+                setOf(ActionRole.Pause, ActionRole.Lap, ActionRole.AddMinute, ActionRole.Stop)
             else -> setOf(ActionRole.Pause, ActionRole.Lap, ActionRole.AddMinute)
         }
-        return actions.filter { classifyAction(it.title) !in banned }
+        return actions.filter { roleOf(it.title) !in banned }
     }
 
-    /** [standard] are the notification's own actions, [view] the buttons read from its custom view in layout order. */
     fun mirror(
         standard: List<IslandNotificationAction>,
         view: List<IslandNotificationAction>,
-        kind: TimerStopwatchParser.ClockKind? = null,
-        packageName: String = ""
+        kind: TimerStopwatchParser.ClockKind? = null
     ): List<IslandNotificationAction> {
-        if (kind == null || !hasKnownStates(packageName)) return mirrorUnchecked(standard, view)
-        // Before the shade limit, so a hidden fourth button cannot push out a right one.
-        return mirrorUnchecked(
-            enforceState(standard.filter { it.pendingIntent != null }, kind),
-            enforceState(view.filter { classifyAction(it.title) in CLOCK_ROLES }, kind)
+        if (kind == null) return mirrorUnchecked(standard, view)
+        // Filter before the shade limit so a hidden button cannot push out a shown one.
+        val ownButtons = enforceState(standard.filter { it.pendingIntent != null }, kind)
+        val shown = mirrorUnchecked(
+            ownButtons,
+            enforceState(view.filter { roleOf(it.title) in CLOCK_ROLES }, kind)
         )
+        return withMissingAddMinute(shown, ownButtons, kind)
+    }
+
+    private fun withMissingAddMinute(
+        shown: List<IslandNotificationAction>,
+        own: List<IslandNotificationAction>,
+        kind: TimerStopwatchParser.ClockKind
+    ): List<IslandNotificationAction> {
+        if (kind != TimerStopwatchParser.ClockKind.Timer || !offersPause(shown)) return shown
+        if (shown.any { roleOf(it.title) == ActionRole.AddMinute }) return shown
+        val addMinute = own.firstOrNull { roleOf(it.title) == ActionRole.AddMinute } ?: return shown
+        return shown + addMinute
     }
 
     private fun mirrorUnchecked(
@@ -68,10 +74,10 @@ object ShadeActions {
         view: List<IslandNotificationAction>
     ): List<IslandNotificationAction> {
         val real = standard.filter { it.pendingIntent != null }
-        val fromView = view.filter { classifyAction(it.title) in CLOCK_ROLES }
+        val fromView = view.filter { roleOf(it.title) in CLOCK_ROLES }
 
         if (fromView.isNotEmpty()) {
-            // The shade draws the view's buttons in its order; the app's own intent beats the view proxy.
+            // Prefer the app's own intent over the view proxy.
             val used = HashSet<Int>()
             return fromView.map { shown ->
                 val match = real.withIndex().firstOrNull { (i, a) -> i !in used && sameButton(a, shown) }
@@ -81,7 +87,7 @@ object ShadeActions {
                 } else {
                     shown
                 }
-            }.distinctBy { classifyAction(it.title) to it.title.trim().lowercase() }
+            }.distinctBy { roleOf(it.title) to it.title.trim().lowercase() }
         }
 
         return real
@@ -91,15 +97,13 @@ object ShadeActions {
 
     private fun sameButton(a: IslandNotificationAction, b: IslandNotificationAction): Boolean {
         if (a.title.trim().equals(b.title.trim(), ignoreCase = true)) return true
-        val role = classifyAction(a.title)
-        return role in CLOCK_ROLES && role == classifyAction(b.title)
+        val role = roleOf(a.title)
+        return role in CLOCK_ROLES && role == roleOf(b.title)
     }
 
-    /** True while running (the shade offers Pause). */
     fun offersPause(actions: List<IslandNotificationAction>): Boolean =
-        actions.any { classifyAction(it.title) == ActionRole.Pause }
+        actions.any { roleOf(it.title) == ActionRole.Pause }
 
-    /** True while paused (the shade offers Resume). */
     fun offersResume(actions: List<IslandNotificationAction>): Boolean =
-        actions.any { classifyAction(it.title) == ActionRole.Resume }
+        actions.any { roleOf(it.title) == ActionRole.Resume }
 }

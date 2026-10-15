@@ -52,7 +52,10 @@ object RecordingClock {
         return null
     }
 
-    /** Paused: the shade's printed time ([shownMs]) wins, the notification text may be empty or "00:00". */
+    /** A stopped chronometer prints elapsed plus the age of its post. */
+    fun withoutPostAge(readingMs: Long?, ageMs: Long): Long? =
+        readingMs?.minus(ageMs.coerceAtLeast(0L))?.takeIf { it > 0L }
+
     fun frozenReading(paused: Boolean, shownMs: Long?, parsedMs: Long?): Long? =
         if (paused && shownMs != null && shownMs > 0L) shownMs else parsedMs
 
@@ -105,11 +108,10 @@ object RecordingClock {
             return State(startMillis = nowMillis - exactFrozenMs, frozenMs = exactFrozenMs)
         }
         if (paused && !finished && previous?.frozenMs != null) {
-            // Already frozen: keep it, a later paused post may print anything.
             return previous
         }
         if (paused || finished) {
-            // A paused post often has no time or a bogus "00:00": prefer a positive reading.
+            // A paused post often prints 00:00.
             val frozen = parsedMs?.takeIf { it > 0L }
                 ?: previousElapsed?.takeIf { it > 0L }
                 ?: fallbackFrozenMs?.takeIf { it > 0L }
@@ -123,7 +125,7 @@ object RecordingClock {
             ?: previousElapsed
             ?: 0L
         val candidateStart = nowMillis - elapsed
-        // Whole-second text jitters the start; keep the old one unless it really moved.
+        // Keep the old start unless it moved beyond whole-second jitter.
         val start = if (!exactStart && previous != null && previous.frozenMs == null &&
             abs(previous.startMillis - candidateStart) <= JITTER_MS
         ) previous.startMillis else candidateStart

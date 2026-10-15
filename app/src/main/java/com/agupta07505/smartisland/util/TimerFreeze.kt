@@ -7,15 +7,9 @@
 
 package com.agupta07505.smartisland.util
 
-/**
- * What a paused clock-app timer has left. No Android types.
- * Clock apps re-post a paused timer showing its full length, so a value frozen by the island wins until the timer runs again.
- */
 object TimerFreeze {
-    /** Whole-second shade text jitters; a reading this close to the remembered value is the same pause. */
     private const val SHADE_TOLERANCE_MS = 2_000L
 
-    /** Priority order is the order of the branches below; [shadeExactMs] is [TimerClock.frozenFromChronometer]. */
     fun remainingMs(
         nowMs: Long,
         rememberedFrozenMs: Long?,
@@ -23,14 +17,19 @@ object TimerFreeze {
         keptFrozenMs: Long?,
         textRemainingMs: Long?,
         shadeShownMs: Long? = null,
-        shadeExactMs: Long? = null
+        shadeExactMs: Long? = null,
+        shownMs: Long? = null,
+        previousShownMs: Long? = null
     ): Long = when {
-        // Exact to the ms: no tolerance, no memory needed.
         shadeExactMs != null && shadeExactMs > 0L -> shadeExactMs
-        // Also catches a resume + pause inside the clock app that the island never saw.
+        // Covers a resume and pause the island never saw.
         shadeShownMs != null && shadeShownMs > 0L &&
             (rememberedFrozenMs == null || kotlin.math.abs(shadeShownMs - rememberedFrozenMs) > SHADE_TOLERANCE_MS) ->
             shadeShownMs
+        // Time added in the app while paused.
+        rememberedFrozenMs != null && shownMs != null && previousShownMs != null &&
+            shownMs - previousShownMs > SHADE_TOLERANCE_MS ->
+            rememberedFrozenMs + (shownMs - previousShownMs)
         rememberedFrozenMs != null -> rememberedFrozenMs
         runningTargetMs != null && runningTargetMs > nowMs -> runningTargetMs - nowMs
         keptFrozenMs != null -> keptFrozenMs
