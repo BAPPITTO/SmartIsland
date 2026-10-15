@@ -249,10 +249,11 @@ fun Notification.toIslandMode(
     val titleText = "${extras?.getCharSequence(Notification.EXTRA_TITLE)} ${extras?.getCharSequence(Notification.EXTRA_TEXT)} ${extras?.getCharSequence(Notification.EXTRA_BIG_TEXT)}".lowercase()
 
     // 0. Timer & Stopwatch (Dedicated Clock/Timer support)
-    if (TimerStopwatchParser.isStopwatch(this, packageName)) {
+    val clockKey = sbn?.let { TimerStopwatchParser.clockKey(it) }
+    if (TimerStopwatchParser.isStopwatch(this, packageName, clockKey)) {
         return IslandMode.Stopwatch
     }
-    if (TimerStopwatchParser.isTimer(this, packageName)) {
+    if (TimerStopwatchParser.isTimer(this, packageName, clockKey)) {
         return IslandMode.Timer
     }
 

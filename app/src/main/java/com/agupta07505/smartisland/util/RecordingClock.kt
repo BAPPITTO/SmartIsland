@@ -52,6 +52,14 @@ object RecordingClock {
         return null
     }
 
+    /**
+     * The time a paused clock should freeze at. For the stock clock's stopwatch the shade's own printed time
+     * ([shownMs], read from its stopped chronometer) is exact, while a stopped chronometer's base keeps drifting
+     * and the notification text may be empty or "00:00", so the printed time wins while paused.
+     */
+    fun frozenReading(paused: Boolean, shownMs: Long?, parsedMs: Long?): Long? =
+        if (paused && shownMs != null && shownMs > 0L) shownMs else parsedMs
+
     /** Paused when a "Resume" button is offered (and no "Pause" one), or the text says "paused". */
     fun isPaused(actionTitles: List<String>, text: String): Boolean {
         val titles = actionTitles.map { it.lowercase() }

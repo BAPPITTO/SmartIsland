@@ -40,7 +40,20 @@ object NotificationViewInspector {
         /** Time the view's chronometer has been running, if the view has one. */
         val chronometerElapsedMs: Long?,
         /** Clickable buttons found in the view, in layout order. */
-        val buttons: List<IslandNotificationAction>
+        val buttons: List<IslandNotificationAction>,
+        /**
+         * Time left on a count-DOWN chronometer in the view (a running clock timer), measured from its base.
+         * Null when the view has no count-down chronometer or it already ran out.
+         */
+        val countdownRemainingMs: Long? = null,
+        /**
+         * The clock time the shade itself prints in the view ("04:59", "1:02:03"), in seconds: the chronometer's
+         * own text first, then the first other text that is only a clock time. A paused timer's chronometer does
+         * not tick, so this is the value the shade shows while paused.
+         */
+        val shownTimeSeconds: Long? = null,
+        /** True when [shownTimeSeconds] is the chronometer's own text, not some other text in the view. */
+        val shownFromChronometer: Boolean = false
     )
 
     @Suppress("DEPRECATION")
@@ -54,6 +67,9 @@ object NotificationViewInspector {
         if (candidates.isEmpty()) return null
 
         var elapsed: Long? = null
+        var countdown: Long? = null
+        var shown: Long? = null
+        var shownFromChrono = false
         var buttons: List<IslandNotificationAction> = emptyList()
         var buttonViews: List<View> = emptyList()
         for (views in candidates) {
@@ -61,27 +77,40 @@ object NotificationViewInspector {
                 .onFailure { android.util.Log.d(TAG, "Could not inflate notification views: ${it.message}") }
                 .getOrNull() ?: continue
             if (elapsed == null) elapsed = result.chronometerElapsedMs
+            if (countdown == null) countdown = result.countdownRemainingMs
+            if (shown == null && result.shownTimeSeconds != null) {
+                shown = result.shownTimeSeconds
+                shownFromChrono = result.shownFromChronometer
+            }
             if (buttons.isEmpty()) {
                 buttons = result.buttons
                 buttonViews = kept
             }
-            if (elapsed != null && buttons.isNotEmpty()) break
+            if ((elapsed != null || countdown != null || shown != null) && buttons.isNotEmpty()) break
         }
         // Only the layout whose buttons the island shows is kept for pressing.
         if (buttonViews.isEmpty()) liveButtons.remove(key) else liveButtons[key] = buttonViews
-        if (elapsed == null && buttons.isEmpty()) return null
-        android.util.Log.d(TAG, "Inspected custom views: elapsedMs=$elapsed buttons=${buttons.map { it.title }}")
-        return Result(elapsed, buttons)
+        if (elapsed == null && countdown == null && shown == null && buttons.isEmpty()) return null
+        android.util.Log.d(
+            TAG,
+            "Inspected custom views: elapsedMs=$elapsed countdownMs=$countdown shownSec=$shown buttons=${buttons.map { it.title }}"
+        )
+        return Result(elapsed, buttons, countdown, shown, shownFromChrono)
     }
 
     private fun inflate(context: Context, views: RemoteViews, key: String): Pair<Result, List<View>> {
         val root = views.apply(context, FrameLayout(context))
 
         var chronometer: Chronometer? = null
+        var otherClockText: Long? = null
         val clickable = ArrayList<View>()
         walk(root) { v ->
             if (v is Chronometer && chronometer == null) chronometer = v
             if (v.hasOnClickListeners()) clickable.add(v)
+            // A plain text that is only a clock time ("04:59"): what a paused timer prints.
+            if (v is TextView && v !is Chronometer && otherClockText == null) {
+                otherClockText = clockOnly(v.text?.toString())
+            }
         }
 
         // Several clickable views can share a label (an icon and its text): keep one of each.
@@ -99,7 +128,20 @@ object NotificationViewInspector {
         val elapsed = chronometer?.let { c ->
             if (c.isCountDown) null else (SystemClock.elapsedRealtime() - c.base).takeIf { it >= 0 }
         }
-        return Result(elapsed, buttons) to kept
+        val countdown = chronometer?.let { c ->
+            if (c.isCountDown) (c.base - SystemClock.elapsedRealtime()).takeIf { it > 0 } else null
+        }
+        // The chronometer's own text is what the shade shows; a stopped one keeps the value it had when set.
+        val chronoText = chronometer?.let { clockOnly(it.text?.toString()) }
+        val shown = chronoText ?: otherClockText
+        return Result(elapsed, buttons, countdown, shown, chronoText != null) to kept
+    }
+
+    /** Seconds of a text that is nothing but a clock time ("04:59", "1:02:03"), else null. */
+    private fun clockOnly(text: String?): Long? {
+        val t = text?.trim().orEmpty()
+        if (t.isEmpty() || t.length > 9 || !CLOCK_ONLY.matches(t)) return null
+        return TimerStopwatchParser.parseClockTimeToSeconds(t)
     }
 
     /** Self-addressed broadcast; the data URI keeps one distinct PendingIntent per key and button. */
@@ -149,6 +191,7 @@ object NotificationViewInspector {
     const val ACTION_CLICK = "com.agupta07505.smartisland.action.PRESS_NOTIFICATION_VIEW"
     const val SCHEME = "smartisland-view"
     private const val TAG = "NotificationViewInspector"
+    private val CLOCK_ONLY = Regex("""-?(?:\d{1,2}:)?\d{1,2}:\d{2}""")
 
     /** Off-screen button views per notification key, indexed like the island's buttons. */
     private val liveButtons = java.util.concurrent.ConcurrentHashMap<String, List<View>>()

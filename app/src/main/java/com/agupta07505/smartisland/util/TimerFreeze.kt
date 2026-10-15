@@ -15,6 +15,9 @@ package com.agupta07505.smartisland.util
  * everything else until the timer runs again.
  */
 object TimerFreeze {
+    /** A shade reading this close to the remembered value is the same pause; whole-second text jitters. */
+    private const val SHADE_TOLERANCE_MS = 2_000L
+
     /**
      * @param rememberedFrozenMs the value frozen earlier for this same pause (kept per app, survives the card's removal)
      * @param runningTargetMs the deadline the island saw while the timer was running, if any
@@ -26,8 +29,14 @@ object TimerFreeze {
         rememberedFrozenMs: Long?,
         runningTargetMs: Long?,
         keptFrozenMs: Long?,
-        textRemainingMs: Long?
+        textRemainingMs: Long?,
+        shadeShownMs: Long? = null
     ): Long = when {
+        // The stopped countdown the shade itself prints is exact. It also catches a timer that was resumed and
+        // paused again inside the clock app, which the island never saw: the remembered value is then stale.
+        shadeShownMs != null && shadeShownMs > 0L &&
+            (rememberedFrozenMs == null || kotlin.math.abs(shadeShownMs - rememberedFrozenMs) > SHADE_TOLERANCE_MS) ->
+            shadeShownMs
         rememberedFrozenMs != null -> rememberedFrozenMs
         runningTargetMs != null && runningTargetMs > nowMs -> runningTargetMs - nowMs
         keptFrozenMs != null -> keptFrozenMs
