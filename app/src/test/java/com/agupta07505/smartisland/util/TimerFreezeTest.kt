@@ -20,7 +20,6 @@ class TimerFreezeTest {
 
     @Test
     fun repostShowingTheFullLengthKeepsTheFrozenTime() {
-        // Paused at 12:00 left, clock app open for 5 minutes, repost prints 30:00.
         assertEquals(12 * min, TimerFreeze.remainingMs(400_000L, 12 * min, 1_000L + 12 * min, null, 30 * min))
     }
 
@@ -50,10 +49,37 @@ class TimerFreezeTest {
 
     @Test
     fun plusOneMinuteWhilePausedIsTakenFromTheShade() {
-        // Remembered 12:00, the user pressed +1:00 in the shade, the stopped chronometer now reads 13:00.
         assertEquals(
             13 * min,
             TimerFreeze.remainingMs(0L, 12 * min, null, null, null, shadeExactMs = 13 * min)
+        )
+    }
+
+    @Test
+    fun plusOneMinuteInTheAppWhilePausedRaisesTheFrozenTime() {
+        assertEquals(
+            13 * min,
+            TimerFreeze.remainingMs(0L, 12 * min, null, null, null, shownMs = 31 * min, previousShownMs = 30 * min)
+        )
+    }
+
+    @Test
+    fun sameOrJitteringTextKeepsTheFrozenTime() {
+        assertEquals(
+            12 * min,
+            TimerFreeze.remainingMs(0L, 12 * min, null, null, null, shownMs = 30 * min + 1_000L, previousShownMs = 30 * min)
+        )
+        assertEquals(
+            12 * min,
+            TimerFreeze.remainingMs(0L, 12 * min, null, null, null, shownMs = 29 * min, previousShownMs = 30 * min)
+        )
+    }
+
+    @Test
+    fun noPreviousPausedTextMeansNothingWasAdded() {
+        assertEquals(
+            12 * min,
+            TimerFreeze.remainingMs(0L, 12 * min, null, null, null, shownMs = 31 * min, previousShownMs = null)
         )
     }
 }

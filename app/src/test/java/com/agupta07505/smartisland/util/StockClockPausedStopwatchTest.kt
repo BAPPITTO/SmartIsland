@@ -62,9 +62,7 @@ class StockClockPausedStopwatchTest {
     fun pausedStockStopwatchStaysAStopwatch() {
         val pkg = "com.google.android.deskclock"
         val key = "$pkg#7"
-        // Running: Pause + Lap, so the island learns this notification is the stopwatch.
         assertTrue(TimerStopwatchParser.isStopwatch(notification("Pause", "Lap"), pkg, key))
-        // Paused: Resume + Stop only, exactly like a paused timer, but it is still the stopwatch.
         val paused = notification("Resume", "Stop")
         assertTrue(TimerStopwatchParser.isStopwatch(paused, pkg, key))
         assertFalse(TimerStopwatchParser.isTimer(paused, pkg, key))
