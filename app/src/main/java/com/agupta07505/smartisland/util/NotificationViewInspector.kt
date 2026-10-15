@@ -114,12 +114,10 @@ object NotificationViewInspector {
     }
 
     private fun inflate(context: Context, views: RemoteViews, key: String): Pair<Result, List<View>> {
-        val root = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            // Send the app's own intent ourselves: background start allowed, fallbacks, result logged.
-            views.apply(context, FrameLayout(context), pressHandler(context))
-        } else {
-            views.apply(context, FrameLayout(context))
-        }
+        // Send the app's own intent ourselves (background start allowed, fallbacks, result logged).
+        // The handler overload of apply() is hidden in the SDK, so it is reached by reflection and
+        // falls back to the plain apply() whenever it is not available.
+        val root = applyWithPressHandler(context, views) ?: views.apply(context, FrameLayout(context))
 
         var chronometer: Chronometer? = null
         var otherClockText: Long? = null
@@ -234,12 +232,42 @@ object NotificationViewInspector {
     /** Labels of the proxy buttons whose kept view still exists. */
     fun liveLabels(key: String): List<String> = liveLabels[key].orEmpty()
 
-    /** Sends the app's own PendingIntent when a kept view is pressed (API 31+; older versions use the default handler). */
-    @androidx.annotation.RequiresApi(Build.VERSION_CODES.S)
-    private fun pressHandler(context: Context) = RemoteViews.InteractionHandler { _, pendingIntent, _ ->
-        val sent = com.agupta07505.smartisland.ui.expanded.sendIntentWithOptions(context, pendingIntent)
-        AppLogRecorder.d(TAG, "ViewPress: app's own intent sent=$sent")
-        sent
+    /**
+     * Inflates [views] with a handler that sends the app's own PendingIntent when a kept view is pressed.
+     * `RemoteViews.apply(Context, ViewGroup, InteractionHandler)` is hidden, so it is called by reflection.
+     * Returns null when the hidden overload cannot be used (the caller then uses the default apply()).
+     */
+    @android.annotation.SuppressLint("PrivateApi", "DiscouragedPrivateApi", "SoonBlockedPrivateApi")
+    private fun applyWithPressHandler(context: Context, views: RemoteViews): View? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return null
+        return try {
+            val handlerClass = Class.forName("android.widget.RemoteViews\$InteractionHandler")
+            val handler = java.lang.reflect.Proxy.newProxyInstance(
+                handlerClass.classLoader,
+                arrayOf(handlerClass)
+            ) { proxy, method, args ->
+                when (method.name) {
+                    "onInteraction" -> {
+                        val pendingIntent = args?.getOrNull(1) as? PendingIntent
+                        val sent = pendingIntent != null &&
+                            com.agupta07505.smartisland.ui.expanded.sendIntentWithOptions(context, pendingIntent)
+                        AppLogRecorder.d(TAG, "ViewPress: app's own intent sent=$sent")
+                        sent
+                    }
+                    "hashCode" -> System.identityHashCode(proxy)
+                    "equals" -> proxy === args?.getOrNull(0)
+                    "toString" -> "SmartIslandPressHandler"
+                    else -> null
+                }
+            }
+            val apply = RemoteViews::class.java.getMethod(
+                "apply", Context::class.java, ViewGroup::class.java, handlerClass
+            )
+            apply.invoke(views, context, FrameLayout(context), handler) as? View
+        } catch (t: Throwable) {
+            AppLogRecorder.w(TAG, "ViewPress: handler apply unavailable, using default (${t.javaClass.simpleName})")
+            null
+        }
     }
 
     /** Drops the kept views of a notification that is gone. */
