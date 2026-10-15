@@ -132,7 +132,7 @@ data class SmartIslandSettings(
     val cameraCutoutWidth: Float = 40f,
     val cameraCutoutHeight: Float = 24f,
     val enableSwipeActions: Boolean = true,
-    val swipeUpAction: String = "Collapse",
+    val swipeUpAction: String = "DismissCurrent",
     val swipeHoldUpAction: String = "DismissAll",
     val swipeDownAction: String = "None",
     val swipeDownCollapsedAction: String = "Expand",
