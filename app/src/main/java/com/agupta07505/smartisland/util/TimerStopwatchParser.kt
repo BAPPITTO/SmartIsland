@@ -77,10 +77,7 @@ object TimerStopwatchParser {
         return pkg in OEM_CLOCK_PACKAGES || OEM_PACKAGE_PREFIXES.any { pkg.startsWith(it) }
     }
 
-    /**
-     * Whether the shade-accurate timer / stopwatch handling applies to this package: Google's and the AOSP clock and
-     * every third-party clock app. Phone makers' own clocks (Xiaomi, Samsung, ...) keep their unchanged behavior.
-     */
+    /** Shade-accurate handling applies to every clock except phone makers' own (Xiaomi, Samsung, ...). */
     fun usesShadeFixes(packageName: String): Boolean = !isOemClock(packageName)
 
     /** Which clock feature a notification belongs to. */
@@ -501,6 +498,13 @@ object TimerStopwatchParser {
         val timerWhen = json.optLong("timerWhen", 0L)
 
         return timerWhen.takeIf { it > now }
+    }
+
+    /** Running timer's deadline in ms (`when` while still ahead), keeping the sub-second part. Null when paused. */
+    fun parseTimerDeadlineExact(notification: Notification, nowMs: Long = System.currentTimeMillis()): Long? {
+        if (isTimerPaused(notification)) return null
+        val notifWhen = runCatching { notification.`when` }.getOrDefault(0L)
+        return notifWhen.takeIf { it > nowMs }
     }
 
     /**

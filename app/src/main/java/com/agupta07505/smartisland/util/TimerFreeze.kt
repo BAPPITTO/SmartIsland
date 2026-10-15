@@ -8,32 +8,26 @@
 package com.agupta07505.smartisland.util
 
 /**
- * What a paused clock-app timer has left. No Android types, so it is unit-testable.
- *
- * Clock apps cancel the timer notification when their screen opens and post a paused one when it is left, and that post
- * often prints the timer's full length ("30:00"). So once the island has frozen a value for a pause, that value wins over
- * everything else until the timer runs again.
+ * What a paused clock-app timer has left. No Android types.
+ * Clock apps re-post a paused timer showing its full length, so a value frozen by the island wins until the timer runs again.
  */
 object TimerFreeze {
-    /** A shade reading this close to the remembered value is the same pause; whole-second text jitters. */
+    /** Whole-second shade text jitters; a reading this close to the remembered value is the same pause. */
     private const val SHADE_TOLERANCE_MS = 2_000L
 
-    /**
-     * @param rememberedFrozenMs the value frozen earlier for this same pause (kept per app, survives the card's removal)
-     * @param runningTargetMs the deadline the island saw while the timer was running, if any
-     * @param keptFrozenMs the frozen value still held on the current card
-     * @param textRemainingMs the time read from the notification text, which may be the full length
-     */
+    /** Priority order is the order of the branches below; [shadeExactMs] is [TimerClock.frozenFromChronometer]. */
     fun remainingMs(
         nowMs: Long,
         rememberedFrozenMs: Long?,
         runningTargetMs: Long?,
         keptFrozenMs: Long?,
         textRemainingMs: Long?,
-        shadeShownMs: Long? = null
+        shadeShownMs: Long? = null,
+        shadeExactMs: Long? = null
     ): Long = when {
-        // The stopped countdown the shade itself prints is exact. It also catches a timer that was resumed and
-        // paused again inside the clock app, which the island never saw: the remembered value is then stale.
+        // Exact to the ms: no tolerance, no memory needed.
+        shadeExactMs != null && shadeExactMs > 0L -> shadeExactMs
+        // Also catches a resume + pause inside the clock app that the island never saw.
         shadeShownMs != null && shadeShownMs > 0L &&
             (rememberedFrozenMs == null || kotlin.math.abs(shadeShownMs - rememberedFrozenMs) > SHADE_TOLERANCE_MS) ->
             shadeShownMs

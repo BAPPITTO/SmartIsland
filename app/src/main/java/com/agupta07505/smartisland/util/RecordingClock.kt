@@ -52,11 +52,7 @@ object RecordingClock {
         return null
     }
 
-    /**
-     * The time a paused clock should freeze at. For the stock clock's stopwatch the shade's own printed time
-     * ([shownMs], read from its stopped chronometer) is exact, while a stopped chronometer's base keeps drifting
-     * and the notification text may be empty or "00:00", so the printed time wins while paused.
-     */
+    /** Paused: the shade's printed time ([shownMs]) wins, the notification text may be empty or "00:00". */
     fun frozenReading(paused: Boolean, shownMs: Long?, parsedMs: Long?): Long? =
         if (paused && shownMs != null && shownMs > 0L) shownMs else parsedMs
 
@@ -79,10 +75,8 @@ object RecordingClock {
         own ?: lastForApp?.takeIf { paused }
 
     /**
-     * Whether a post is paused, remembering that a paused clock stays paused. Clock apps cancel the notification when
-     * their screen opens and post a new one when it is left; that post may carry neither a "Resume" button nor the word
-     * "paused", so [detected] alone would call it running and the clock would go on from the moment the app was left.
-     * A post counts as running again only when the app offers "Pause" (or, with no readable buttons, never).
+     * Paused state that survives a clock app's cancel-and-repost (the new post may show neither "Resume" nor "paused").
+     * Counts as running again only once the app offers "Pause".
      */
     fun resolvePaused(detected: Boolean, lastForApp: State?, actionTitles: List<String>): Boolean {
         if (detected) return true
@@ -92,11 +86,8 @@ object RecordingClock {
     }
 
     /**
-     * The next clock state.
-     * @param previous the state kept for this recording, if any
-     * @param parsedMs the time read from the notification text
-     * @param chronometerBaseMs `when` of a notification that shows a count-up chronometer
-     * @param fallbackFrozenMs elapsed time read from the notification's own view, used only while paused
+     * The next clock state. [exactFrozenMs] ([TimerClock.elapsedFromChronometer]) wins while paused; [exactStart] means
+     * [chronometerBaseMs] is exact, so the start is not smoothed towards the previous one.
      */
     fun next(
         previous: State?,
@@ -105,16 +96,20 @@ object RecordingClock {
         finished: Boolean,
         parsedMs: Long?,
         chronometerBaseMs: Long?,
-        fallbackFrozenMs: Long? = null
+        fallbackFrozenMs: Long? = null,
+        exactFrozenMs: Long? = null,
+        exactStart: Boolean = false
     ): State {
         val previousElapsed = previous?.elapsedMs(nowMillis)
+        if (paused && !finished && exactFrozenMs != null && exactFrozenMs >= 0L) {
+            return State(startMillis = nowMillis - exactFrozenMs, frozenMs = exactFrozenMs)
+        }
         if (paused && !finished && previous?.frozenMs != null) {
-            // Already frozen: the value it froze at is the truth, whatever a later paused post prints.
+            // Already frozen: keep it, a later paused post may print anything.
             return previous
         }
         if (paused || finished) {
-            // A paused post often carries no time, or a bogus "00:00". Prefer a real positive reading, then the
-            // clock that was running up to the pause, then the notification view's own chronometer.
+            // A paused post often has no time or a bogus "00:00": prefer a positive reading.
             val frozen = parsedMs?.takeIf { it > 0L }
                 ?: previousElapsed?.takeIf { it > 0L }
                 ?: fallbackFrozenMs?.takeIf { it > 0L }
@@ -128,9 +123,8 @@ object RecordingClock {
             ?: previousElapsed
             ?: 0L
         val candidateStart = nowMillis - elapsed
-        // Whole-second text makes the start jitter by up to a second; keep the old start unless the
-        // recorder's own time has really moved away from it.
-        val start = if (previous != null && previous.frozenMs == null &&
+        // Whole-second text jitters the start; keep the old one unless it really moved.
+        val start = if (!exactStart && previous != null && previous.frozenMs == null &&
             abs(previous.startMillis - candidateStart) <= JITTER_MS
         ) previous.startMillis else candidateStart
         return State(startMillis = start, frozenMs = null)
