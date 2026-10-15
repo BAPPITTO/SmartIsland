@@ -132,4 +132,32 @@ class RecordingClockTest {
         assertEquals(4_000L, reposted.frozenMs)
         assertEquals(4_000L, reposted.elapsedMs(999_000L))
     }
+
+    @Test
+    fun exactPauseReadingBeatsTheRememberedFrozenValue() {
+        // Paused at 02:00, clock app opened and left; the corrected stopped chronometer still says 02:00.300.
+        val frozen = RecordingClock.State(startMillis = 0L, frozenMs = 120_000L)
+        val again = RecordingClock.next(
+            frozen, 500_000L, paused = true, finished = false, parsedMs = 187_000L,
+            chronometerBaseMs = null, exactFrozenMs = 120_300L
+        )
+        assertEquals(120_300L, again.frozenMs)
+    }
+
+    @Test
+    fun withoutAnExactReadingAFrozenValueStaysFrozen() {
+        val frozen = RecordingClock.State(startMillis = 0L, frozenMs = 120_000L)
+        val again = RecordingClock.next(
+            frozen, 500_000L, paused = true, finished = false, parsedMs = 187_000L, chronometerBaseMs = null
+        )
+        assertEquals(120_000L, again.frozenMs)
+    }
+
+    @Test
+    fun exactChronometerBaseIsNotSmoothedAway() {
+        val first = RecordingClock.next(null, 100_000L, paused = false, finished = false, parsedMs = null, chronometerBaseMs = 70_000L, exactStart = true)
+        // The clock app was reset and restarted 1.2 s ago: a smoothed start would stay at 70_000.
+        val second = RecordingClock.next(first, 101_000L, paused = false, finished = false, parsedMs = null, chronometerBaseMs = 99_800L, exactStart = true)
+        assertEquals(99_800L, second.startMillis)
+    }
 }
