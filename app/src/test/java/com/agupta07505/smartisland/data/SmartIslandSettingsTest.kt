@@ -52,7 +52,7 @@ class SmartIslandSettingsTest {
         assertEquals(false, settings.recordLogs)
         assertEquals(false, settings.enableNotchMode)
         assertEquals(true, settings.enableSwipeActions)
-        assertEquals("Collapse", settings.swipeUpAction)
+        assertEquals("DismissCurrent", settings.swipeUpAction)
         assertEquals("DismissAll", settings.swipeHoldUpAction)
         assertEquals("None", settings.swipeDownAction)
         assertEquals("Expand", settings.swipeDownCollapsedAction)
