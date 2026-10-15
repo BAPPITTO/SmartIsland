@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.Icon
 import com.agupta07505.smartisland.ui.IslandText as Text
@@ -653,7 +654,14 @@ private fun TimerExpandedCurrent(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.Stop,
+                        imageVector = if (
+                            classifyAction(stopAction.title) == ActionRole.Reset &&
+                            com.agupta07505.smartisland.util.TimerStopwatchParser.usesShadeFixes(notification.packageName)
+                        ) {
+                            Icons.Rounded.Refresh
+                        } else {
+                            Icons.Rounded.Stop
+                        },
                         contentDescription = stopAction.title,
                         tint = LocalIslandPalette.current.danger,
                         modifier = Modifier.size(18.dp)
