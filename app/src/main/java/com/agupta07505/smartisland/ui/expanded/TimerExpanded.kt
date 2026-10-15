@@ -54,6 +54,7 @@ import com.agupta07505.smartisland.data.SmartIslandCommand
 import com.agupta07505.smartisland.di.SmartIslandRepositories
 import com.agupta07505.smartisland.model.IslandNotification
 import com.agupta07505.smartisland.ui.bounceClick
+import com.agupta07505.smartisland.util.TimerClock
 import com.agupta07505.smartisland.util.TimerStopwatchParser
 import androidx.compose.runtime.getValue
 import android.widget.Toast
@@ -408,9 +409,16 @@ private fun TimerExpandedCurrent(
         mutableLongStateOf(notification?.timeMillis ?: (System.currentTimeMillis() + 300000L))
     }
 
+    // Exact cards truncate to whole seconds like the shade.
+    val exact = notification?.exactClock == true
+
     var remainingSec by remember(notification?.key) {
         val parsed = notification?.let { TimerStopwatchParser.parseTimerRemainingSeconds(it) }
-        val rem = if (parsed != null && parsed > 0) {
+        val startTarget = notification?.timeMillis ?: 0L
+        val rem = if (exact && !isPaused && startTarget > System.currentTimeMillis()) {
+            // The deadline beats the rounded text, which can be a second off.
+            TimerClock.secondsLeft(startTarget - System.currentTimeMillis())
+        } else if (parsed != null && parsed > 0) {
             parsed
         } else {
             val t = notification?.timeMillis ?: (System.currentTimeMillis() + 300000L)
@@ -425,7 +433,7 @@ private fun TimerExpandedCurrent(
 
     // The paused remaining time the listener froze; the text of a paused timer can still show its full length.
     val frozenSec = if (isPaused && notification?.recordingPaused == true) {
-        notification.recordingFrozenMs?.let { (it + 500L) / 1000L }
+        notification.recordingFrozenMs?.let { TimerClock.displaySeconds(it, exact, 500L) }
     } else {
         null
     }
@@ -443,21 +451,31 @@ private fun TimerExpandedCurrent(
         }
     }
 
+    // "Time's up!" only after the real deadline; the last second reads 00:00.
+    var timeUp by remember(notification?.key, targetTime, isPaused) { mutableStateOf(false) }
+
     LaunchedEffect(notification?.key, targetTime, isPaused) {
         if (!isPaused) {
             while (true) {
                 val now = System.currentTimeMillis()
-                val rem = if (targetTime > now) {
-                    ((targetTime - now + 500L) / 1000L).coerceAtLeast(0L)
-                } else {
-                    0L
-                }
+                val remMs = (targetTime - now).coerceAtLeast(0L)
+                val rem = TimerClock.displaySeconds(remMs, exact, 500L)
                 remainingSec = rem
-                if (rem <= 0L) break
-                kotlinx.coroutines.delay(500L)
+                if (exact) {
+                    if (remMs <= 0L) {
+                        timeUp = true
+                        break
+                    }
+                    // Wake just after the shown second changes.
+                    kotlinx.coroutines.delay(TimerClock.msToNextTick(remMs))
+                } else {
+                    if (rem <= 0L) break
+                    kotlinx.coroutines.delay(500L)
+                }
             }
         }
     }
+    val finished = if (exact) timeUp else remainingSec == 0L
 
     val shownSec = frozenSec ?: remainingSec
     val displayTime = remember(shownSec) {
@@ -523,7 +541,7 @@ private fun TimerExpandedCurrent(
                     letterSpacing = 0.5.sp
                 )
                 Spacer(Modifier.height(2.dp))
-                val timerSubtitle = if (remainingSec == 0L && !isPaused) {
+                val timerSubtitle = if (finished && !isPaused) {
                     "Time's up!"
                 } else if (isPaused) {
                     "Paused"
@@ -540,7 +558,7 @@ private fun TimerExpandedCurrent(
                 }
                 Text(
                     text = timerSubtitle,
-                    color = if (remainingSec == 0L && !isPaused) LocalIslandPalette.current.danger else timerColor,
+                    color = if (finished && !isPaused) LocalIslandPalette.current.danger else timerColor,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold
                 )

@@ -537,9 +537,11 @@ private fun StopwatchExpandedCurrent(
                         .clip(CircleShape)
                         .background(LocalIslandPalette.current.pick(Color(0xFF3F3F46), Color(0xFFC9C8CB)))
                         .bounceClick {
-                            notification.fireAction(context, resetAction)
-                            SmartIslandRepositories.notificationRepository(context).removeNotification(notification.key)
-                            onCollapse()
+                            // Clear the card only if the press was delivered.
+                            if (notification.fireAction(context, resetAction)) {
+                                SmartIslandRepositories.notificationRepository(context).removeNotification(notification.key)
+                                onCollapse()
+                            }
                         },
                     contentAlignment = Alignment.Center
                 ) {

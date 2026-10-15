@@ -125,8 +125,25 @@ fun IslandNotification?.offersResume(): Boolean =
  * Does not touch island state: the listener re-posts the notification when the app updates it.
  */
 fun IslandNotification.fireAction(context: Context, action: com.agupta07505.smartisland.model.IslandNotificationAction): Boolean {
-    val intent = action.pendingIntent ?: return false
+    val intent = action.pendingIntent
+    val refusal = com.agupta07505.smartisland.util.ButtonPress.refusal(
+        hasIntent = intent != null,
+        viaView = action.viaView,
+        liveLabels = if (action.viaView) com.agupta07505.smartisland.util.NotificationViewInspector.liveLabels(key) else emptyList(),
+        title = action.title
+    )
+    if (refusal != null || intent == null) {
+        com.agupta07505.smartisland.util.AppLogRecorder.w(
+            "ButtonPress",
+            "pkg=$packageName '${action.title}' (${classifyAction(action.title)}) not sent: $refusal"
+        )
+        return false
+    }
     val sent = triggerAction(context, packageName, intent, action.title, contentIntent)
+    com.agupta07505.smartisland.util.AppLogRecorder.d(
+        "ButtonPress",
+        "pkg=$packageName '${action.title}' (${classifyAction(action.title)}) via=${if (action.viaView) "view" else "app"} sent=$sent"
+    )
     if (sent) SmartIslandRepositories.notificationRepository(context).resetTimer()
     return sent
 }
