@@ -48,7 +48,6 @@ object ShizukuMethodCheck {
 
     internal fun probePassed(output: String?): Boolean = output?.contains(OK_MARKER) == true
 
-    /** True once the check has been run on this phone. */
     fun hasRun(context: Context): Boolean = prefs(context).getBoolean(PREF_CHECKED, false)
 
     /** The outcomes of the last check; every method is [Outcome.NotTested] before the first one. */
@@ -63,22 +62,17 @@ object ShizukuMethodCheck {
         }
     }
 
-    /** Whether [method] passed the last check. */
     fun works(context: Context, method: Method): Boolean = saved(context)[method] == Outcome.Works
 
-    /**
-     * Whether a shell method may be used: Shizuku is ready and the method did not fail a check. A method that was never
-     * checked is allowed (a shell command that does not exist just does nothing); the hotspot is the exception, see
-     * [UtilityActions].
-     */
+    /** Whether a shell method may be used: Shizuku is ready and the method did not fail a check. */
     fun usable(context: Context, method: Method): Boolean {
         if (!ShizukuManager.isBinderAvailable() || !ShizukuManager.hasPermission()) return false
         return saved(context)[method] != Outcome.Missing
     }
 
     /**
-     * Runs the check and saves the outcomes. [testHotspot] switches the hotspot on and off once; without it the hotspot is
-     * left as it was (not tested).
+     * Runs the check and saves the outcomes. [testHotspot] switches the hotspot on and off once; without it the
+     * hotspot is left as it was (not tested).
      */
     suspend fun run(context: Context, testHotspot: Boolean): List<Result> = withContext(Dispatchers.IO) {
         val app = context.applicationContext
@@ -103,7 +97,6 @@ object ShizukuMethodCheck {
         results
     }
 
-    /** Switches the hotspot on, checks that it came on, switches it off again. */
     private suspend fun testHotspotToggle(app: Context): Outcome {
         val wasOn = HotspotUtil.isOn(app)
         if (wasOn) return Outcome.NotTested // leave a hotspot that is already in use alone

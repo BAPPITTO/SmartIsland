@@ -42,11 +42,17 @@ import com.agupta07505.smartisland.model.LedFrames
 import com.agupta07505.smartisland.model.LedGlow
 import com.agupta07505.smartisland.model.LedGrid
 import com.agupta07505.smartisland.model.LedIcon
+import com.agupta07505.smartisland.model.LedMotion
+import com.agupta07505.smartisland.model.LedMotionFrames
+import com.agupta07505.smartisland.model.LedMotions
+import com.agupta07505.smartisland.model.weatherLook
+import com.agupta07505.smartisland.model.NetSpeedRules
 import com.agupta07505.smartisland.model.LedTick
 import com.agupta07505.smartisland.model.LedTickConfig
+import com.agupta07505.smartisland.model.WeatherDisplay
 import com.agupta07505.smartisland.model.WeatherLook
+import com.agupta07505.smartisland.model.WeatherSlotFace
 import com.agupta07505.smartisland.model.WidgetIslandContent
-import com.agupta07505.smartisland.model.weatherLook
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
@@ -60,13 +66,12 @@ import java.util.Locale
  * model/LedFont.kt (pure, unit tested); this file draws them.
  */
 
-/** Size of one LED in dp at the normal glyph size; the glyph scale setting scales it. */
 private const val LED_PITCH_DP = 1.3f
 
 /** Which widgets draw their slots on the LED board. The notification count and the mode glyph keep the smooth tick. */
 internal fun ledSlotSupported(kind: IdleWidgetKind, right: Boolean): Boolean = when (kind) {
     IdleWidgetKind.Date, IdleWidgetKind.Weather, IdleWidgetKind.Battery,
-    IdleWidgetKind.NextAlarm, IdleWidgetKind.NetSpeed, IdleWidgetKind.Clock, IdleWidgetKind.Wind -> true
+    IdleWidgetKind.NextAlarm, IdleWidgetKind.NetSpeed, IdleWidgetKind.Clock, IdleWidgetKind.LiveClock, IdleWidgetKind.Wind -> true
     else -> false
 }
 
@@ -100,15 +105,16 @@ private fun ledBatteryIcon(percent: Int, charging: Boolean): LedIcon = when {
     else -> LedIcon.Battery
 }
 
+private fun ledWeatherFace(face: WeatherSlotFace): LedFace = when (face) {
+    WeatherSlotFace.Empty -> LedFace.Text("")
+    is WeatherSlotFace.Icon -> LedFace.Icon(ledWeatherIcon(face.look, face.isDay))
+    is WeatherSlotFace.Text -> LedFace.Text(face.text)
+}
+
 private fun ledAlarmField(atMs: Long, field: Int): Int =
     java.util.Calendar.getInstance().apply { timeInMillis = atMs }.get(field)
 
-/**
- * One slot of the pill on the LED board. The face is worked out from the same data as the smooth slots; when it changes (a new
- * temperature, the next minute) the board plays a burst from the old face to the new one, and on every beat of the glyph tick
- * period it plays a burst from the face to the same face. A slot that alternates between two faces (the faster net side's arrow
- * and its speed, the alarm glyph and its hour) changes face on its own beat, so it needs no extra beat.
- */
+/** One slot of the pill on the LED board. */
 @Composable
 internal fun LedSlot(kind: IdleWidgetKind, frame: IdleWidgetFrame, right: Boolean, config: LedTickConfig) {
     val context = LocalContext.current
@@ -116,12 +122,13 @@ internal fun LedSlot(kind: IdleWidgetKind, frame: IdleWidgetFrame, right: Boolea
     val locale = Locale.getDefault()
     val is24 = android.text.format.DateFormat.is24HourFormat(context)
     val timeFormat = remember(is24, locale) { SimpleDateFormat(if (is24) "HH:mm" else "h:mm", locale) }
+    val hourFormat = remember(is24, locale) { SimpleDateFormat(if (is24) "HH" else "h", locale) }
+    val minuteFormat = remember(locale) { SimpleDateFormat("mm", locale) }
     val dayFormat = remember(locale) { SimpleDateFormat(IdleSlots.DAY_PATTERN, locale) }
     val monthFormat = remember(locale) { SimpleDateFormat(IdleSlots.MONTH_PATTERN, locale) }
 
-    val lead = IdleSlots.speedLead(data.downBytesPerSecond, data.upBytesPerSecond)
-    val owns = kind == IdleWidgetKind.NetSpeed && IdleSlots.speedLeadOwnsSlot(lead, right)
-    val alternates = owns || (kind == IdleWidgetKind.NextAlarm && !right && data.nextAlarmMs > 0L)
+    val netUpload = NetSpeedRules.isUpload(data.downBytesPerSecond, data.upBytesPerSecond)
+    val alternates = kind == IdleWidgetKind.NextAlarm && !right && data.nextAlarmMs > 0L
     val period = frame.tickPeriodMs
 
     // True while the alternate face (the arrow, the alarm hour) is the one to show.
@@ -143,10 +150,10 @@ internal fun LedSlot(kind: IdleWidgetKind, frame: IdleWidgetFrame, right: Boolea
             val snapshot = data.weather
             if (snapshot == null) {
                 if (right) LedFace.Text("--°") else LedFace.Icon(LedIcon.Cloud)
-            } else if (right) {
-                LedFace.Text(IdleWidgets.displayTemp(snapshot.temperatureC, frame.fahrenheit))
             } else {
-                LedFace.Icon(ledWeatherIcon(weatherLook(snapshot.weatherCode), snapshot.isDay))
+                // The same slots as the smooth pill, so both tick styles always show the same thing.
+                val slots = WeatherDisplay.slots(frame.weatherMode, snapshot, frame.fahrenheit)
+                ledWeatherFace(if (right) slots.right else slots.left)
             }
         }
         IdleWidgetKind.Battery -> {
@@ -171,38 +178,67 @@ internal fun LedSlot(kind: IdleWidgetKind, frame: IdleWidgetFrame, right: Boolea
             else -> LedFace.Icon(LedIcon.Alarm)
         }
         IdleWidgetKind.NetSpeed ->
-            if (owns && alternate) LedFace.Icon(if (lead == IdleSlots.SpeedLead.Upload) LedIcon.ArrowUp else LedIcon.ArrowDown)
-            else LedFace.Text(IdleWidgets.shortSpeed(if (right) data.downBytesPerSecond else data.upBytesPerSecond))
+            if (right) LedFace.Text(IdleWidgets.shortSpeed(NetSpeedRules.busier(data.downBytesPerSecond, data.upBytesPerSecond)))
+            else LedFace.Icon(if (netUpload) LedIcon.ArrowUp else LedIcon.ArrowDown)
         IdleWidgetKind.Wind ->
             if (right) LedFace.Text(IdleWidgets.displayWind(data.weather?.windKmh ?: -1f, frame.windUnit)) else LedFace.Icon(LedIcon.Wind)
+        IdleWidgetKind.LiveClock -> LedFace.Text((if (right) minuteFormat else hourFormat).format(Date(data.nowMs)))
         IdleWidgetKind.Clock ->
             if (right) LedFace.Text(timeFormat.format(Date(data.nowMs))) else LedFace.Icon(LedIcon.Clock)
         else -> LedFace.Text("")
     }
-    // Which way the content leaves: the same directions the smooth ticks use.
     val towardsDown = when (kind) {
         IdleWidgetKind.Weather -> !right
-        IdleWidgetKind.NetSpeed -> lead != IdleSlots.SpeedLead.Upload
+        IdleWidgetKind.NetSpeed -> !netUpload
         IdleWidgetKind.NextAlarm -> true
         else -> false
     }
+    // The ambient motions of the smooth glyphs (sun turning, rain falling, wind swaying, the fast-speed arrow, the
+    // soon alarm), as dot frames.
+    val snapshot = data.weather
+    val fastSpeed = if (kind == IdleWidgetKind.NetSpeed) rememberFastSpeed(data.speedBytesPerSecond) else false
+    val alarmSoon = if (kind == IdleWidgetKind.NextAlarm) rememberAlarmSoon(data.nextAlarmMs) else false
+    val motion = LedMotions.forGlyph(
+        widget = kind,
+        look = snapshot?.let { weatherLook(it.weatherCode) },
+        isDay = snapshot?.isDay ?: true,
+        windKmh = snapshot?.windKmh ?: -1f,
+        fastSpeed = fastSpeed,
+        alarmSoon = alarmSoon,
+        // The weather glyph has its own switch (and Battery Saver choice); the others follow the tick rules.
+        animationsOff = if (kind == IdleWidgetKind.Weather) !frame.weatherAnimate else !frame.tickAnimates
+    )
     LedTickFace(
         face = face,
         config = config,
         towardsDown = towardsDown,
         tickPeriodMs = period,
-        repeatBeat = !alternates,
+        motion = motion,
+        // Keep clear of the widget switch, like the smooth beat (IdleSlots.beatClearOfSwitch).
+        beatClear = {
+            val nowMs = SystemClock.elapsedRealtime()
+            IdleSlots.beatClearOfSwitch(nowMs - frame.lastSwitchAtMs, nowMs - frame.cycleStartAtMs, frame.cycleMs)
+        },
+        // The clock only moves when its hour or minute changes, not on every beat.
+        repeatBeat = !alternates && kind != IdleWidgetKind.LiveClock && !frame.beatOnlyOnChange &&
+            IdleSlots.beatRuns(frame.beatPaused, frame.tickAnimates),
         glyphScale = frame.glyphScale,
-        // Footsteps: the right slot steps half a pace after the left one. Only the slot whose own face changed moves on a data change, so
-        // a new minute or temperature steps the value alone and the glyph stays still; a new widget changes both faces and both step.
+        // Footsteps: the right slot steps half a pace after the left one.
         startDelayMs = LedTick.staggerMs(config.paceMs, right, config.stagger),
-        ready = { frame.appear.value >= 1f }
+        ready = { frame.appear.value >= 1f },
+        animate = frame.tickAnimates
     )
 }
 
 /** The state of one LED board: what it settled on, its afterglow and a counter that redraws it. */
 private class LedBoardState(initial: LedGrid) {
     var target: LedGrid = initial
+
+    /** True while a burst or a fade plays: the ambient motion waits. */
+    var busy = false
+
+    /** The face the board rests on (the one the last change ended on): the ambient motion animates this one. */
+    var restFace: LedFace? = null
     var glow: LedGlow = LedGlow(initial.cols).also { it.settle(LedFrames.place(initial, initial.cols, LedTick.ROWS, 0)) }
         private set
     var cols by mutableIntStateOf(initial.cols)
@@ -216,8 +252,52 @@ private class LedBoardState(initial: LedGrid) {
         }
     }
 
-    /** Plays one burst from [from] to [to] and leaves the board at rest on [to]. */
+    /** The change as a plain cross-fade of the dots, no footsteps ([IdleSlots.PLAIN_FADE_MS]); leaves the board at rest on [to]. */
+    suspend fun fade(from: LedGrid, to: LedGrid) {
+        busy = true
+        try {
+            fadeBody(from, to)
+        } finally {
+            busy = false
+        }
+    }
+
+    fun showFrame(grid: LedGrid) {
+        resize(grid.cols)
+        glow.settle(LedFrames.place(grid, grid.cols, LedTick.ROWS, 0))
+        version++
+    }
+
+    private suspend fun fadeBody(from: LedGrid, to: LedGrid) {
+        val boardCols = maxOf(from.cols, to.cols)
+        resize(boardCols)
+        val a = LedFrames.place(from, boardCols, LedTick.ROWS, 0)
+        val b = LedFrames.place(to, boardCols, LedTick.ROWS, 0)
+        val total = IdleSlots.PLAIN_FADE_MS.toFloat()
+        val start = withFrameNanos { it }
+        while (true) {
+            val now = withFrameNanos { it }
+            val t = (now - start) / 1_000_000f
+            glow.blend(a, b, t / total)
+            version++
+            if (t >= total) break
+        }
+        target = to
+        resize(to.cols)
+        glow.settle(LedFrames.place(to, to.cols, LedTick.ROWS, 0))
+        version++
+    }
+
     suspend fun burst(from: LedGrid, to: LedGrid, towardsDown: Boolean, config: LedTickConfig, beat: Long) {
+        busy = true
+        try {
+            burstBody(from, to, towardsDown, config, beat)
+        } finally {
+            busy = false
+        }
+    }
+
+    private suspend fun burstBody(from: LedGrid, to: LedGrid, towardsDown: Boolean, config: LedTickConfig, beat: Long) {
         val hops = LedTick.hopsAt(config.pattern, beat)
         val boardCols = maxOf(from.cols, to.cols)
         resize(boardCols)
@@ -250,11 +330,7 @@ private class LedBoardState(initial: LedGrid) {
     }
 }
 
-/**
- * The LED board of one slot. [face] is what the slot should show; [tickPeriodMs] is the glyph tick period (the beat and the
- * clock the pattern follows); [repeatBeat] says whether the board re-ticks the same face on every beat; [ready] holds the beat
- * back while the widget is still fading in.
- */
+/** The LED board of one slot. */
 @Composable
 internal fun LedTickFace(
     face: LedFace,
@@ -264,7 +340,12 @@ internal fun LedTickFace(
     repeatBeat: Boolean,
     glyphScale: Float,
     startDelayMs: Long = 0L,
-    ready: () -> Boolean = { true }
+    ready: () -> Boolean = { true },
+    /** False (Battery Saver, "remove animations"): a changed face cross-fades instead of stepping ([IdleSlots.ticksAnimate]). */
+    animate: Boolean = true,
+    motion: LedMotion = LedMotion.NONE,
+    /** False while a beat would run into a widget switch ([IdleSlots.beatClearOfSwitch]): that beat is skipped. */
+    beatClear: () -> Boolean = { true }
 ) {
     val context = LocalContext.current
     val faceNow by rememberUpdatedState(face)
@@ -274,22 +355,56 @@ internal fun LedTickFace(
     val repeatNow by rememberUpdatedState(repeatBeat)
     val readyNow by rememberUpdatedState(ready)
     val delayNow by rememberUpdatedState(startDelayMs)
+    val animateNow by rememberUpdatedState(animate)
+    val motionNow by rememberUpdatedState(motion)
+    val clearNow by rememberUpdatedState(beatClear)
 
-    val board = remember(config.fontId) { LedBoardState(ledGridOf(context, face, config.fontId)) }
+    val board = remember(config.fontId) { LedBoardState(ledGridOf(context, face, config.fontId)).also { it.restFace = face } }
+
+    // The ambient motion: between bursts the board steps through the frames of the icon it rests on.
+    LaunchedEffect(board) {
+        var shown = -1
+        while (true) {
+            val m = motionNow
+            val rest = board.restFace
+            val icon = (rest as? LedFace.Icon)?.icon
+            if (!m.isRunning || icon == null || rest != faceNow || board.busy || !readyNow()) {
+                if (shown != -1 && !board.busy && rest != null) board.showFrame(ledGridOf(context, rest, configNow.fontId))
+                shown = -1
+                delay(LED_MOTION_RECHECK_MS)
+                continue
+            }
+            val frames = LedMotionFrames.frames(icon, m.kind)
+            val now = SystemClock.elapsedRealtime()
+            val index = LedMotions.frameAt(now, m.stepMs, frames.size)
+            if (index != shown) {
+                board.showFrame(frames[index])
+                shown = index
+            }
+            delay((m.stepMs - now % m.stepMs).coerceAtLeast(16L))
+        }
+    }
 
     LaunchedEffect(board) {
         var current = faceNow
         var nextBeatAt = SystemClock.elapsedRealtime() + periodNow
         while (true) {
-            val wait = if (repeatNow) (nextBeatAt - SystemClock.elapsedRealtime()).coerceAtLeast(0L) else Long.MAX_VALUE
+            // Not repeating: look again now and then, so the beat starts again (a full period later) when it is switched back on.
+            val wait = if (repeatNow) (nextBeatAt - SystemClock.elapsedRealtime()).coerceAtLeast(0L) else LED_BEAT_RECHECK_MS
             val changed = withTimeoutOrNull(wait) { snapshotFlow { faceNow }.first { it != current } }
             val cfg = configNow
             val beat = LedTick.beatIndex(SystemClock.elapsedRealtime(), periodNow)
             if (changed != null) {
-                if (delayNow > 0L) delay(delayNow)
-                board.burst(ledGridOf(context, current, cfg.fontId), ledGridOf(context, changed, cfg.fontId), downNow, cfg, beat)
+                if (animateNow) {
+                    if (delayNow > 0L) delay(delayNow)
+                    board.burst(ledGridOf(context, current, cfg.fontId), ledGridOf(context, changed, cfg.fontId), downNow, cfg, beat)
+                } else {
+                    // No footsteps and no stagger: the two halves fade together.
+                    board.fade(ledGridOf(context, current, cfg.fontId), ledGridOf(context, changed, cfg.fontId))
+                }
                 current = changed
-            } else if (repeatNow && readyNow()) {
+                board.restFace = current
+            } else if (repeatNow && readyNow() && clearNow()) {
                 if (delayNow > 0L) delay(delayNow)
                 val same = ledGridOf(context, current, cfg.fontId)
                 board.burst(same, same, downNow, cfg, beat)
@@ -324,9 +439,8 @@ internal fun LedTickFace(
 }
 
 /**
- * A live sample of the LED style for the settings: a small black pill with a glyph board and a value board, stepping through a few
- * typical changes with the chosen pattern, pace, font, colour and stagger. A new minute or temperature steps the value alone; a new
- * widget steps both, the value half a pace after the glyph when the stagger is on.
+ * A live sample of the LED style for the settings: a small black pill with a glyph board and a value board, stepping
+ * through a few typical changes with the chosen pattern, pace, font, colour and stagger.
  */
 @Composable
 internal fun LedTickPreview(config: LedTickConfig, modifier: Modifier = Modifier) {
@@ -380,3 +494,7 @@ internal fun LedTickPreview(config: LedTickConfig, modifier: Modifier = Modifier
         }
     }
 }
+
+private const val LED_BEAT_RECHECK_MS = 500L
+
+private const val LED_MOTION_RECHECK_MS = 250L

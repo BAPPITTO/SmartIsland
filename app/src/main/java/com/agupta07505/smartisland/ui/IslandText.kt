@@ -22,8 +22,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
 
 /**
- * Drop-in for Material 3 `Text` in the island. It takes the island font from the surrounding text style;
- * a `fontFamily` set by the caller wins.
+ * Drop-in for Material 3 `Text` in the island. It takes the island font from the surrounding text style; a
+ * `fontFamily` set by the caller wins.
  */
 @Composable
 internal fun IslandText(

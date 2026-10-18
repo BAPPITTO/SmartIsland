@@ -31,7 +31,7 @@ class TapGuardTest {
 
     @Test
     fun aSidewaysDragUnderTheSwipeThresholdIsNotATap() {
-        // The old expanded rule only looked at the vertical offset: 25 dp sideways with 0 dp up/down was a tap.
+        // The expanded rule must look at both axes, not only the vertical offset: 25 dp sideways with 0 dp up/down is not a tap.
         val slop = 10f
         val g = TapGuard(slop)
         g.update(25f, 0f)

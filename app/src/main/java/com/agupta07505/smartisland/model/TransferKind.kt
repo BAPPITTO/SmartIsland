@@ -8,9 +8,8 @@
 package com.agupta07505.smartisland.model
 
 /**
- * What a progress card (IslandMode.DownloadUpload) is actually doing. Each kind has its own
- * switch on the Home tab (see IslandEvent.forTransfer) and its own wording on the card.
- * `pointsUp` picks the arrow direction in the transfer glyph.
+ * What a progress card (IslandMode.DownloadUpload) is doing. Each kind has its own Home switch and wording on the
+ * card; `pointsUp` picks the arrow direction of the transfer glyph.
  */
 enum class TransferKind(val pointsUp: Boolean, val badge: String, val fallbackTitle: String) {
     DOWNLOAD(false, "Downloading", "Downloading file"),

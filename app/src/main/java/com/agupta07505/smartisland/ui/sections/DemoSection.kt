@@ -54,8 +54,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
 /**
- * Demo tab: a button per island event that puts a sample card on the island, so every cutout,
- * expanded card and switch can be tried at any time. Sample cards never touch the system shade.
+ * Demo tab: a button per island event that puts a sample card on the island, so every cutout, expanded card and
+ * switch can be tried at any time. Sample cards never touch the system shade.
  */
 @Composable
 fun DemoSection(
@@ -119,6 +119,7 @@ fun DemoSection(
             }
         }
 
+        val faceIdState by com.agupta07505.smartisland.util.FaceIdController.state.collectAsState()
         DemoEvents.available.groupBy { it.group }.entries.forEachIndexed { index, (group, events) ->
             val showingCount = events.count { DemoEvents.keyFor(it) in showingKeys }
             CollapsibleCard(
@@ -132,17 +133,79 @@ fun DemoSection(
                     if (rowIndex > 0) {
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
                     }
-                    val showing = DemoEvents.keyFor(event) in showingKeys
+                    val showing = if (event == IslandEvent.FACE_UNLOCK) faceIdState.active else DemoEvents.keyFor(event) in showingKeys
                     val off = !settings.isEventEnabled(event.id)
                     DemoRow(
-                        title = event.label,
+                        title = if (event == IslandEvent.FACE_UNLOCK) "Face ID expanded / mix (no face found)" else event.label,
                         subtitle = if (off) "Switched off on the Home tab" else null,
                         event = event,
                         showing = showing,
-                        enabled = notificationRepository != null,
-                        onShow = { notificationRepository?.let { DemoEvents.show(context, it, event, openExpanded, settings.batteryWarningMs.toLong()) } },
-                        onClear = { notificationRepository?.let { DemoEvents.clear(it, event) } }
+                        enabled = notificationRepository != null || event == IslandEvent.FACE_UNLOCK,
+                        onShow = {
+                            if (event == IslandEvent.FACE_UNLOCK) {
+                                if (!off) com.agupta07505.smartisland.util.FaceIdController.start()
+                            } else {
+                                notificationRepository?.let { DemoEvents.show(context, it, event, openExpanded, settings.batteryWarningMs.toLong()) }
+                            }
+                        },
+                        onClear = {
+                            if (event == IslandEvent.FACE_UNLOCK) {
+                                com.agupta07505.smartisland.util.FaceIdController.stop()
+                            } else {
+                                notificationRepository?.let { DemoEvents.clear(it, event) }
+                            }
+                        }
                     )
+                    if (event == IslandEvent.FACE_UNLOCK) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+                        DemoRow(
+                            title = "Face ID expanded (face accepted)",
+                            subtitle = if (off) "Switched off on the Home tab" else null,
+                            event = event,
+                            showing = faceIdState.active,
+                            enabled = true,
+                            onShow = {
+                                if (!off) com.agupta07505.smartisland.util.FaceIdController.start(accepted = true, style = com.agupta07505.smartisland.util.FaceIdController.Style.SquareTick)
+                            },
+                            onClear = { com.agupta07505.smartisland.util.FaceIdController.stop() }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+                        DemoRow(
+                            title = "Face ID mix (face accepted)",
+                            subtitle = if (off) "Switched off on the Home tab" else null,
+                            event = event,
+                            showing = faceIdState.active,
+                            enabled = true,
+                            onShow = {
+                                if (!off) com.agupta07505.smartisland.util.FaceIdController.start(accepted = true)
+                            },
+                            onClear = { com.agupta07505.smartisland.util.FaceIdController.stop() }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+                        DemoRow(
+                            title = "Face ID cutout mode (no face found)",
+                            subtitle = if (off) "Switched off on the Home tab" else null,
+                            event = event,
+                            showing = faceIdState.active,
+                            enabled = true,
+                            onShow = {
+                                if (!off) com.agupta07505.smartisland.util.FaceIdController.start(style = com.agupta07505.smartisland.util.FaceIdController.Style.Cutout)
+                            },
+                            onClear = { com.agupta07505.smartisland.util.FaceIdController.stop() }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+                        DemoRow(
+                            title = "Face ID cutout mode (face accepted)",
+                            subtitle = if (off) "Switched off on the Home tab" else null,
+                            event = event,
+                            showing = faceIdState.active,
+                            enabled = true,
+                            onShow = {
+                                if (!off) com.agupta07505.smartisland.util.FaceIdController.start(accepted = true, style = com.agupta07505.smartisland.util.FaceIdController.Style.Cutout)
+                            },
+                            onClear = { com.agupta07505.smartisland.util.FaceIdController.stop() }
+                        )
+                    }
                 }
             }
         }

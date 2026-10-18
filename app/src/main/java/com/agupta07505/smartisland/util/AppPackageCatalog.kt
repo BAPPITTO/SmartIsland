@@ -8,16 +8,14 @@
 package com.agupta07505.smartisland.util
 
 /**
- * Package names of the apps the island treats specially. One place so the navigation parser and the live-activity parser
- * agree on which app is which: a delivery or ride app is never read as turn-by-turn guidance, and a map app is never read as
- * an order tracker.
+ * Package names of apps the island treats specially, shared by the navigation and live-activity parsers so a delivery or
+ * ride app is never read as navigation and a map app never as an order tracker.
  *
- * Most IDs were checked against Google Play listings, F-Droid / IzzyOnDroid metadata or the apps' own developer docs. The ones
- * marked "unverified" come from general knowledge only; a wrong ID there simply never matches, it cannot misclassify anything.
+ * IDs marked "unverified" are from general knowledge only; a wrong ID never matches, so it cannot misclassify.
  */
 object AppPackageCatalog {
 
-    /** Map and turn-by-turn navigation apps (store builds plus the alternative builds some of them ship). */
+    /** Includes the alternative builds (F-Droid, Huawei) some of these apps ship. */
     val NAVIGATION: Set<String> = setOf(
         // Google
         "com.google.android.apps.maps",
@@ -68,7 +66,6 @@ object AppPackageCatalog {
         "com.maptls.app"
     )
 
-    /** Ride-hailing and taxi apps. */
     val RIDE_HAILING: Set<String> = setOf(
         "com.ubercab",                 // Uber
         "me.lyft.android",             // Lyft
@@ -85,7 +82,6 @@ object AppPackageCatalog {
         "in.juspay.nammayatri"         // Namma Yatri (unverified)
     )
 
-    /** Food, grocery and quick-commerce delivery apps. */
     val DELIVERY: Set<String> = setOf(
         "com.application.zomato",      // Zomato
         "in.swiggy.android",           // Swiggy & Instamart
@@ -108,7 +104,6 @@ object AppPackageCatalog {
         "com.bigbasket.mobileapp"      // BigBasket (unverified)
     )
 
-    /** Everything the live-activity parser tracks. */
     val LIVE_ACTIVITY: Set<String> = RIDE_HAILING + DELIVERY
 
     fun isNavigationApp(packageName: String): Boolean = packageName in NAVIGATION

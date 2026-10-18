@@ -29,9 +29,7 @@ import androidx.compose.ui.unit.dp
 import com.agupta07505.smartisland.model.NotificationMedia
 
 /**
- * Landscape: the image selector of a card with 2 or more pictures, shown in the island beside the card at the half-size height.
- * Nothing in it reacts except a tap on one of the pictures ([onPick]): no scrolling, no other taps (the island's own tap and the
- * swipe actions are also off while it is open, see IslandMainGestures). Swipe up (one step back, to the preview) is the only gesture.
+ * Landscape: the image selector of a card with 2 or more pictures, in the island beside the card at half-size height.
  */
 @Composable
 internal fun PictureSelector(

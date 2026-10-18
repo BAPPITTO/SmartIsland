@@ -13,7 +13,6 @@ data class LandscapeCamera(
     val centerYDp: Float
 )
 
-/** What the overlay needs to know about the display to pick and place the landscape profile. */
 data class OrientationState(
     val isLandscape: Boolean = false,
     val screenWidthDp: Float = 0f,
@@ -23,25 +22,12 @@ data class OrientationState(
     /** Side the camera sits on when no cutout was reported, derived from display rotation. */
     val rotationSide: String = SmartIslandSettings.LANDSCAPE_POSITION_LEFT,
     /**
-     * Reverse landscape (display rotation 270, the camera on the right): the landscape profile
-     * is authored for the normal landscape, so every left / right choice and horizontal fine
-     * tuning is mirrored here.
+     * Reverse landscape (display rotation 270, the camera on the right): the landscape profile is authored for the
+     * normal landscape, so every left / right choice and horizontal fine tuning is mirrored here.
      */
     val reversed: Boolean = false
 )
 
-/**
- * Returns the settings the overlay should actually render with.
- *
- * Portrait returns the settings unchanged. Landscape overlays the landscape profile on top of
- * the shared settings (colours, gestures, behaviour stay shared), so the overlay code keeps
- * reading plain `width`, `height`, `xOffset`, ... and needs no orientation branches.
- *
- * With cards on the island the collapsed pill uses the landscape width / height / offsets /
- * corner radius exactly as the user set them (top middle by default, or wherever the sliders
- * put it, e.g. near the camera). Idle, the pill is the small circle placed by
- * `landscapeCirclePosition` (camera cutout, top left, top right or top middle) plus fine tuning.
- */
 fun SmartIslandSettings.forOrientation(
     state: OrientationState,
     hasContent: Boolean = false,
@@ -65,7 +51,7 @@ fun SmartIslandSettings.forOrientation(
     if (hasContent) return base.landscapeContentPillFor(this, state, hasCards)
 
     // Idle cutout. `landscapeShape` is a legacy setting kept only so old backups still load; it
-    // no longer changes the geometry.
+    // does not change the geometry.
     val flip = if (state.reversed) -1f else 1f
     val size = landscapeCircleSize
     val halfScreen = state.screenWidthDp / 2f
@@ -92,7 +78,6 @@ fun SmartIslandSettings.forOrientation(
             baseY = landscapeCircleYOffset
         }
         else -> if (camera != null) {
-            // Camera cutout: right on the notch, exactly where the system reports it.
             side = if (camera.xOffsetDp < 0f) SmartIslandSettings.LANDSCAPE_POSITION_LEFT
             else SmartIslandSettings.LANDSCAPE_POSITION_RIGHT
             baseX = camera.xOffsetDp
@@ -124,9 +109,8 @@ fun SmartIslandSettings.forOrientation(
 }
 
 /**
- * Portrait collapsed cutout with a card on it: the idle width stretched to [SmartIslandSettings.contentPillWidthPercent], unless the
- * "same as idle" switch is on. Only the width changes (the height, and so the overlay window's height, stays), and never wider than the
- * screen minus a margin on each side. The overlay animates between the two widths (see IslandLayout).
+ * Portrait collapsed cutout with a card on it: the idle width stretched to
+ * [SmartIslandSettings.contentPillWidthPercent], unless "same as idle" is on.
  */
 fun SmartIslandSettings.withContentPillWidth(screenWidthDp: Float): SmartIslandSettings {
     val stretched = contentPillWidthDp(screenWidthDp)
@@ -143,10 +127,7 @@ fun SmartIslandSettings.contentPillWidthDp(screenWidthDp: Float): Float {
     return wanted.coerceAtMost(room).coerceAtLeast(width)
 }
 
-/**
- * Landscape: the pill's width while a card is on it. Its base is the landscape width (what the pill has while it only carries the idle
- * widgets); [SmartIslandSettings.contentPillSameAsIdleLandscape] keeps that, otherwise it is stretched by the landscape percent.
- */
+/** Landscape pill width with a card on it: the landscape width, stretched by the landscape percent unless "same as idle" is on. */
 fun SmartIslandSettings.landscapeContentWidthDp(screenWidthDp: Float): Float {
     if (contentPillSameAsIdleLandscape) return landscapeWidth
     val percent = if (contentPillWidthPercentLandscape.isNaN()) SmartIslandSettings.DEFAULT_CONTENT_PILL_PERCENT
@@ -157,7 +138,6 @@ fun SmartIslandSettings.landscapeContentWidthDp(screenWidthDp: Float): Float {
 
 private const val CONTENT_PILL_SCREEN_MARGIN_DP = 24f
 
-/** Side of the screen the camera is on in landscape: the forced circle position, else the camera cutout, else the rotation. */
 fun SmartIslandSettings.landscapeCameraSide(state: OrientationState): String =
     when (mirrorLandscapeSide(landscapeCirclePosition, state.reversed)) {
         SmartIslandSettings.LANDSCAPE_POSITION_LEFT -> SmartIslandSettings.LANDSCAPE_POSITION_LEFT
@@ -176,26 +156,18 @@ internal fun mirrorLandscapeSide(side: String, reversed: Boolean): String = when
     else -> side
 }
 
-/** Same for the companion circle's side. */
 internal fun mirrorCirclePosition(position: String, reversed: Boolean): String = when {
     !reversed -> position
     position == SmartIslandSettings.CIRCLE_POSITION_LEFT -> SmartIslandSettings.CIRCLE_POSITION_RIGHT
     else -> SmartIslandSettings.CIRCLE_POSITION_LEFT
 }
 
-/** Companion circle goes to the inner side of an edge pill; a centred pill keeps the portrait side. */
 private fun innerCircleSide(side: String, portraitCirclePosition: String): String = when (side) {
     SmartIslandSettings.LANDSCAPE_POSITION_LEFT -> SmartIslandSettings.CIRCLE_POSITION_RIGHT
     SmartIslandSettings.LANDSCAPE_POSITION_RIGHT -> SmartIslandSettings.CIRCLE_POSITION_LEFT
     else -> portraitCirclePosition
 }
 
-/**
- * Landscape collapsed pill with content: the landscape size, corner radius and vertical offset from
- * the landscape layout settings, placed horizontally by `landscapePillPosition` (left
- * corner, right corner or top middle) plus `landscapeXOffset` as fine tuning. [this] already has the
- * landscape profile's shared fields applied; [portrait] is the untouched settings.
- */
 private fun SmartIslandSettings.landscapeContentPillFor(
     portrait: SmartIslandSettings,
     state: OrientationState,
@@ -203,7 +175,7 @@ private fun SmartIslandSettings.landscapeContentPillFor(
 ): SmartIslandSettings {
     val flip = if (state.reversed) -1f else 1f
     val side = mirrorLandscapeSide(portrait.landscapePillSide(state), state.reversed)
-    // The pill that only carries the idle widgets has the landscape width; with a card on it the width may stretch (see below).
+    // With a card on it the width may stretch.
     val pillWidth = if (hasCards) portrait.landscapeContentWidthDp(state.screenWidthDp) else portrait.landscapeWidth
     val baseX = landscapePillBaseX(
         side = side,
@@ -242,8 +214,8 @@ fun SmartIslandSettings.landscapePillSide(@Suppress("UNUSED_PARAMETER") state: O
     }
 
 /**
- * Horizontal centre of the pill relative to the screen centre before fine tuning: the camera
- * cutout when asked for and reported, a corner inset from the screen edge, or the middle.
+ * Horizontal centre of the pill relative to the screen centre before fine tuning: the camera cutout when asked for
+ * and reported, a corner inset from the screen edge, or the middle.
  */
 internal fun landscapePillBaseX(
     side: String,
@@ -262,8 +234,6 @@ internal fun landscapePillBaseX(
     }
 }
 
-/** Pills within this many dp of the centre count as centred when picking the companion side. */
 private const val CENTRE_BAND_DP = 30f
 
-/** Size of the secondary round cutout: the cutout's short side (its height in every layout, a circle's size). */
 fun collapsedCompanionSizeDp(settings: SmartIslandSettings): Float = minOf(settings.width, settings.height)

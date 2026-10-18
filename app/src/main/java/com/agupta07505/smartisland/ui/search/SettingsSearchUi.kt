@@ -42,7 +42,6 @@ import androidx.compose.ui.unit.dp
 import com.agupta07505.smartisland.R
 import com.agupta07505.smartisland.ui.bounceClick
 
-/** The search box at the top of the Settings tab. */
 @Composable
 internal fun SettingsSearchField(
     query: String,
@@ -75,7 +74,6 @@ internal fun SettingsSearchField(
     )
 }
 
-/** The list shown under the search box instead of the normal Settings overview. */
 @Composable
 internal fun SettingsSearchResults(
     query: String,

@@ -45,12 +45,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
 /**
- * A card whose header always shows (icon, title, short summary, optional trailing control such as a
- * group switch) and whose body folds away. Long screens become a short list of headers the user can
- * open one at a time. The open/closed state survives rotation and tab changes ([stateKey]).
- * [searchKeyPrefix] opens the card when a settings-search result with that key prefix is chosen.
- * With [framed] = false the header is a plain section header and the body keeps its own cards
- * (used to fold a block that already draws several cards).
+ * A card whose header always shows (icon, title, short summary, optional trailing control such as a group switch) and
+ * whose body folds away.
  */
 @Composable
 fun CollapsibleCard(

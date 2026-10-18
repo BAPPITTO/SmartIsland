@@ -28,7 +28,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.agupta07505.smartisland.data.SmartIslandSettings
 
-/** The third card's mini pill, shown beside the expanded island when 3+ cards are around. */
 @Composable
 internal fun TertiaryPill(
     settings: SmartIslandSettings,

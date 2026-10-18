@@ -61,16 +61,12 @@ import androidx.compose.ui.window.DialogProperties
 import com.agupta07505.smartisland.data.SmartIslandSettings
 import com.agupta07505.smartisland.model.SwipeAction
 
-// ---------------------------------------------------------------------------------------------------------------------
-// What each gesture does right now. Everything that can be changed on the Gestures screen is read from the settings, so this
-// page never goes out of date when an action is changed; the fixed gestures are written out.
-// ---------------------------------------------------------------------------------------------------------------------
+// What each gesture does right now.
 
 private data class GestureLine(val icon: ImageVector, val gesture: String, val result: String)
 
 private data class GestureGroup(val title: String, val note: String?, val lines: List<GestureLine>)
 
-/** The title of a configurable action, or a note that its whole family of gestures is switched off. */
 @Composable
 private fun actionText(id: String, default: SwipeAction, enabled: Boolean): String =
     if (!enabled) "Off (switched off above)" else getSwipeActionTitle(SwipeAction.fromId(id, default))
@@ -104,7 +100,6 @@ private fun gestureGroups(settings: SmartIslandSettings): List<GestureGroup> {
                 GestureLine(Icons.Rounded.ArrowUpward, "Swipe up", actionText(settings.pillSwipeUpAction, SwipeAction.DismissCurrent, pill)),
                 GestureLine(Icons.Rounded.ArrowDownward, "Swipe down", "Expands the island (fixed, cannot be changed)."),
                 GestureLine(Icons.Rounded.TouchApp, "Long press", longPressText),
-                GestureLine(Icons.Rounded.TouchApp, "Tap a privacy dot", "Lists the apps using the camera, microphone, location or screen sharing (app names need Shizuku). Not on an auto-hidden pill: that tap only brings it back."),
             )
         ),
         GestureGroup(
@@ -120,7 +115,7 @@ private fun gestureGroups(settings: SmartIslandSettings): List<GestureGroup> {
             title = "Second and third pill",
             note = "The smaller pills beside the main one that show other events. Expanded, the second pill sits on the camera spot.",
             lines = listOf(
-                GestureLine(Icons.Rounded.TouchApp, "Tap the second pill", "Brings that event to the main pill and expands the island if it was collapsed. A privacy cutout (camera, microphone, location, screen sharing) lists the apps using it instead."),
+                GestureLine(Icons.Rounded.TouchApp, "Tap the second pill", "Brings that event to the main pill and expands the island if it was collapsed."),
                 GestureLine(Icons.Rounded.TouchApp, "Tap the second pill, expanded, card has siblings", "It shows three lines and opens the list of that app's other cards. A second tap closes the list."),
                 GestureLine(Icons.Rounded.TouchApp, "Tap the third pill", "Switches to that event, and expands the island if it was collapsed."),
                 GestureLine(Icons.Rounded.TouchApp, "Landscape: the pill beside an open card", "Tap swaps to the other stored card. It takes the pill swipes and the long press just like the main pill."),
@@ -265,9 +260,7 @@ private fun IconBadge(icon: ImageVector, size: Int) {
     }
 }
 
-// ---------------------------------------------------------------------------------------------------------------------
 // The tour for new users: a few steps, one idea each, in the order a person meets them.
-// ---------------------------------------------------------------------------------------------------------------------
 
 private data class TourStep(val icon: ImageVector, val title: String, val points: List<String>, val tip: String)
 
@@ -355,8 +348,8 @@ private fun tourSteps(settings: SmartIslandSettings): List<TourStep> {
 }
 
 /**
- * The new-user tour: a dialog of steps with Back / Next. Reached from the welcome dialog and from the top of the Gestures
- * screen. [onFinish] is called by Done, by Skip and by tapping outside.
+ * The new-user tour: a dialog of steps with Back / Next. Reached from the welcome dialog and from the top of the
+ * Gestures screen. [onFinish] is called by Done, by Skip and by tapping outside.
  */
 @Composable
 fun NewUserTour(settings: SmartIslandSettings, onFinish: () -> Unit) {
@@ -384,7 +377,6 @@ fun NewUserTour(settings: SmartIslandSettings, onFinish: () -> Unit) {
                     )
                     if (!last) TextButton(onClick = onFinish) { Text("Skip") }
                 }
-                // Progress dots.
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     steps.indices.forEach { i ->
                         Box(

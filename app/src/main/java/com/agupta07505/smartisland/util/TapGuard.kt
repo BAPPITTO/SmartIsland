@@ -20,38 +20,29 @@ import kotlin.math.hypot
  */
 enum class TouchZone { Tap, Dead, Armed }
 
-/** The zone for a touch whose tap slop has (not) been exceeded and whose swipe would (not) fire on lift. */
 fun touchZone(slopExceeded: Boolean, liftFires: Boolean): TouchZone = when {
     liftFires -> TouchZone.Armed
     slopExceeded -> TouchZone.Dead
     else -> TouchZone.Tap
 }
 
-/**
- * True while a card step (preview, reader, picture) follows the finger (`stepMode` 1 = deeper, -1 = back). Such a touch ends by
- * the step's own progress, so the swipe arming (tick, pull-back lock) and the dead-zone shrink do not apply to it.
- */
+/** True while a card step (preview, reader, picture) follows the finger (`stepMode` 1 = deeper, -1 = back). */
 fun stepFollowsFinger(stepMode: Int): Boolean = stepMode == 1 || stepMode == -1
 
-/** Whether the dead-zone shrink shows: the touch is in [TouchZone.Dead] and no step is following the finger. */
 fun deadZoneCue(slopExceeded: Boolean, liftFires: Boolean, stepFollowing: Boolean): Boolean =
     !stepFollowing && touchZone(slopExceeded, liftFires) == TouchZone.Dead
 
 /**
- * Decides whether a touch can still end as a tap. The *peak* distance from the touch-down point counts, not the final
- * one: a finger that went past the slop and came back is a cancelled drag, not a tap. Before this, the expanded island
- * only looked at the vertical offset (a sideways drag of up to the swipe threshold still opened the notification) and
- * the collapsed pill only at its swipe threshold (a drag between the tap slop and that threshold expanded the pill).
+ * Decides whether a touch can still end as a tap. The peak distance from the touch-down point counts, not the final
+ * one: a finger that went past the slop and came back is a cancelled drag, not a tap.
  */
 class TapGuard(private val slopPx: Float) {
     /** Largest distance from the touch-down point so far, in px. */
     var peak: Float = 0f
         private set
 
-    /** True once the finger has gone further than the slop: this touch is no longer a tap. */
     val exceeded: Boolean get() = peak > slopPx
 
-    /** Feeds the displacement from the touch-down point. */
     fun update(dx: Float, dy: Float) {
         val d = hypot(dx, dy)
         if (d > peak) peak = d

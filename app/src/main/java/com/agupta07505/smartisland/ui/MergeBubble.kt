@@ -13,23 +13,11 @@ import kotlin.math.exp
 
 /**
  * Pure maths for the "bubble" merge style (see [com.agupta07505.smartisland.util.MergeStyle.BUBBLE]): push, then join.
- *
- * All values are fractions of the merge progress `merge` (0 = bubble apart, 1 = fused), with `contact` from
- * [mergeContactFraction] marking the moment the bubble first touches the pill. The merge has three parts:
- *
- *  1. approach (`merge` < `contact`): the bubble travels to the pill, nothing else changes;
- *  2. push ([mergePush]): the two soft bodies press into each other, the touching faces go flat (no gap) and the
- *     bubble's icon fades out, so it is gone before the join;
- *  3. join ([mergeJoin]): the bodies become one shape (drawn gooey on Android 12+), the bubble is drawn into the
- *     pill and shrinks away, and the pill takes it in with a small swell that settles (no burst).
- *
- * Lengths are in dp and match the browser demo ("Bubble merge demo, 3rd version") the style was ported from.
  */
 
 /** How far (dp) the two bodies press into each other during the push. */
 const val MERGE_PUSH_DEPTH_DP = 7f
 
-/** How far (dp) inside the pill's near edge the bubble's centre ends up before it is gone. */
 private const val JOIN_SINK_DP = 14f
 
 /** How far (dp) inside the pill the bridge between bubble and pill reaches. */
@@ -38,22 +26,16 @@ const val MERGE_NECK_INSIDE_DP = 10f
 /** Height of the bridge at its widest, as a share of the round cutout's height. */
 const val MERGE_NECK_HEIGHT_FRACTION = 0.65f
 
-/** Share of the post-contact stretch of the merge taken by the push; the join gets the rest. */
 private const val PUSH_SPAN = 0.37f
 
-/** Share of the post-contact stretch in which the bubble's icon fades (finished before the join starts). */
 private const val ICON_FADE_SPAN = 0.33f
 
-/** Share of the join in which the bubble moves into the pill and shrinks. */
 private const val JOIN_MOVE_SPAN = 0.53f
 
-/** Share of the join in which the bridge closes. */
 private const val NECK_FADE_SPAN = 0.37f
 
-/** Share of the join in which the flat faces round off again. */
 private const val FLAT_FADE_SPAN = 0.15f
 
-/** Peak (dp) of the pill's swell when it takes the bubble in; it rings out as a damped wave. */
 private const val PILL_SWELL_DP = 5f
 
 private fun smooth(t: Float): Float {
@@ -67,13 +49,11 @@ private fun postContactSpan(contact: Float): Float = (1f - contact).coerceAtLeas
 fun mergePush(merge: Float, contact: Float): Float =
     smooth((merge - contact) / (postContactSpan(contact) * PUSH_SPAN))
 
-/** 0..1 through the join, which starts when the push is over. */
 fun mergeJoin(merge: Float, contact: Float): Float {
     val span = postContactSpan(contact)
     return ((merge - contact - span * PUSH_SPAN) / (span * (1f - PUSH_SPAN))).coerceIn(0f, 1f)
 }
 
-/** The bubble's icon: solid until contact, gone before the join. */
 fun mergeIconAlpha(merge: Float, contact: Float): Float =
     1f - smooth((merge - contact) / (postContactSpan(contact) * ICON_FADE_SPAN))
 
@@ -81,15 +61,13 @@ fun mergeIconAlpha(merge: Float, contact: Float): Float =
 fun mergeFaceFlat(merge: Float, contact: Float): Float =
     mergePush(merge, contact) * (1f - smooth(mergeJoin(merge, contact) / FLAT_FADE_SPAN))
 
-/** Radius of the touching corners as a share of the normal radius (1 round .. 0.35 flat). */
 fun mergeNearCornerFactor(flat: Float): Float = 1f - 0.65f * flat.coerceIn(0f, 1f)
 
-/** The join's own progress (0..1) of the bubble moving into the pill and shrinking. */
 private fun joinMove(merge: Float, contact: Float): Float = smooth(mergeJoin(merge, contact) / JOIN_MOVE_SPAN)
 
 /**
- * How far (dp) the bubble's centre has moved toward the pill from its resting place: it crosses the [gapDp]
- * between the cutouts, is pressed in a little by the push, then goes [JOIN_SINK_DP] inside the pill in the join.
+ * How far (dp) the bubble's centre has moved toward the pill from its resting place: it crosses the [gapDp] between
+ * the cutouts, is pressed in a little by the push, then goes [JOIN_SINK_DP] inside the pill in the join.
  */
 fun mergeBubbleOffsetDp(merge: Float, contact: Float, gapDp: Float, bubbleWidthDp: Float, pillWidthDp: Float): Float {
     val m = merge.coerceIn(0f, 1f)
@@ -102,13 +80,11 @@ fun mergeBubbleOffsetDp(merge: Float, contact: Float, gapDp: Float, bubbleWidthD
     return pushedEnd + (target - pushedEnd) * joinMove(m, contact)
 }
 
-/** The bubble shrinks away as it is drawn into the pill (1 down to 0). */
 fun mergeBubbleShrink(merge: Float, contact: Float): Float {
     val s = joinMove(merge, contact)
     return 1f - s * s
 }
 
-/** Width of the bubble as a multiple of its resting width: narrows as it is pressed, then shrinks away. */
 fun mergeBubbleScaleX(merge: Float, contact: Float, bubbleWidthDp: Float): Float {
     val narrow = if (bubbleWidthDp <= 0f) 1f else 1f - 0.6f * MERGE_PUSH_DEPTH_DP * mergePush(merge, contact) / bubbleWidthDp
     return narrow.coerceAtLeast(0.5f) * mergeBubbleShrink(merge, contact)
@@ -125,7 +101,6 @@ fun mergePillSwellDp(merge: Float, contact: Float): Float {
     return PILL_SWELL_DP * exp(-5f * j) * cos(9f * j) * smooth(j / 0.05f)
 }
 
-/** The pill's height as a multiple of its resting height: 8 % taller while it is pushed, then the swell. */
 fun mergePillScaleY(merge: Float, contact: Float, pillHeightDp: Float): Float {
     val pushed = 0.08f * mergePush(merge, contact) * (1f - smooth(mergeJoin(merge, contact) / FLAT_FADE_SPAN))
     return 1f + pushed + if (pillHeightDp > 0f) mergePillSwellDp(merge, contact) / pillHeightDp else 0f
@@ -135,7 +110,10 @@ fun mergePillScaleY(merge: Float, contact: Float, pillHeightDp: Float): Float {
 fun mergePillScaleX(merge: Float, contact: Float, pillWidthDp: Float): Float =
     1f + if (pillWidthDp > 0f) mergePillSwellDp(merge, contact) / pillWidthDp else 0f
 
-/** Height of the bridge between bubble and pill (0..1 of [MERGE_NECK_HEIGHT_FRACTION] circles): open at the join's start, closed by 37 % of it. */
+/**
+ * Height of the bridge between bubble and pill (0..1 of [MERGE_NECK_HEIGHT_FRACTION] circles): open at the join's
+ * start, closed by 37 % of it.
+ */
 fun mergeNeckHeightFactor(merge: Float, contact: Float): Float {
     val j = mergeJoin(merge, contact)
     return if (j <= 0f) 0f else 1f - smooth(j / NECK_FADE_SPAN)
@@ -143,22 +121,17 @@ fun mergeNeckHeightFactor(merge: Float, contact: Float): Float {
 
 /**
  * Signed distance (dp, positive toward the pill) from the bubble's centre to the pill's near edge when the bubble's
- * centre has moved [offsetDp] toward the pill. It is half the bubble width at contact and goes negative once the
- * bubble's centre is inside the pill.
+ * centre has moved [offsetDp] toward the pill.
  */
 fun mergeEdgeDistanceFromOffsetDp(distDp: Float, pillWidthDp: Float, offsetDp: Float): Float =
     abs(distDp) - pillWidthDp / 2f - offsetDp
 
-/**
- * Same as [mergeEdgeDistanceFromOffsetDp] for the slide style's straight-line travel (`travelDp * merge`).
- */
 fun mergeEdgeDistanceDp(distDp: Float, pillWidthDp: Float, travelDp: Float, merge: Float): Float =
     mergeEdgeDistanceFromOffsetDp(distDp, pillWidthDp, travelDp * merge.coerceIn(0f, 1f))
 
 /**
  * The moment two merging cutouts touch: [merge] has just crossed [contact] on its way up (merging in). Used for the
- * light haptic tick. Going back down (the bubble returning), a merge that is already finished and a jump over the
- * whole range in one step (animations off) never count.
+ * light haptic tick.
  */
 fun mergeTouchCrossed(previous: Float, now: Float, contact: Float): Boolean {
     if (now >= 0.999f) return false
@@ -166,33 +139,22 @@ fun mergeTouchCrossed(previous: Float, now: Float, contact: Float): Boolean {
     return previous < c && now >= c && now > previous
 }
 
-// ---- Gooey join (Android 12+): the bubble, its neighbour and the bridge between them blurred and alpha-thresholded ----
+// Gooey join (Android 12+): the bubble, its neighbour and the bridge between them blurred and alpha-thresholded
 
-/** Float noise at the exact start of the join must not count as the join having begun. */
 private const val JOIN_EPSILON = 1e-4f
 
 /** True while the gooey join is drawn: the join part of a merge at [merge] with first contact at [contact]. The push is crisp. */
 fun gooeyBridgeActive(merge: Float, contact: Float): Boolean =
     merge > 0f && merge < 1f && mergeJoin(merge, contact) > JOIN_EPSILON
 
-/** Blur radius (dp) of the gooey effect for a round cutout [circleDp] tall: a bit over a fifth of its height. */
 fun gooeyBlurDp(circleDp: Float): Float = (circleDp * 0.22f).coerceIn(3f, 14f)
 
-/**
- * Margin around the shapes, in blur sigmas, that the gooey layer covers. Only pixels whose blurred alpha is above about 47 % survive
- * the threshold, and those lie within a fraction of a sigma of the shapes' edges, so 1.5 sigma loses nothing visible while the old
- * 3 sigma made the layer (and so the blur) roughly twice as large on each axis.
- */
+/** Margin around the shapes, in blur sigmas, that the gooey layer covers. */
 const val GOO_MARGIN_SIGMAS = 1.5f
 
-/** Smallest blur radius (px) the gooey layer is allowed to be blurred with once it is drawn at a reduced resolution. */
 private const val GOO_MIN_SCALED_BLUR_PX = 6f
 
-/**
- * Resolution the gooey layer is recorded at (1 = full, 0.5, 0.25), drawn back up by the same factor. The edge of the threshold is as soft as
- * about an eighth of the blur radius, so while the blur stays at 6 px or more after the reduction the stretched edge is still smooth;
- * a reduction by 2 cuts the layer's pixels to a quarter and the blur's cost with it. A small blur stays at full resolution.
- */
+/** Resolution the gooey layer is recorded at (1 = full, 0.5, 0.25), drawn back up by the same factor. */
 fun gooeyLayerScale(blurPx: Float): Float = when {
     blurPx >= 4f * GOO_MIN_SCALED_BLUR_PX -> 0.25f
     blurPx >= 2f * GOO_MIN_SCALED_BLUR_PX -> 0.5f

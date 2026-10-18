@@ -15,9 +15,8 @@ import android.media.session.MediaController
 import android.os.Build
 
 /**
- * Where the music is playing right now, for the media card's output chip (read-only).
- *
- * The decision is pure ([MediaOutputRules], tested); [MediaOutputReader] only gathers the facts from Android.
+ * Where the music is playing right now, for the media card's output chip. The decision is pure ([MediaOutputRules]);
+ * [MediaOutputReader] only gathers the facts from Android.
  */
 enum class MediaOutputKind { Phone, Bluetooth, Headphones, Usb, Hdmi, Cast }
 
@@ -51,7 +50,6 @@ object MediaOutputRules {
     private const val TYPE_BLE_SPEAKER = 27
     private const val TYPE_BLE_BROADCAST = 30
 
-    /** Lower wins: something plugged or paired beats the phone's own speaker. */
     private fun rank(kind: MediaOutputKind): Int = when (kind) {
         MediaOutputKind.Bluetooth -> 0
         MediaOutputKind.Headphones -> 1
@@ -62,8 +60,8 @@ object MediaOutputRules {
     }
 
     /**
-     * The output to show. [remote] is a session playing on another device (cast, a TV): no local device is
-     * asked then. With nothing recognisable the phone is shown.
+     * The output to show. [remote] is a session playing on another device (cast, a TV): no local device is asked
+     * then. With nothing recognisable the phone is shown.
      */
     fun resolve(remote: Boolean, remoteName: String?, candidates: List<OutputCandidate>): MediaOutput {
         if (remote) return MediaOutput(MediaOutputKind.Cast, cleanName(remoteName))
@@ -103,8 +101,7 @@ object MediaOutputRules {
 
     /**
      * The name of the cast target. [controlId] is the session's volume control id (what a remote session reports),
-     * [routes] are the router's (id, name) pairs. Null when the id is empty or no route carries it, so the chip keeps its plain
-     * "Cast" word instead of showing a wrong device.
+     * [routes] are the router's (id, name) pairs.
      */
     fun remoteRouteName(controlId: String?, routes: List<Pair<String, String?>>): String? {
         val id = controlId?.takeIf { it.isNotEmpty() } ?: return null
@@ -130,11 +127,6 @@ object MediaOutputReader {
         return MediaOutputRules.resolve(remote = false, remoteName = null, candidates = candidates)
     }
 
-    /**
-     * The cast target's own name, read from `MediaRouter2` (API 30+) by matching the session's volume control id against the
-     * router's routes. Null when the phone does not offer it; whether a given ROM / cast app reports a matching id is for the device
-     * to show (the `MediaOutput` log line says what was found).
-     */
     private fun castTargetName(context: Context, info: MediaController.PlaybackInfo): String? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
         return runCatchingLogged("MediaOutput", "reading the cast target failed") {
@@ -151,7 +143,6 @@ object MediaOutputReader {
         return name
     }
 
-    /** API 33+: the devices this stream would really use (the routed one first). Null below that or when empty. */
     private fun routedDevices(audio: AudioManager, attributes: AudioAttributes?): List<AudioDeviceInfo>? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return null
         val attrs = attributes ?: AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).build()

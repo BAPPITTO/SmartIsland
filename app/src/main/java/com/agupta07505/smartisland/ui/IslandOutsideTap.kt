@@ -13,8 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 
 /**
- * Fills the overlay window. While expanded, a tap anywhere outside the island closes things in order: an open picture,
- * then an open sibling picker, then the island itself.
+ * Fills the overlay window. While expanded, a tap anywhere outside the island closes things in order: an open
+ * picture, then an open sibling picker, then the island itself.
  */
 internal fun Modifier.islandOutsideTap(
     expanded: Boolean,

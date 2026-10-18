@@ -97,10 +97,7 @@ internal fun rememberAppIcon(packageName: String): ImageBitmap? {
     return iconBitmap
 }
 
-/**
- * The "Select Pinned Apps" dialog. One composable for both homes: the App Shortcuts settings screen and [PickerActivity], the
- * small window the island opens from its plus tile so the app's own screen never has to come up.
- */
+/** The "Select Pinned Apps" dialog. */
 @Composable
 fun AppPickerDialog(
     settings: SmartIslandSettings,

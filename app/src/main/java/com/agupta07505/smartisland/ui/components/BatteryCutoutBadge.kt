@@ -47,7 +47,6 @@ fun pluggedInTurns(cardMs: Long): Int = (cardMs / 3000f).roundToInt().coerceIn(1
 fun pluggedInTurnMs(cardMs: Long): Int =
     minOf(MAX_TURN_MS, cardMs / pluggedInTurns(cardMs)).toInt().coerceAtLeast(MIN_TURN_MS)
 
-/** Scale of the one-shot swell at progress [q] (0..1): 1 at both ends, [SWELL_PEAK] in the middle. */
 fun batterySwellScale(q: Float): Float = 1f + (SWELL_PEAK - 1f) * sin(PI.toFloat() * q.coerceIn(0f, 1f))
 
 private const val MAX_TURN_MS = 1500L
@@ -56,7 +55,6 @@ private const val SWELL_MS = 1100
 private const val SWELL_PEAK = 1.2f
 private const val FILL_SHARE = 0.85f
 
-/** Everything below is drawn on a 48 x 48 grid and scaled to the badge. */
 private const val GRID = 48f
 private const val RING_RADIUS = 20.4f
 private const val RING_STROKE = 3.2f
@@ -67,16 +65,8 @@ private val TrackColor = Color(0x33FFFFFF)
 private val NoPulse: State<Float> = mutableFloatStateOf(1f)
 
 /**
- * The battery event as it sits in a cutout: a grey disc with the state icon, inside one connected ring that shows the level
- * (a faint track with the level drawn over it, from 12 o'clock, clockwise).
- *
- *  - PluggedIn  the ring turns once or twice (see [pluggedInTurns]) and comes to rest at 12 o'clock
- *  - Full       the battery fills with [color] while the icon swells once and settles
- *  - Low, Saver the same single swell and settle
- *  - PluggedOut the red bolt drains (shrinks and dims once)
- *
- * [cardMs] is how long the card stays on the island; it only decides how many turns the plugged-in ring makes.
- * With the system's animations off every motion is skipped and the badge shows its end state.
+ * The battery event as it sits in a cutout: a grey disc with the state icon, inside one connected ring that shows the
+ * level (a faint track with the level drawn over it, from 12 o'clock, clockwise).
  */
 @Composable
 fun BatteryCutoutBadge(
@@ -169,7 +159,6 @@ private fun DrawScope.drawRing(level: Float, color: Color, k: Float) {
     }
 }
 
-/** A squarer battery (small corners), a little larger than the old icon; the swell leaves room inside the disc. */
 private fun DrawScope.drawBatteryGlyph(visual: BatteryVisual, color: Color, fill: Float, k: Float) {
     drawRoundRect(
         color = color,

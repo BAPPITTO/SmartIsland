@@ -134,7 +134,7 @@ class SameAppCardsTest {
         assertEquals(2, cutoutCardCount(system, expanded = false))
     }
 
-    // --- app groups (sibling track S1) ---
+    // app groups (sibling track S1)
 
     @Test
     fun siblingIndicesListsTheWholeAppInListOrder() {

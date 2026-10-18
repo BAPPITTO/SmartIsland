@@ -16,13 +16,7 @@ import java.util.ArrayDeque
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Manages intelligent notification rate-limiting and anti-spam cooldown.
- * When an application posts multiple notifications in a rapid burst exceeding
- * the threshold within a 30-second sliding window, it enters a cooldown period.
- *
- * During cooldown, rapid successive alerts are suppressed from vibrating/popping up
- * the island. The latest notification is buffered and released after the cooldown
- * duration expires.
+ * Per-app rate limit for notification bursts: more than the threshold within a 30-second window starts a cooldown.
  */
 object NotificationCooldownManager {
     const val DETECTION_WINDOW_MS = 30_000L
@@ -34,8 +28,8 @@ object NotificationCooldownManager {
     private val cooldownExpirations = ConcurrentHashMap<String, Long>()
 
     /**
-     * System events that come from the system (broadcasts and callbacks) rather than from an app's notification, so the
-     * per-app list cannot cover them. Each one can be switched into the cooldown on its own.
+     * System events that come from the system (broadcasts and callbacks) rather than from an app's notification, so
+     * the per-app list cannot cover them. Each one can be switched into the cooldown on its own.
      */
     val SYSTEM_EVENTS: List<IslandEvent> = listOf(
         IslandEvent.PLUGGED_IN,
@@ -48,6 +42,10 @@ object NotificationCooldownManager {
         IslandEvent.WIFI_DISCONNECTED,
         IslandEvent.VPN_DISCONNECTED,
         IslandEvent.BLUETOOTH,
+        IslandEvent.USB_CONNECTED,
+        IslandEvent.USB_DISCONNECTED,
+        IslandEvent.HEADPHONES_CONNECTED,
+        IslandEvent.HEADPHONES_DISCONNECTED,
         IslandEvent.FLASHLIGHT
     )
 
@@ -56,12 +54,7 @@ object NotificationCooldownManager {
     // packageName -> latest buffered notification during cooldown
     private val bufferedNotifications = ConcurrentHashMap<String, StatusBarNotification>()
 
-    /**
-     * Checks if this notification should be throttled / held back.
-     *
-     * @return true if the notification is throttled (should NOT pop/sound in the island),
-     *         false if it should be displayed normally.
-     */
+    /** @return true when the notification is throttled and must not pop up or sound in the island. */
     fun shouldThrottle(
         sbn: StatusBarNotification,
         settings: SmartIslandSettings,
@@ -80,18 +73,15 @@ object NotificationCooldownManager {
 
         val cooldownExpiresAt = cooldownExpirations[pkg] ?: 0L
         if (currentTimeMs < cooldownExpiresAt) {
-            // Actively in cooldown — buffer the latest message and throttle
             bufferedNotifications[pkg] = sbn
             return true
         }
 
-        // Clean up expired cooldown state if any
         if (cooldownExpiresAt != 0L && currentTimeMs >= cooldownExpiresAt) {
             cooldownExpirations.remove(pkg)
             recentTimestamps.remove(pkg)
         }
 
-        // Sliding window detection
         val timestamps = recentTimestamps.getOrPut(pkg) { ArrayDeque() }
         synchronized(timestamps) {
             timestamps.addLast(currentTimeMs)
@@ -100,7 +90,6 @@ object NotificationCooldownManager {
             }
 
             if (timestamps.size >= settings.notificationCooldownThreshold) {
-                // Threshold exceeded! Trigger cooldown for subsequent notifications
                 val durationMs = settings.notificationCooldownDurationMinutes * 60_000L
                 cooldownExpirations[pkg] = currentTimeMs + durationMs
                 timestamps.clear()
@@ -111,10 +100,8 @@ object NotificationCooldownManager {
     }
 
     /**
-     * Anti-spam for one system event announcement (a charger plugged in again and again, Wi-Fi that keeps reconnecting).
-     * Call it once per announcement that would pop the island open. The caller keeps the card but drops the pop-up when
-     * this returns true. Events the user did not switch in, and every event while the cooldown is off, never throttle.
-     * The window, the trigger count and the quiet period are the same ones the app notifications use.
+     * Anti-spam for one system event announcement (a charger plugged in again and again, Wi-Fi that keeps
+     * reconnecting).
      */
     fun shouldThrottleSystemEvent(
         eventId: String,
@@ -146,10 +133,7 @@ object NotificationCooldownManager {
         return false
     }
 
-    /**
-     * Returns true if the given IslandMode should never be rate-limited
-     * (e.g. phone calls, timers, music, navigation).
-     */
+    /** True for modes that are never rate-limited (calls, timers, music, navigation). */
     fun isExemptMode(mode: IslandMode): Boolean {
         return mode == IslandMode.IncomingCall ||
             mode == IslandMode.Timer ||
@@ -157,8 +141,7 @@ object NotificationCooldownManager {
             mode == IslandMode.Music ||
             mode == IslandMode.Navigation ||
             mode == IslandMode.Hotspot ||
-            // A download or upload posts a progress update every second or so. Counted as spam, they started a cooldown
-            // (3 minutes by default) and the "download finished" notification was held until it ended.
+            // Progress updates arrive every second or so; counting them as spam would hold back the "download finished" notification.
             mode == IslandMode.DownloadUpload ||
             mode == IslandMode.Battery ||
             mode == IslandMode.Flashlight ||
@@ -166,16 +149,11 @@ object NotificationCooldownManager {
             mode == IslandMode.AudioRecording
     }
 
-    /**
-     * Retrieves and clears the latest buffered notification for a package when its cooldown completes.
-     */
+    /** Returns and clears the buffered notification once the cooldown has ended. */
     fun pollBufferedNotification(packageName: String): StatusBarNotification? {
         return bufferedNotifications.remove(packageName)
     }
 
-    /**
-     * Checks whether a package is currently cooling down.
-     */
     fun isPackageInCooldown(
         packageName: String,
         currentTimeMs: Long = SystemClock.elapsedRealtime()
@@ -184,9 +162,7 @@ object NotificationCooldownManager {
         return currentTimeMs < expiresAt
     }
 
-    /**
-     * Returns remaining cooldown seconds for a package, or 0 if not cooling down.
-     */
+    /** Remaining cooldown in seconds, 0 when not cooling down. */
     fun getRemainingCooldownSeconds(
         packageName: String,
         currentTimeMs: Long = SystemClock.elapsedRealtime()
@@ -196,9 +172,6 @@ object NotificationCooldownManager {
         return if (remainingMs > 0) (remainingMs / 1000L).toInt() else 0
     }
 
-    /**
-     * Clears all cooldown states, timestamps, and buffered notifications.
-     */
     fun clear() {
         recentTimestamps.clear()
         cooldownExpirations.clear()

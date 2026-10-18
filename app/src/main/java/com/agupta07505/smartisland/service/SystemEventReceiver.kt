@@ -27,17 +27,14 @@ import com.agupta07505.smartisland.util.runCatchingLogged
 class SystemEventReceiver(
     private val notificationRepository: INotificationRepository,
     private val settingsProvider: () -> com.agupta07505.smartisland.data.SmartIslandSettings = { com.agupta07505.smartisland.data.SmartIslandSettings.Default },
-    /** True while a battery card is open in the expanded island: its timers wait until the island closes. */
     private val isBatteryCardExpanded: () -> Boolean = { false }
 ) : BroadcastReceiver() {
 
     private var lastBatteryPct: Int = -1
     private var lastBatteryTitle: String? = null
     private var isCurrentlyCharging: Boolean = false
-    /** False until the first battery broadcast (the sticky one delivered on registration). */
     private var chargingKnown: Boolean = false
     private var unpluggedCardUntil: Long = 0L
-    /** While the brief "plugged in" card is up, periodic charging updates must not replace it. */
     private var pluggedInCardUntil: Long = 0L
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
@@ -45,24 +42,13 @@ class SystemEventReceiver(
     private var lastBluetoothAddress: String? = null
     private var lastBluetoothConnectedTime: Long = 0L
 
-    /**
-     * True when this announcement may pop the island open: [wantsExpand] is what the event asked for, and the anti-spam
-     * cooldown may take it away for an event the user switched into it. A throttled event still posts its card, so the
-     * island shows the real state without the pop-up.
-     */
     private fun mayExpand(event: IslandEvent, wantsExpand: Boolean): Boolean =
         wantsExpand && !NotificationCooldownManager.shouldThrottleSystemEvent(event.id, settingsProvider())
 
-    /** Stops the delayed "unplugged" follow-up when the overlay service goes away. */
     fun release() {
         mainHandler.removeCallbacksAndMessages(null)
     }
 
-    /**
-     * Runs [action] after [delayMs], like postDelayed. If a battery card is open in the expanded island at that
-     * moment, the action waits (checked every [EXPANDED_RECHECK_MS]) and runs once the island is closed again, so a
-     * battery card is never taken away while the user is looking at it.
-     */
     private fun postUnlessExpanded(delayMs: Long, action: () -> Unit) {
         mainHandler.postDelayed(object : Runnable {
             override fun run() {
@@ -94,7 +80,7 @@ class SystemEventReceiver(
                         "Bluetooth Device"
                     }
 
-                    // Suppress smartwatches, health trackers, and peripherals from hijacking the Island with connection alerts
+                    // Smartwatches, trackers and peripherals must not hijack the island with connection alerts.
                     if (isIgnoredBluetoothDevice(device, deviceName)) {
                         return@runCatchingLogged
                     }
@@ -102,8 +88,7 @@ class SystemEventReceiver(
                     val address = runCatching { device?.address }.getOrNull()
                     val now = System.currentTimeMillis()
 
-                    // Debounce: If this device is already active or reconnected within the debounce window,
-                    // do not auto-expand the Island to prevent repetitive popup loops.
+                    // Debounce: a device already active or reconnected within the window does not auto-expand (no popup loops).
                     val isRecentReconnection = address != null &&
                         address == lastBluetoothAddress &&
                         lastBluetoothConnectedTime > 0L &&
@@ -166,10 +151,8 @@ class SystemEventReceiver(
                     }
                     val disconnectedAddress = runCatching { disconnectedDevice?.address }.getOrNull()
 
-                    // Only dismiss the Bluetooth notification if the device that disconnected
-                    // is our currently active Bluetooth device (or address could not be determined).
-                    // This avoids removing the notification when a smartwatch/peripheral disconnects
-                    // while audio earbuds are connected.
+                    // Only dismiss when the disconnected device is the active one (or unknown), so a smartwatch
+                    // disconnecting does not remove the card while earbuds are connected.
                     if (activeBluetoothAddress == null || disconnectedAddress == null || disconnectedAddress == activeBluetoothAddress) {
                         activeBluetoothAddress = null
                         notificationRepository.removeNotification("system_bluetooth")
@@ -203,9 +186,7 @@ class SystemEventReceiver(
                 Intent.ACTION_BATTERY_CHANGED -> {
                     val charging = isCharging(intent)
                     if (!chargingKnown) {
-                        // Sticky broadcast on registration: adopt the current state silently
-                        // instead of announcing a "plugged in" or "unplugged" event that
-                        // did not just happen (service start, settings toggle).
+                        // Sticky broadcast on registration: adopt the current state silently, not as a new plug-in or unplug event.
                         chargingKnown = true
                         isCurrentlyCharging = charging
                         if (charging) {
@@ -231,9 +212,7 @@ class SystemEventReceiver(
     }
 
     private fun isCharging(intent: Intent): Boolean {
-        // A connected charger counts even when the status says NOT_CHARGING, which is what
-        // phones report while a charge limit (80 to 85%) or heat protection pauses charging.
-        // Without this the island announced "Unplugged" for a cable that was still attached.
+        // A connected charger counts even when the status says NOT_CHARGING (charge limit or heat protection pause charging).
         val plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)
         if (plugged > 0) return true
         val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
@@ -252,7 +231,6 @@ class SystemEventReceiver(
         }
     }
 
-    /** Brief "charger unplugged" card; normal low-battery/saver handling resumes after it fades. */
     private fun postUnplugged(context: Context, intent: Intent?) {
         val intentToUse = getBatteryIntent(context, intent)
         val level = intentToUse?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
@@ -280,12 +258,6 @@ class SystemEventReceiver(
         }
     }
 
-    /**
-     * Low battery, battery saver and fully charged are short warnings: they leave the island by
-     * themselves after the battery warning length from settings (default
-     * [com.agupta07505.smartisland.util.IslandTimings.BATTERY_WARNING_CARD_MS]). The check keeps a newer battery card (for
-     * example "Charging") from being removed by an older warning's timer.
-     */
     private fun scheduleWarningRemoval(category: String) {
         postUnlessExpanded(settingsProvider().batteryWarningMs.toLong()) {
             val card = notificationRepository.notifications.value.firstOrNull { it.key == "system_battery" }
@@ -360,13 +332,6 @@ class SystemEventReceiver(
         }
     }
 
-    /**
-     * Cards while a charger is connected:
-     *  - "plugged in" (category battery_plugged_in): the brief card shown when the cable connects; it is cleared
-     *    after PLUGGED_IN_DISPLAY_MS;
-     *  - "fully charged" (category battery_full) when the battery is full.
-     * Nothing else is shown while charging.
-     */
     private fun updateBatteryIsland(context: Context, batteryIntent: Intent?, autoExpand: Boolean, event: String? = null) {
         if (event != "plugged_in" && System.currentTimeMillis() < pluggedInCardUntil) return
         val intentToUse = getBatteryIntent(context, batteryIntent)
@@ -391,7 +356,6 @@ class SystemEventReceiver(
         val category = if (isFull) "battery_full" else "battery_plugged_in"
         val cooldownEvent = if (isFull) IslandEvent.FULLY_CHARGED else IslandEvent.PLUGGED_IN
 
-        // Skip redundant posts when both the percentage and title haven't changed.
         if (!autoExpand && batteryPct == lastBatteryPct && title == lastBatteryTitle) return
         lastBatteryPct = batteryPct
         lastBatteryTitle = title
@@ -440,12 +404,12 @@ class SystemEventReceiver(
         val majorClass = bluetoothClass?.majorDeviceClass
         val deviceClass = bluetoothClass?.deviceClass
 
-        // 1. Explicitly allow Audio/Video devices (earbuds, headphones, car audio, speakers, headsets)
+        // Audio/video devices (earbuds, headphones, car audio, speakers, headsets) are allowed.
         if (majorClass == BluetoothClass.Device.Major.AUDIO_VIDEO) {
             return false
         }
 
-        // 2. Filter out Wearables, Health sensors, and Peripherals (mice, keyboards, controllers)
+        // Wearables, health sensors and peripherals (mice, keyboards, controllers) are filtered out.
         if (majorClass == BluetoothClass.Device.Major.WEARABLE ||
             majorClass == BluetoothClass.Device.Major.HEALTH ||
             majorClass == BluetoothClass.Device.Major.PERIPHERAL
@@ -462,7 +426,7 @@ class SystemEventReceiver(
             return true
         }
 
-        // 3. Name-based heuristics for smartwatches, fitness bands, and trackers
+        // Name heuristics for smartwatches, fitness bands and trackers.
         val lowerName = deviceName.lowercase()
         val wearableKeywords = listOf(
             "watch", "smartwatch", "wear os", "fitbit", "garmin", "amazfit",
@@ -473,7 +437,7 @@ class SystemEventReceiver(
             return true
         }
 
-        // 4. Peripherals / HID keywords
+        // HID keywords.
         val peripheralKeywords = listOf("mouse", "keyboard", "trackpad", "gamepad", "controller", "stylus", "s pen")
         if (peripheralKeywords.any { lowerName.contains(it) }) {
             return true

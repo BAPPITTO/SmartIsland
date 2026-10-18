@@ -8,9 +8,8 @@
 package com.agupta07505.smartisland.util
 
 /**
- * Which picker the island's plus button wants open: [APPS] is the pinned apps picker, [UTILITY] the "add a utility" flow. Both open in
- * their own small window ([com.agupta07505.smartisland.ui.pickers.PickerActivity]); the app's settings screens host the same shared dialogs
- * themselves and are never asked to open one on the island's behalf.
+ * Which picker the island's plus button wants open: [APPS] is the pinned apps picker, [UTILITY] the "add a utility"
+ * flow.
  */
 object PickerRequest {
     const val APPS = "apps"

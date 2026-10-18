@@ -11,12 +11,7 @@ import com.agupta07505.smartisland.model.CountEntry
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-/**
- * The notifications the count idle widget counts, kept by the notification listener service (the only part of the app that sees the system shade)
- * and read by the widget (ui/IdleWidgets.kt, via [rememberIdleWidgetData]). Each entry is one notification in the shade or one card the island
- * holds, already merged per key ([com.agupta07505.smartisland.model.NotificationCounts.merge]); what counts is decided later by
- * [com.agupta07505.smartisland.model.NotificationCounts.summarize].
- */
+/** Notifications for the count idle widget, kept by the notification listener service and read by the widget. */
 object NotificationCountTracker {
     private val state = MutableStateFlow<List<CountEntry>>(emptyList())
     val entries: StateFlow<List<CountEntry>> = state
@@ -25,7 +20,6 @@ object NotificationCountTracker {
         if (state.value != entries) state.value = entries
     }
 
-    /** The listener lost its connection: nothing is known any more. */
     fun clear() {
         state.value = emptyList()
     }

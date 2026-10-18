@@ -35,10 +35,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
-/**
- * The few things a utility needs from the overlay service. The service fills these in while it runs, so the Utilities page can
- * ask for a global action, a collapse or a floating window without every layer of the island passing callbacks down to it.
- */
+/** The few things a utility needs from the overlay service. */
 object UtilityBridge {
     @Volatile var collapse: (() -> Unit)? = null
     @Volatile var globalAction: ((Int) -> Boolean)? = null
@@ -71,8 +68,7 @@ object UtilityActions {
     const val SECTION_APP_SHORTCUTS = "app_shortcuts"
 
     /**
-     * Opens the app on the App Shortcuts configuration (where the pinned apps and the Utilities layout are edited). The island stays
-     * open on top, so the choices made there show up in it while they are being made.
+     * Opens the app on the App Shortcuts configuration (where the pinned apps and the Utilities layout are edited).
      */
     fun openShortcutSettings(context: Context) {
         val intent = Intent(context.applicationContext, com.agupta07505.smartisland.MainActivity::class.java)
@@ -82,8 +78,8 @@ object UtilityActions {
     }
 
     /**
-     * Opens one of the island's pickers ([PickerRequest.APPS], [PickerRequest.UTILITY]) in its own small window, without bringing the app up. The island
-     * stays open on top, so the choices show up in it as they are made.
+     * Opens one of the island's pickers ([PickerRequest.APPS], [PickerRequest.UTILITY]) in its own small window,
+     * without bringing the app up.
      */
     fun openPicker(context: Context, picker: String) {
         val kind = com.agupta07505.smartisland.ui.pickers.PickerKinds.forRequest(picker) ?: return
@@ -91,7 +87,6 @@ object UtilityActions {
             .onFailure { openShortcutSettings(context) }
     }
 
-    /** Screenshots wait a moment so the island is gone from the picture. */
     private const val SCREENSHOT_DELAY_MS = 450L
 
     @Volatile var torchOn: Boolean = false
@@ -128,25 +123,16 @@ object UtilityActions {
         }
     }
 
-    // ---- Things that open a screen or a system action ----
-
-    /**
-     * Opens [intent] full screen and closes the island; a phone with nothing to handle it gets a short note. Only the camera uses it:
-     * every other utility that has to open an app or a system page as its fallback goes through [startFirst], floating first.
-     */
     private fun startFull(context: Context, intent: Intent): Boolean {
         val started = runCatching { context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess
         if (started) UtilityBridge.collapse?.invoke() else toast(context, R.string.utility_action_failed)
         return started
     }
 
-    // ---- System switches: Bluetooth, airplane mode, auto-rotate, dark mode, battery saver ----
-
     fun bluetoothEnabled(context: Context): Boolean = runCatching {
         (context.applicationContext.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter?.isEnabled == true
     }.getOrDefault(false)
 
-    /** Apps cannot switch Bluetooth since Android 13: Shizuku does it, otherwise the Bluetooth settings open. */
     private fun toggleBluetooth(context: Context) {
         if (shizukuUsable(context, ShizukuMethodCheck.Method.Shell)) {
             val verb = if (bluetoothEnabled(context)) "disable" else "enable"
@@ -208,8 +194,6 @@ object UtilityActions {
         }
     }
 
-    // ---- Auto brightness and ringer (the buttons inside the two sliders) ----
-
     fun autoBrightnessEnabled(context: Context): Boolean = runCatching {
         Settings.System.getInt(context.applicationContext.contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE) ==
             Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC
@@ -231,16 +215,12 @@ object UtilityActions {
         (context.applicationContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager).ringerMode
     }.getOrDefault(AudioManager.RINGER_MODE_NORMAL)
 
-    /** Whether the app may change Do Not Disturb, which the silent ringer needs (Shizuku setup grants it). */
     fun dndAccessGranted(context: Context): Boolean = runCatching {
         (context.applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager)
             .isNotificationPolicyAccessGranted
     }.getOrDefault(false)
 
-    /**
-     * Cycles the ringer: ring, then vibrate, then silent, then ring again. Silent needs Do Not Disturb access; without it the cycle
-     * skips silent (ring and vibrate need nothing) and a short note says how to get it.
-     */
+    /** Cycles the ringer: ring, then vibrate, then silent, then ring again. */
     fun toggleRinger(context: Context) {
         val app = context.applicationContext
         val am = app.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
@@ -264,8 +244,6 @@ object UtilityActions {
             }
         }
     }
-
-    // ---- Calculator ----
 
     /** Calculator apps on the device: the system default first, then any launcher app named like a calculator. */
     fun calculatorApps(context: Context): List<LaunchableApp> {
@@ -304,8 +282,6 @@ object UtilityActions {
         UtilityBridge.collapse?.invoke()
     }
 
-    // ---- Flashlight ----
-
     /** Starts following the torch so [torchOn] is right before the first tap. Safe to call repeatedly. */
     fun watchTorch(context: Context) {
         if (torchCallbackRegistered) return
@@ -329,11 +305,8 @@ object UtilityActions {
         }
     }
 
-    // ---- Wi-Fi and mobile data ----
-
     private fun shizukuReady(): Boolean = ShizukuManager.isBinderAvailable() && ShizukuManager.hasPermission()
 
-    /** Shizuku is ready and the method did not fail the setup check (a method never checked is still tried). */
     private fun shizukuUsable(context: Context, method: ShizukuMethodCheck.Method): Boolean =
         ShizukuMethodCheck.usable(context, method)
 
@@ -355,11 +328,7 @@ object UtilityActions {
         }
     }
 
-    /**
-     * Whether mobile data is on. A phone with two SIM slots keeps the on / off value per SIM (`mobile_data<id>`), and the plain
-     * `mobile_data` key can then stay at its default for ever, which made the tile always say "on" and always send "disable".
-     * So the default data SIM's own key is read first; the plain key is only the last resort.
-     */
+    /** Whether mobile data is on. */
     fun mobileDataEnabled(context: Context): Boolean {
         val app = context.applicationContext
         val subId = runCatching { SubscriptionManager.getDefaultDataSubscriptionId() }
@@ -383,10 +352,6 @@ object UtilityActions {
         }
     }
 
-    /**
-     * The system's small pop-up panel opens as it is (it already floats over the screen). Only when the phone has no such panel does
-     * the full settings page open, in a floating window first.
-     */
     private fun openPanel(context: Context, panelAction: String, fallbackAction: String) {
         val shown = runCatching { context.startActivity(Intent(panelAction).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess
         if (shown) {
@@ -396,9 +361,6 @@ object UtilityActions {
         startFirst(context, listOf(Intent(fallbackAction)))
     }
 
-    // ---- Clear background cache ----
-
-    /** Stops background apps (never this one, the home screen or the app in front) and, with Shizuku, trims every app's cache. */
     private fun clearBackground(context: Context) {
         scope.launch {
             val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
@@ -423,8 +385,6 @@ object UtilityActions {
         UtilityBridge.collapse?.invoke()
     }
 
-    // ---- Screenshot and lock screen ----
-
     private fun screenshot(context: Context) {
         UtilityBridge.collapse?.invoke()
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) { toast(context, R.string.utility_needs_android_9); return }
@@ -443,12 +403,6 @@ object UtilityActions {
         }
     }
 
-    // ---- Screen recorder ----
-
-    /**
-     * With Shizuku the shell's own `screenrecord` records to Movies (it stops by itself after three minutes, a limit of the tool);
-     * a second tap stops it. Without Shizuku the quick settings open so the system's screen-record tile can be used.
-     */
     private fun toggleScreenRecord(context: Context) {
         if (!shizukuUsable(context, ShizukuMethodCheck.Method.ScreenRecorder)) {
             UtilityBridge.collapse?.invoke()
@@ -475,12 +429,6 @@ object UtilityActions {
         }
     }
 
-    // ---- Hotspot ----
-
-    /**
-     * With Shizuku, and only once the setup check saw the shell command work on this phone, the hotspot switches directly.
-     * Otherwise (no Shizuku, or the check was not run or failed) the hotspot settings page opens, as before.
-     */
     private fun toggleHotspot(context: Context) {
         if (shizukuReady() && ShizukuMethodCheck.works(context, ShizukuMethodCheck.Method.Hotspot)) {
             scope.launch { HotspotUtil.toggleWithShizuku(context) }
@@ -490,33 +438,24 @@ object UtilityActions {
         UtilityBridge.collapse?.invoke()
     }
 
-    // ---- Timer and stopwatch ----
-
     /** Lengths offered by the Timer tile, in minutes. */
     val TIMER_CHOICES_MINUTES: List<Int> = listOf(1, 5, 10, 15, 30)
 
     /**
-     * Starts the island's own countdown of [seconds] (see [InAppTimer]); no clock app is involved. The island closes so the cutout
-     * shows the countdown.
+     * Starts the island's own countdown of [seconds]; no clock app is involved. The island closes so the cutout shows
+     * the countdown.
      */
     fun startTimer(context: Context, seconds: Int) {
         InAppTimer.start(context, seconds.coerceIn(1, 24 * 60 * 60))
         UtilityBridge.collapse?.invoke()
     }
 
-    /** The Stopwatch tile: the island's own stopwatch (see [InAppStopwatch]). Starting one closes the island so the cutout shows it. */
     private fun toggleStopwatch(context: Context) {
         val wasActive = InAppStopwatch.isActive
         InAppStopwatch.toggle(context)
         if (!wasActive) UtilityBridge.collapse?.invoke()
     }
 
-    // ---- helpers ----
-
-    /**
-     * Starts the first of [intents] the device can open. Each one is tried in a floating window first (when that is on), then as a
-     * normal full-screen page.
-     */
     private fun startFirst(context: Context, intents: List<Intent>) {
         for (intent in intents) {
             val started = UtilityBridge.openIntentFloating?.invoke(Intent(intent)) == true ||
@@ -533,16 +472,10 @@ object UtilityActions {
         main.post { Toast.makeText(context, res, Toast.LENGTH_SHORT).show() }
     }
 
-    // ---- Brightness and volume sliders (Utilities page) ----
-
     private const val BRIGHTNESS_MAX = 255
     private const val BRIGHTNESS_MIN = 1
     @Volatile private var lastWritePromptMs = 0L
 
-    /**
-     * True when the app may change system settings. If not, the system page that grants it opens (at most once every few seconds,
-     * so a drag does not open it repeatedly) and false is returned.
-     */
     private fun ensureCanWriteSettings(app: Context): Boolean {
         if (Settings.System.canWrite(app)) return true
         val now = System.currentTimeMillis()
@@ -563,11 +496,7 @@ object UtilityActions {
         return (raw.coerceIn(0, BRIGHTNESS_MAX)) / BRIGHTNESS_MAX.toFloat()
     }
 
-    /**
-     * Sets the screen brightness from a 0..1 [fraction] (never fully black). Needs the "modify system settings" permission; without
-     * it the system page that grants it opens instead (at most once every few seconds, so a drag does not open it repeatedly).
-     * Moving the slider switches adaptive brightness to manual, as the system's own slider does.
-     */
+    /** Sets the screen brightness from a 0..1 [fraction] (never fully black). */
     fun setBrightness(context: Context, fraction: Float) {
         val app = context.applicationContext
         if (!ensureCanWriteSettings(app)) return

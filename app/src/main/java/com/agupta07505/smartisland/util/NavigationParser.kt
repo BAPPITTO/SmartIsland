@@ -48,8 +48,8 @@ object NavigationParser {
     fun parse(sbn: StatusBarNotification): NavigationInfo? {
         val packageName = sbn.packageName
 
-        // Delivery and ride apps track an order or a trip; they never give turn-by-turn guidance, even when one of them tags its
-        // notification with the navigation category and a distance ("Your rider is 500 m away"). Live Activities owns them.
+        // Delivery and ride apps track an order or a trip; they never give turn-by-turn guidance, even when one of
+        // them tags its notification with the navigation category and a distance ("Your rider is 500 m away").
         if (AppPackageCatalog.isLiveActivityApp(packageName)) return null
 
         val notification = sbn.notification ?: return null
@@ -64,8 +64,8 @@ object NavigationParser {
             return null
         }
 
-        // A map app also posts ordinary notifications (Maps' "Your September Timeline", a saved-place tip, a traffic alert). Guidance is
-        // either categorised as navigation or runs as an ongoing / foreground-service notification; without either, it is not guidance.
+        // A map app also posts ordinary notifications (Maps' "Your September Timeline", a saved-place tip, a traffic
+        // alert).
         if (!isCategoryNav) {
             val running = (notification.flags and (Notification.FLAG_ONGOING_EVENT or Notification.FLAG_FOREGROUND_SERVICE)) != 0
             if (!running) return null
@@ -86,7 +86,6 @@ object NavigationParser {
             return null
         }
 
-        // 1. Evidence that this is guidance, in any covered language
         val leadingDist = NavigationLocale.LEADING_DISTANCE.find(title.trim())
         val anyDist = if (leadingDist == null) NavigationLocale.ANY_DISTANCE.find("$title $text") else null
         val distanceMatch = leadingDist ?: anyDist
@@ -95,22 +94,19 @@ object NavigationParser {
         val hasTripStat = NavigationLocale.TRIP_STAT.containsMatchIn(combinedContent)
 
         if (knownApp) {
-            // A known map app that categorises the notification as navigation is trusted. Otherwise it is only an ongoing
-            // notification, which a map app also keeps for "Waze is running" or a shared-location chip: it must read like guidance.
+            // A known map app that categorises the notification as navigation is trusted.
             if (!isCategoryNav && !hasManeuverWording && distanceMatch == null && !hasTripStat) return null
         } else {
-            // Any other app only gets here through the navigation category, which delivery, ride and tracking apps use too. Real
-            // maneuver wording is required (a distance alone is not enough) and order / ride vocabulary rules it out.
+            // Any other app only gets here through the navigation category, which delivery, ride and tracking apps
+            // use too.
             if (!hasManeuverWording) return null
             if (NavigationLocale.DELIVERY_OR_RIDE_WORDING.containsMatchIn(combinedContent)) return null
         }
 
         val distanceText = distanceMatch?.value ?: "In 200 m"
 
-        // 2. Determine Turn Direction
         val turnDirection = parseTurnDirection(combinedContent)
 
-        // 3. Clean up Maneuver Title
         val maneuverTitle = when {
             title.isNotBlank() && !title.startsWith(distanceText, ignoreCase = true) -> title
             text.isNotBlank() -> text
@@ -166,12 +162,7 @@ object NavigationParser {
 
     private val SEGMENT_SPLIT = Regex("\\s*[\u2022\u00B7|]\\s*")
 
-    /**
-     * Splits a navigation notification into the rows of the expanded card.
-     * Segments of [text] (split on bullets) that look like trip stats (minutes, ETA, arrival time)
-     * go to [NavigationCardText.eta]; the rest is instruction detail. A distance only counts for the
-     * badge when it is not part of a trip stat, so "24 min • 8.5 km" never becomes "In 8.5 km".
-     */
+    /** Splits a navigation notification into the rows of the expanded card. */
     fun cardText(title: String, text: String): NavigationCardText {
         val segments = text.split(SEGMENT_SPLIT).map { it.trim() }.filter { it.isNotEmpty() }
         val (statSegments, detailSegments) = segments.partition { NavigationLocale.TRIP_STAT.containsMatchIn(it) || NavigationLocale.TRIP_DISTANCE.matches(it) }

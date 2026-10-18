@@ -90,21 +90,16 @@ fun IslandCollapsedContent(
     collapsedAlpha: Float,
     settings: SmartIslandSettings,
     modifier: Modifier = Modifier,
-    privacyActive: Set<com.agupta07505.smartisland.model.PrivacyKind> = emptySet(),
-    /** Receives where the privacy dots are on screen (null when none), so a tap on them can be recognised. */
-    onPrivacyDotsBounds: ((PrivacyDotsHit?) -> Unit)? = null,
     /** The idle widget to draw while no card is on the island (mode Empty); null = nothing. See ui/IdleWidgets.kt. */
     idleWidget: IdleWidgetFrame? = null
 ) {
     val density = LocalDensity.current
-    val dotsWidthDp = privacyDotsWidthDp(privacyActive)
     val maxTranslationPx = with(density) { COLLAPSED_TRANSLATION_MAX_DP.toPx() }
     val translationProgress = 1f - collapsedAlpha
     val translationXLeft = translationProgress * maxTranslationPx
     val translationXRight = -translationProgress * maxTranslationPx
 
     Box(modifier = modifier.fillMaxSize()) {
-        // Left Slot (Icon / Glyphs)
         Box(
             modifier = Modifier
                 .align(Alignment.CenterStart)
@@ -227,22 +222,10 @@ fun IslandCollapsedContent(
             }
         }
 
-        if (dotsWidthDp > 0) {
-            PrivacyDots(
-                active = privacyActive,
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = RIGHT_SLOT_PADDING_END_DP.dp),
-                onBounds = onPrivacyDotsBounds
-            )
-        }
-
-        // Right Slot (Visualizer / Indicators)
         Row(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
-                // The privacy dots own the far right; other right-side content shifts left beside them.
-                .padding(end = (RIGHT_SLOT_PADDING_END_DP + dotsWidthDp).dp)
+                .padding(end = RIGHT_SLOT_PADDING_END_DP.dp)
                 .graphicsLayer {
                     translationX = translationXRight
                 },
@@ -472,7 +455,6 @@ private fun AudioVisualizer(
     }
 }
 
-
 @Composable
 internal fun CallTimer(postTimeMillis: Long, color: Color) {
     var elapsedSeconds by remember(postTimeMillis) {
@@ -549,7 +531,6 @@ private fun SmoothCircularRingProgress(
         val topLeftOffset = androidx.compose.ui.geometry.Offset(strokeWidth / 2f, strokeWidth / 2f)
         val arcSize = androidx.compose.ui.geometry.Size(diameter, diameter)
 
-        // Track background ring
         drawArc(
             color = Color(0x4DFFFFFF),
             startAngle = -90f,
@@ -560,7 +541,6 @@ private fun SmoothCircularRingProgress(
             style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
         )
 
-        // Filled progress arc (360 degrees for completed 1.0f)
         val sweepAngle = (360f * progress.coerceIn(0f, 1f))
         if (sweepAngle > 0f) {
             drawArc(
@@ -690,7 +670,6 @@ private fun CustomPremiumTransferIcon(
         val drawAlpha = alphaFraction.coerceIn(0f, 1f)
         val drawColor = color.copy(alpha = drawAlpha)
 
-        // 1. Main Arrow Shaft
         drawLine(
             color = drawColor,
             start = androidx.compose.ui.geometry.Offset(cx, tailY),
@@ -699,7 +678,6 @@ private fun CustomPremiumTransferIcon(
             cap = StrokeCap.Round
         )
 
-        // 2. Main Arrow Head Wings
         val wingY = if (isUpload) tipY + arrowHeadHeight else tipY - arrowHeadHeight
         val path = androidx.compose.ui.graphics.Path().apply {
             moveTo(cx - arrowHeadWidth, wingY)
@@ -712,7 +690,6 @@ private fun CustomPremiumTransferIcon(
             style = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round)
         )
 
-        // 3. Subtle Trailing Particle Dot
         val particleOffsetY = if (isUpload) 4.5.dp.toPx() else -4.5.dp.toPx()
         val particleY = tailY + particleOffsetY
         val particleAlpha = (drawAlpha * 0.5f).coerceIn(0f, 1f)
@@ -947,6 +924,8 @@ internal fun TimerCountdown(notification: IslandNotification?, color: Color) {
     }
 
     val targetTime = notification?.timeMillis ?: remember { System.currentTimeMillis() + 300000L }
+    // Exact cards truncate to whole seconds like the shade.
+    val exact = !isMiuiRom && notification?.exactClock == true
 
     var remainingSec by remember(notification?.key) {
         val parsed = notification?.let { TimerStopwatchParser.parseTimerRemainingSeconds(it) }
@@ -960,7 +939,9 @@ internal fun TimerCountdown(notification: IslandNotification?, color: Color) {
                     0L
                 }
         } else {
-            if (parsed != null && parsed > 0) {
+            if (exact && !isPaused && targetTime > System.currentTimeMillis()) {
+                com.agupta07505.smartisland.util.TimerClock.secondsLeft(targetTime - System.currentTimeMillis())
+            } else if (parsed != null && parsed > 0) {
                 parsed
             } else if (targetTime > System.currentTimeMillis()) {
                 ((targetTime - System.currentTimeMillis() + 500L) / 1000L).coerceAtLeast(0L)
@@ -973,7 +954,9 @@ internal fun TimerCountdown(notification: IslandNotification?, color: Color) {
 
     // The paused remaining time the listener froze; the text of a paused timer can still show its full length.
     val frozenSec = if (isPaused && notification?.recordingPaused == true) {
-        notification.recordingFrozenMs?.let { (it + 500L) / 1000L }
+        notification.recordingFrozenMs?.let {
+            com.agupta07505.smartisland.util.TimerClock.displaySeconds(it, exact, 500L)
+        }
     } else {
         null
     }
@@ -1021,14 +1004,17 @@ internal fun TimerCountdown(notification: IslandNotification?, color: Color) {
             if (!isPaused) {
                 while (true) {
                     val now = System.currentTimeMillis()
-                    val rem = if (targetTime > now) {
-                        ((targetTime - now + 500L) / 1000L).coerceAtLeast(0L)
-                    } else {
-                        0L
-                    }
+                    val remMs = (targetTime - now).coerceAtLeast(0L)
+                    val rem = com.agupta07505.smartisland.util.TimerClock.displaySeconds(remMs, exact, 500L)
                     remainingSec = rem
-                    if (rem <= 0L) break
-                    kotlinx.coroutines.delay(500L)
+                    if (exact) {
+                        if (remMs <= 0L) break
+                        // Wake just after the shown second changes.
+                        kotlinx.coroutines.delay(com.agupta07505.smartisland.util.TimerClock.msToNextTick(remMs))
+                    } else {
+                        if (rem <= 0L) break
+                        kotlinx.coroutines.delay(500L)
+                    }
                 }
             }
         }
@@ -1154,19 +1140,22 @@ fun BluetoothCollapsedRight(
     }
 
     if (notification?.category == "wifi" || notification?.category == "wifi_disconnected") {
-        // Same glyph as the expanded card: looping arcs while connected, slashed and still when lost. Portrait pill and landscape cutout alike.
+        // Same glyph as the expanded card: looping arcs while connected, slashed and still when lost. Portrait pill
+        // and landscape cutout alike.
         com.agupta07505.smartisland.ui.expanded.WifiArcs(
             accent = com.agupta07505.smartisland.ui.expanded.connectivityAccent(notification.category, settings.bluetoothColor),
             lost = notification.category == "wifi_disconnected",
             modifier = Modifier.size(20.dp)
         )
     } else if (notification?.category == "vpn" ||
+        com.agupta07505.smartisland.ui.expanded.isWiredCategory(notification?.category) ||
         com.agupta07505.smartisland.ui.expanded.isConnectionLost(notification?.category)
     ) {
-        Icon(
+        com.agupta07505.smartisland.ui.expanded.SlashableIcon(
             imageVector = com.agupta07505.smartisland.ui.expanded.connectivityIcon(notification?.category),
             contentDescription = "Connection",
             tint = com.agupta07505.smartisland.ui.expanded.connectivityAccent(notification?.category, settings.bluetoothColor),
+            slashed = com.agupta07505.smartisland.ui.expanded.isUnpluggedWired(notification?.category),
             modifier = Modifier.size(20.dp)
         )
     } else if (!settings.showBluetoothBattery || batteryLevel == null) {
@@ -1243,7 +1232,6 @@ fun BluetoothCollapsedRight(
     }
 }
 
-// Collapsed content animation
 private val COLLAPSED_TRANSLATION_MAX_DP = 32.dp
 private const val LEFT_SLOT_PADDING_START_DP = 8
 private const val RIGHT_SLOT_PADDING_END_DP = 12

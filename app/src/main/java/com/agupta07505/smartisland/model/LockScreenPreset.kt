@@ -10,17 +10,16 @@ package com.agupta07505.smartisland.model
 import com.agupta07505.smartisland.data.SmartIslandSettings
 
 /**
- * One choice that sets the lock-screen switches together, so most people never open the per-event list.
- * The preset is not stored: [from] reads it back from the switches, and null (a custom mix) selects no button.
- *
- * - [ShowAll]: the island shows on the lock screen with every event.
- * - [MessagesOnly]: only app notifications (and calls, which are never hidden).
+ * One choice that sets the lock-screen switches together. Not stored: [from] reads it back from the switches; null (a
+ * custom mix) selects no button.
+ * - [ShowAll]: the island shows every event on the lock screen.
+ * - [MessagesOnly]: only app notifications (calls are never hidden).
  * - [CallsOnly]: no event but calls; the idle cutout stays.
- * - [Off]: the island is hidden on the lock screen altogether, calls included (the older "Show Island on Lock Screen" off).
+ * - [Off]: the island is hidden on the lock screen, calls included.
  */
 enum class LockScreenPreset { ShowAll, MessagesOnly, CallsOnly, Off;
 
-    /** The settings this preset stands for, built on [base]; every other setting is kept. */
+    /** Settings this preset stands for, built on [base]; every other setting is kept. */
     fun applyTo(base: SmartIslandSettings): SmartIslandSettings = when (this) {
         ShowAll -> base.copy(showOnLockScreen = true, hideAllOnLockScreen = false, hideOnLockScreenEvents = emptySet())
         MessagesOnly -> base.copy(

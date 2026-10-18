@@ -13,12 +13,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 
-/**
- * LMO Freeform (LibreMobileOS, bundled in several custom ROMs). Its `StartFreeformReceiver` is exported and, on
- * `com.libremobileos.freeform.START_FREEFORM`, opens `packageName` / `activityName` (extras) in a freeform window.
- * `userId` defaults to 0 and `taskId` to -1 (a new task). With a real `taskId` it moves that existing task into a
- * window instead, which is how a notification's own chat is shown (see SmartIslandOverlayService.openInLmoFreeform).
- */
+/** LMO Freeform (LibreMobileOS, bundled in several custom ROMs). */
 object LmoFreeform {
     const val PACKAGE = "com.libremobileos.freeform"
     const val ACTION_START = "com.libremobileos.freeform.START_FREEFORM"
@@ -34,13 +29,13 @@ object LmoFreeform {
         false
     }
 
-    /** The activity LMO should open for [packageName]: its launcher activity, or null if the app has none. */
+    /** Null if the app has no launcher activity. */
     fun launcherComponent(pm: PackageManager, packageName: String): ComponentName? =
         pm.getLaunchIntentForPackage(packageName)?.component
 
     /**
-     * The activity an activity-type PendingIntent would open, asked of the system (Android 14+ `queryIntentComponents`,
-     * reached by reflection because it is not in the public SDK). Null when unavailable or not an activity intent.
+     * The activity an activity-type PendingIntent would open, asked of the system (Android 14+
+     * `queryIntentComponents`, reached by reflection because it is not in the public SDK).
      */
     fun pendingIntentActivity(pending: PendingIntent): ComponentName? = try {
         val infos = PendingIntent::class.java.getMethod("queryIntentComponents", Int::class.javaPrimitiveType)
@@ -74,7 +69,7 @@ object LmoFreeform {
     private val USER_ID = Regex("""userId=(\d+)""")
     private val TOP_ACTIVITY = Regex("""topActivity=ComponentInfo\{([\w.]+)/([\w.$]+)\}""")
 
-    /** Tasks in the order the system lists them (front-most first). Pure text parsing, unit-tested. */
+    /** Front-most task first. Pure text parsing. */
     fun parseTasks(output: String): List<TaskInfo> = output.lineSequence().mapNotNull { line ->
         val m = TASK_LINE.find(line) ?: return@mapNotNull null
         val rest = m.groupValues[4]
@@ -90,8 +85,8 @@ object LmoFreeform {
     }.toList()
 
     /**
-     * The task a just-opened notification landed in: the newest task of [packageName] that was not in [before]
-     * (task ids only grow); if the app reused a task it already had, its front-most one.
+     * The task a just-opened notification landed in: the newest task of [packageName] that was not in [before] (task
+     * ids only grow); if the app reused a task it already had, its front-most one.
      */
     fun pickTask(after: List<TaskInfo>, before: Set<Int>, packageName: String): TaskInfo? {
         val mine = after.filter { it.packageName == packageName }
@@ -104,7 +99,6 @@ object LmoFreeform {
     private val DISPLAY_LINE = Regex("""lmo-freeform:([\w.]+),[^"]*",\s*displayId\s+(\d+)""")
     private val ROOT_LINE = Regex("""RootTask id=\d+.*displayId=(\d+)""")
 
-    /** Display ids of LMO windows that belong to [packageName]. Pure text parsing. */
     fun parseDisplayIds(output: String, packageName: String): Set<Int> =
         DISPLAY_LINE.findAll(output)
             .filter { it.groupValues[1] == packageName }
@@ -122,15 +116,13 @@ object LmoFreeform {
         return result
     }
 
-    /** Compact "id@user(class)" list of [packageName]'s tasks, for the diagnostic log. */
     fun summarize(tasks: List<TaskInfo>, packageName: String): String =
         tasks.filter { it.packageName == packageName }
             .joinToString(prefix = "[", postfix = "]") { "${it.taskId}@u${it.userId}(${it.className.substringAfterLast('.')})" }
 
     /**
-     * Raw `am stack list` lines that mention [packageName] (trimmed), so the window mode and bounds of the chat's task
-     * are visible in the log. When nothing matches, the first lines of the output are returned instead, which shows
-     * a command whose output format [TASK_LINE] does not understand.
+     * Raw `am stack list` lines that mention [packageName] (trimmed). When nothing matches, the first lines of the
+     * output are returned instead, which shows a format [TASK_LINE] does not understand.
      */
     fun rawLinesFor(output: String, packageName: String, maxLines: Int = 6, maxChars: Int = 260): String {
         val lines = output.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()

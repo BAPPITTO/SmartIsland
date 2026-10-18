@@ -32,20 +32,19 @@ import com.agupta07505.smartisland.ui.glass.LocalGlassBackdropColors
 import com.agupta07505.smartisland.ui.glass.LocalGlassDark
 import com.agupta07505.smartisland.ui.glass.LocalLiquidGlass
 
-// ---------------------------------------------------------------------------------------------------------------------
-// The app's theme: Material 3 colour roles, built from one accent colour (or from the wallpaper with Material You), drawn either
-// flat (plain Material 3) or as liquid glass (translucent panels over a soft colour backdrop, see ui/glass).
-// ---------------------------------------------------------------------------------------------------------------------
+// The app's theme: Material 3 colour roles, built from one accent colour (or from the wallpaper with Material You),
+// drawn either flat (plain Material 3) or as liquid glass (translucent panels over a soft colour backdrop, see
+// ui/glass).
 
-/** One colour of the HSL space; [hue] 0..360, [sat] and [light] 0..1. */
 private fun hsl(hue: Float, sat: Float, light: Float): Color {
     val h = ((hue % 360f) + 360f) % 360f
     return Color(ColorUtils.HSLToColor(floatArrayOf(h, sat.coerceIn(0f, 1f), light.coerceIn(0f, 1f))))
 }
 
 /**
- * A full Material 3 colour scheme grown from [seed]: primary, secondary (the same hue, calmer) and tertiary (a warm-shifted hue)
- * families plus neutrals that lean slightly towards the seed's hue, so surfaces never look grey next to the accent.
+ * A full Material 3 colour scheme grown from [seed]: primary, secondary (the same hue, calmer) and tertiary (a warm-
+ * shifted hue) families plus neutrals that lean slightly towards the seed's hue, so surfaces never look grey next to
+ * the accent.
  */
 internal fun accentColorScheme(seed: Color, dark: Boolean): ColorScheme {
     val hsl = FloatArray(3)
@@ -121,9 +120,9 @@ internal fun accentColorScheme(seed: Color, dark: Boolean): ColorScheme {
 }
 
 /**
- * The glass version of a scheme: the same colours, but the page background is clear (the backdrop is drawn behind it), the panels
- * (surface, surfaceVariant, surfaceContainer) are see-through so the backdrop tints them, and the roles that dialogs, menus and
- * sheets sit on stay nearly solid, so text over a dimmed screen stays readable. Outlines become light hairlines.
+ * The glass version of a scheme: the same colours, but the page background is clear (the backdrop is drawn behind
+ * it), the panels (surface, surfaceVariant, surfaceContainer) are see-through so the backdrop tints them, and the
+ * roles that dialogs, menus and sheets sit on stay nearly solid, so text over a dimmed screen stays readable.
  */
 internal fun ColorScheme.asGlass(dark: Boolean): ColorScheme = copy(
     background = Color.Transparent,

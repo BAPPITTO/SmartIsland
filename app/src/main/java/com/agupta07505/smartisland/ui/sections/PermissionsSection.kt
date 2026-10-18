@@ -154,7 +154,6 @@ fun PermissionsSection(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Shizuku 1-Tap Auto Setup Card
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -407,7 +406,6 @@ fun PermissionsSection(
             )
         }
 
-        // Required Permission 1: Accessibility
         PermissionCard(
             title = stringResource(R.string.perm_accessibility_title),
             description = stringResource(R.string.perm_accessibility_desc),
@@ -416,7 +414,6 @@ fun PermissionsSection(
             onClick = onOverlayClick
         )
 
-        // Required Permission 2: Notification Listener
         PermissionCard(
             title = stringResource(R.string.perm_notification_title),
             description = stringResource(R.string.perm_notification_desc),
@@ -425,7 +422,6 @@ fun PermissionsSection(
             onClick = onNotificationClick
         )
 
-        // Recommended Permission 3: Nearby devices / Bluetooth
         PermissionCard(
             title = stringResource(R.string.perm_bluetooth_title),
             description = stringResource(R.string.perm_bluetooth_desc),
@@ -434,7 +430,6 @@ fun PermissionsSection(
             onClick = onBluetoothClick
         )
 
-        // Recommended Permission 4: Battery Optimization
         PermissionCard(
             title = stringResource(R.string.perm_battery_title),
             description = stringResource(R.string.perm_battery_desc),
@@ -443,7 +438,6 @@ fun PermissionsSection(
             onClick = onBatteryClick
         )
 
-        // Overlay System Warning Card
         val warningIconColor = if (isOverlayWarningDisabled) Color(0xFF0F9F6E) else MaterialTheme.colorScheme.onSurfaceVariant
         val warningBgColor = if (isOverlayWarningDisabled) Color(0xFF0F9F6E).copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant
         Card(
@@ -533,7 +527,6 @@ fun PermissionsSection(
             }
         }
 
-        // OEM Autostart & Kill Protection Card
         val oemIconColor = if (isOemAutostartEnabled) Color(0xFF0F9F6E) else MaterialTheme.colorScheme.tertiary
         val oemBgColor = if (isOemAutostartEnabled) Color(0xFF0F9F6E).copy(alpha = 0.12f) else MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f)
         Card(
@@ -648,7 +641,6 @@ private fun shizukuMethodLabel(method: ShizukuMethodCheck.Method): Int = when (m
     ShizukuMethodCheck.Method.Hotspot -> R.string.shizuku_method_hotspot
 }
 
-/** One of the two 1-tap setups: what it grants, and its button. */
 @Composable
 private fun SetupOption(
     title: String,

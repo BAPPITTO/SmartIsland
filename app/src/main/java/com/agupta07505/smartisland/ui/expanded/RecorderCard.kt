@@ -57,13 +57,7 @@ import com.agupta07505.smartisland.ui.rememberRecordingSeconds
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
-/**
- * Shared expanded card for screen and audio recorders.
- *
- * The buttons are the notification's own buttons (same ones the shade shows): Pause (Resume once
- * paused) and Save / Stop. Pressing one fires its PendingIntent. The card flips at once on a press and
- * then follows the notification the recorder re-posts. The timer is frozen while paused.
- */
+/** Shared expanded card for screen and audio recorders. */
 @Composable
 fun RecorderCard(
     notification: IslandNotification?,
@@ -252,17 +246,15 @@ fun RecorderCard(
     }
 }
 
-/** The two buttons a recorder card shows: Pause / Resume, and Save (stop). */
 internal data class RecorderButtons(
     val toggle: IslandNotificationAction?,
     val save: IslandNotificationAction?
 )
 
 /**
- * Picks the recorder's real buttons. Labels are matched first (Pause, Resume, Save, Stop ...); when an app
- * uses wording that is not recognised, the buttons are taken by position instead: the first button is the
- * pause / resume toggle and the last one is save / stop (that is how Google Recorder and most OEM
- * recorders lay them out, before and after pausing).
+ * Picks the recorder's real buttons: labels first (Pause, Resume, Save, Stop ...); when the wording is not
+ * recognised, by position - the first button toggles pause / resume and the last saves / stops (how Google Recorder
+ * and most OEM recorders lay them out).
  */
 internal fun recorderButtons(notification: IslandNotification?, paused: Boolean): RecorderButtons {
     val real = notification?.actionIntents.orEmpty().filter { it.pendingIntent != null }

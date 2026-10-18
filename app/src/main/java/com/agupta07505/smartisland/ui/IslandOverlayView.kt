@@ -45,16 +45,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 
 /**
- * The island overlay. This function only wires the pieces together; each behaviour lives in its own file:
- *
- * - state and callbacks: IslandInteractionState.kt, IslandCallbacks.kt, IslandActionRunner.kt
- * - geometry and transitions: IslandLayout.kt, IslandGeometry.kt, LandscapePillExit.kt
- * - the pill shell and its touch handling: IslandPillSurface.kt, IslandMainGestures.kt, IslandOutsideTap.kt
- * - the cutouts: IslandSecondary.kt (state), IslandSecondaryBubble.kt, IslandTertiaryPill.kt, IslandCornerPill.kt,
- *   IslandMergeBackdrop.kt (bubble merge), IslandMergeMath.kt, IslandSmallViews.kt (idle dot)
- * - the expanded card: IslandCardHost.kt, IslandCardHeight.kt
- * - effects: IslandHapticEffects.kt, IslandAutoHide.kt, IslandSwitchBounce.kt
- * - swipe actions: IslandSwipeActions.kt
+ * The island overlay. This function only wires the pieces together; each behaviour lives in its own file.
  */
 @Composable
 fun IslandOverlayView(
@@ -71,11 +62,13 @@ fun IslandOverlayView(
     onDismissNotification: () -> Unit,
     onOpenFloatingWindow: () -> Unit,
     onOpenNotificationShade: () -> Unit = {},
-    privacyState: com.agupta07505.smartisland.model.PrivacyIndicatorState = com.agupta07505.smartisland.model.PrivacyIndicatorState(),
     statusBarHeight: Float,
     /** The idle widgets are held off the pill (Settings > Idle widgets: off after tap to close / long press to hide). */
     idleWidgetsSuppressed: Boolean = false,
-    /** Landscape: a tick has brought the pill in although it was hidden (ui/TickPill.kt): the idle widgets stay off it, only the tick shows. */
+    /**
+     * Landscape: a tick has brought the pill in although it was hidden (ui/TickPill.kt): the idle widgets stay off
+     * it, only the tick shows.
+     */
     tickPillHold: Boolean = false,
     onTickPillHold: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
@@ -104,7 +97,6 @@ fun IslandOverlayView(
     onHandleHeld: (Boolean) -> Unit = {},
     pickerOnLeft: Boolean = false,
     landscapeDot: com.agupta07505.smartisland.model.IdleDotGeometry? = null,
-    /** Landscape: the collapsed pill stays on screen to carry the idle widgets while no card is on the island. */
     widgetPill: Boolean = false,
     onIdleDotTap: () -> Unit = {},
     onOpenAppsLauncher: () -> Unit = {},
@@ -115,7 +107,7 @@ fun IslandOverlayView(
     /** The semi-expanded idle widget island is open (see [WidgetIslandLayer]) and the call that opens or closes it. */
     widgetIslandOpen: Boolean = false,
     onWidgetIslandChange: (Boolean) -> Unit = {},
-    /** Counts closes that skip the closing animation (shade, screen off, lock, rotation). */
+    onWidgetIslandShownChange: (Boolean) -> Unit = {},
     widgetIslandSnap: Int = 0
 ) {
     val safeIndex = selectedIndex.coerceIn(0, (notifications.size - 1).coerceAtLeast(0))
@@ -170,10 +162,8 @@ fun IslandOverlayView(
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     val screenWidth = configuration.screenWidthDp.dp
     val screenCenter = screenWidth / 2f
-    // Landscape (and portrait for a tap on the idle circle): when the last card goes, the collapsed cutout itself slides away (up, or out to the nearer
-    // edge) and the idle circle opens at its spot, overlapping the slide. A card arriving later reverses it: the
-    // idle circle vanishes first and the pill slides back in. One state machine; see model/PillPresence.kt. While it leaves, the island keeps the settings it had
-    // with the card (otherwise it would glide to the idle size). State and maths: LandscapePillExit.kt.
+    // Landscape (and portrait for a tap on the idle circle): when the last card goes, the collapsed cutout itself
+    // slides away (up, or out to the nearer edge) and the idle circle opens at its spot, overlapping the slide.
     val pillExit = rememberLandscapePillExit(
         // The widget pill is a pill on the island too: a card arriving or leaving swaps its content, the pill neither slides out nor in.
         hasContent = com.agupta07505.smartisland.model.pillOnIsland(notifications.isNotEmpty(), widgetPill && isLandscape),
@@ -187,9 +177,8 @@ fun IslandOverlayView(
     )
     @Suppress("NAME_SHADOWING")
     val settings = pillExit.frozenNow ?: settings
-    // Landscape: an open sibling picker sits beside the card as a SEPARATE island, so the window
-    // widens while it is open and this view's own single island surface is switched off.
-    // An open picture takes the same slot (it is shown instead of the picker while it is open).
+    // Landscape: an open sibling picker sits beside the card as a SEPARATE island, so the window widens while it is
+    // open and this view's own single island surface is switched off.
     val openPicture = com.agupta07505.smartisland.ui.expanded.LocalMediaExpansion.current
     val pictureBeside = expanded && com.agupta07505.smartisland.ui.expanded.pictureShownBesideCard(
         isLandscape = isLandscape,
@@ -201,22 +190,19 @@ fun IslandOverlayView(
     )
     val pickerSideBySideNow = pictureBeside || (isLandscape && expanded && siblingPickerOpen &&
         com.agupta07505.smartisland.model.siblingIndices(notifications, safeIndex).isNotEmpty())
-    // Landscape: when the picker closes, the two-island layout (window width, separate surfaces, no shell clip)
-    // is kept for the length of the close so the picker island can shrink away instead of vanishing. The content runs the
-    // same length (model/PickerSwap.CLOSE_MS, speed applied); a picture beside the card is not held.
+    // Landscape: when the picker closes, the two-island layout (window width, separate surfaces, no shell clip) is
+    // kept for the length of the close so the picker island can shrink away instead of vanishing.
     var sideBySideHold by remember { mutableStateOf(false) }
     val sideBySideHoldMs = settings.animationSpeed(isLandscape).durationMs(com.agupta07505.smartisland.model.PickerSwap.CLOSE_MS)
-    // A picture island is held like the picker's. While a step that closes it follows the finger (the island shrinks with the drag)
-    // the hold waits for the lift, then runs for the length of the closing animation.
+    // A picture island is held like the picker's.
     val stepDragForHold = com.agupta07505.smartisland.ui.expanded.LocalStepDrag.current
     LaunchedEffect(pickerSideBySideNow) {
         if (pickerSideBySideNow) {
             sideBySideHold = true
         } else if (sideBySideHold) {
             androidx.compose.runtime.snapshotFlow { stepDragForHold.active }.first { !it }
-            // The content says when its two islands are gone (a timer ended before the card had grown back
-            // to the single island's width, so the single surface and the blur window showed up around a smaller card). The
-            // old length is only the safety cap now.
+            // The content says when its two islands are gone (a timer ended before the card had grown back to the
+            // single island's width, so the single surface showed up around a smaller card).
             kotlinx.coroutines.withTimeoutOrNull(sideBySideHoldMs * 3L + 400L) {
                 androidx.compose.runtime.snapshotFlow { stepDragForHold.splitShown }.first { !it }
             }
@@ -224,44 +210,46 @@ fun IslandOverlayView(
             sideBySideHold = false
         }
     }
-    // The hold also ends the moment the content has left the two-island layout (it reports that in splitShown). The flag used to drop
-    // 40 ms later and the surface faded in over another 60 ms, and for those frames the single-layout card was drawn without a surface
-    // in the wide, unclipped two-island shell: the square-cornered slab at the end of the picker close.
+    // The hold also ends the moment the content has left the two-island layout (it reports that in splitShown).
     val pickerSideBySideRaw = pickerSideBySideNow || (sideBySideHold && isLandscape && expanded && stepDragForHold.splitShown)
     // Set by the watchdog below when the flag was still on with nothing open. It drops the flag until the next picker / picture.
     var forceSingle by remember { mutableStateOf(false) }
     LaunchedEffect(pickerSideBySideNow, expanded) { forceSingle = false }
     val pickerSideBySide = pickerSideBySideRaw && !forceSingle
-    // What the shell's clip, shadow and surface follow: the flag above only sizes the window early; the two islands are
-    // drawn when the content says so too (model/ShellStateGuard.kt). Read here, so it recomposes only when the content flips it.
+    // What the shell's clip, shadow and surface follow: the flag above only sizes the window early; the two islands
+    // are drawn when the content says so too (model/ShellStateGuard.kt).
     val twoIslandsDrawn = com.agupta07505.smartisland.model.ShellStateGuard.twoIslandsDrawn(pickerSideBySide, stepDragForHold.splitShown)
     // Natural width of the card island in the split layout, reported by the content; null until
     // measured (the window then starts at the widest the card may get and settles once measured).
     var splitCardWidthDp by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(pickerSideBySide) { if (!pickerSideBySide) splitCardWidthDp = 0f }
     val activeNotification = notifications.getOrNull(safeIndex)
-    // The width each card had in the split layout the last time. The window starts from it, so opening the picker
-    // on a card seen before does not first size the window for the widest card and then shrink it in the first frames of the swap.
+    // The width each card had in the split layout the last time.
     val splitWidthCache = remember { HashMap<String, Float>() }
     val splitWidthSeed = activeNotification?.key?.let { splitWidthCache[it] } ?: 0f
     val splitWidthEffective = if (splitCardWidthDp > 0f) splitCardWidthDp else splitWidthSeed
     val activeMode = activeNotification?.mode ?: IslandMode.Empty
 
-    // A card that is pre-composed while collapsed reports its real height itself, so the estimate
-    // must not overwrite it. Modes that are not pre-composed (and the empty island) still start from the estimate.
-    // The screen state is read first and unconditionally: a composable call must not hide behind the && below.
+    // A card that is pre-composed while collapsed reports its real height itself, so the estimate must not overwrite
+    // it.
     val screenOn = rememberScreenInteractive()
     val prewarmWanted = notifications.isNotEmpty() && com.agupta07505.smartisland.model.CardPrewarm.shouldPrewarm(activeMode, screenOn)
     var expandedHeight by rememberExpandedHeight(activeMode, notifications.isEmpty(), expanded, prewarmWanted)
     AutoHideEffects(expanded, notifications, selectedIndex, settings, ui)
 
+    // The extra cutouts beside the pill keep the state they had when the widget island opened, until it is back in the cutout.
+    val holdCutouts = com.agupta07505.smartisland.model.widgetIslandHoldsExpand(widgetIslandOpen, ui.widgetIslandShown)
+    val cutoutSnapshot = remember { arrayOfNulls<Pair<List<IslandNotification>, Int>>(1) }
+    val heldCutouts = cutoutSnapshot[0]
+    if (!holdCutouts || heldCutouts == null) cutoutSnapshot[0] = notifications to safeIndex
+    val cutoutNotifications = if (holdCutouts && heldCutouts != null) heldCutouts.first else notifications
+    val cutoutIndex = if (holdCutouts && heldCutouts != null) heldCutouts.second else safeIndex
+
     val layout = rememberIslandLayout(
         settings = settings,
-        notifications = notifications,
+        notifications = cutoutNotifications,
         expanded = expanded,
-        safeIndex = safeIndex,
-        privacyState = privacyState,
-        chipShowing = com.agupta07505.smartisland.model.ChipAvoidance.chipShowing(privacyState, notifications),
+        safeIndex = cutoutIndex,
         isFullWidth = isFullWidth,
         pickerOnLeft = pickerOnLeft,
         statusBarHeight = statusBarHeight,
@@ -279,7 +267,8 @@ fun IslandOverlayView(
         screenCenter = screenCenter,
         snapGeometry = pillExit.snapGeometry,
         cardSwitching = { ui.cardSwipeSnap },
-        landscapePillStretch = widgetPill
+        landscapePillStretch = widgetPill,
+        holdArrivalPulse = holdCutouts
     )
     SideEffect {
         pillExit.record(
@@ -297,12 +286,12 @@ fun IslandOverlayView(
     }
     val pickerLeftFraction = rememberUpdatedState(layout.pickerEdgeFraction)
     val pickerOnLeftState = rememberUpdatedState(pickerOnLeft)
-    // True once the single island's surface has faded back in after the two landscape islands (flips twice per split, so reading it
-    // here does not recompose per frame of the fade). The blur window waits for it.
+    // True once the single island's surface has faded back in after the two landscape islands (flips twice per split,
+    // so reading it here does not recompose per frame of the fade).
     val layoutForSurface by rememberUpdatedState(layout)
     val surfaceBack by remember { androidx.compose.runtime.derivedStateOf { layoutForSurface.singleSurfaceAlpha >= 0.98f } }
-    // Close hand-off: the content keeps its two-island layout (the same rectangle at progress 0) until the shell is the single island
-    // again: the flag is off, the surface is back, and the window has had two frames to follow. Then the content may flip.
+    // Close hand-off: the content keeps its two-island layout (the same rectangle at progress 0) until the shell is
+    // the single island again: the flag is off, the surface is back, and the window has had two frames to follow.
     LaunchedEffect(pickerSideBySideNow, twoIslandsDrawn, surfaceBack) {
         if (!pickerSideBySideNow && !twoIslandsDrawn && surfaceBack) {
             androidx.compose.runtime.withFrameNanos { }
@@ -310,9 +299,7 @@ fun IslandOverlayView(
             stepDragForHold.shellSingleReady = true
         }
     }
-    // Watchdog. The expanded island has sat at rest for a while and its shell state is wrong (the two-island flag held with
-    // nothing open, a single island without its surface or with square corners): drop the flag where that repairs it, and log what the state was,
-    // so the real trigger shows up in the next log. The rule is a pure function (model/ShellStateGuard.kt).
+    // Watchdog.
     val notificationsNow by rememberUpdatedState(notifications)
     val safeIndexNow by rememberUpdatedState(safeIndex)
     val selectedIndexNow by rememberUpdatedState(selectedIndex)
@@ -341,17 +328,14 @@ fun IslandOverlayView(
             if (com.agupta07505.smartisland.model.ShellStateGuard.canForceSingle(reason)) forceSingle = true
         }
     }
-    // No single expanded island (collapsed, or the two landscape islands): the blur window hides.
+    // No single expanded island (collapsed, or the two landscape islands).
     LaunchedEffect(expanded, pickerSideBySide) {
         if (!expanded || pickerSideBySide) cb.currentOnExpandedSurfaceBounds(null)
     }
-    // Tactile spring scale bounce when the user switches between active notifications
     val switchScaleAnim = rememberSwitchScaleAnim(selectedIndex) {
         System.currentTimeMillis() - ui.lastCardSwipeMs < SWIPE_SWITCH_BOUNCE_SKIP_MS
     }
-    // The collapsed content fades in as the idle cutout grows into the pill when a card arrives. When the
-    // last card leaves, its content goes with the pill's slide-away (landscape) or at once; there is no
-    // glide of the cutout back to the idle spot.
+    // The collapsed content fades in as the idle cutout grows into the pill when a card arrives.
     val collapsedContentFade = rememberCollapsedContentFade(
         activeNotification,
         settings.animationSpeed(isLandscape),
@@ -359,11 +343,11 @@ fun IslandOverlayView(
     )
     val secondary = rememberIslandSecondary(
         settings = settings,
-        notifications = notifications,
-        safeIndex = safeIndex,
+        notifications = cutoutNotifications,
+        safeIndex = cutoutIndex,
         expanded = expanded,
         layout = layout,
-        activeNotification = activeNotification,
+        activeNotification = cutoutNotifications.getOrNull(cutoutIndex),
         isFullWidth = isFullWidth,
         isLandscape = isLandscape,
         screenWidth = screenWidth,
@@ -379,7 +363,6 @@ fun IslandOverlayView(
     AnimScaleProbeEffect()
     MergeTouchHapticEffect(layout, secondary, cb)
 
-    // Outer Box: Fills the entire WindowManager window bounds (which are padded for easy touch)
     Box(
         modifier = modifier
             .islandOutsideTap(expanded, cb, isInputActive, onReplyStateChanged)
@@ -387,7 +370,6 @@ fun IslandOverlayView(
             .islandTopInset { layout.topShift.coerceAtLeast(0.dp).roundToPx() },
         contentAlignment = Alignment.TopCenter
     ) {
-        // Invisible touch target over the pill location when hiding
         HiddenPillTouchTarget(settings, layout, cb, ui)
 
         // Notch mode, collapsed: square top corners. The radius itself is read in the draw phase (IslandShellModifiers.kt).
@@ -396,16 +378,12 @@ fun IslandOverlayView(
         // Landscape, expanded: the collapsed pill stays at its own spot beside / above the card.
         CornerPill(settings, layout, secondary, cb, ui, runner, scope, context)
 
-        // Landscape: the collapsed cutout lives in the top corner nearest the camera. While the card
-        // is open it stays there instead of vanishing into the expanded card, and the companion
-        // cutouts keep the vertical position they have when collapsed (the window top is the
-        // screen top, so the collapsed shift is lowered by hand here).
-        // A function: the top shift is animated, so it is read where it is used (inside the offset lambdas), not here.
+        // Landscape: the collapsed cutout lives in the top corner nearest the camera.
         val cornerLockY: () -> Dp = { if (isLandscape && !settings.enableNotchMode) layout.collapsedTopShift - layout.topShift else 0.dp }
 
         MergeBubbleBackdrop(settings, layout, secondary, pillExit, switchScaleAnim, cornerLockY, cb)
 
-        // The shell's opacity fades between the shared value and the media value (it switched at once).
+        // The shell's opacity fades between the shared value and the media value.
         val palette = com.agupta07505.smartisland.ui.expanded.LocalIslandPalette.current
         val mediaShell = expanded && activeMode == IslandMode.Music
         val mediaShellOpacity = androidx.compose.animation.core.animateFloatAsState(
@@ -433,13 +411,11 @@ fun IslandOverlayView(
             }
         }
 
-        // Landscape, the last card went while the island was open (a dismissed card, a call that ended): the shell must not shrink down onto the
-        // idle circle. It is not drawn while it still has a bigger size (or the media opacity) to settle from, and the idle dot stands in
-        // at the idle spot meanwhile; the shell takes over once it is the idle size (same spot, colour and opacity, so nothing shows).
-        // The pill leaving and the hand-over after it have their own handling (pillExit.phase).
+        // Landscape, the last card went while the island was open (a dismissed card, a call that ended): the shell
+        // must not shrink down onto the idle circle.
         val closingOntoIdle: () -> Boolean = {
             isLandscape && !settings.enableNotchMode && landscapeDot != null && notifications.isEmpty() && !widgetPill && !appsLauncherOpen &&
-                !privacyState.hasAnything && pillExit.phase == com.agupta07505.smartisland.model.PillPhase.None &&
+                pillExit.phase == com.agupta07505.smartisland.model.PillPhase.None &&
                 !pillExit.shellSettled()
         }
 
@@ -457,10 +433,19 @@ fun IslandOverlayView(
             cutoutHeightDp = cutoutArea?.heightDp ?: 0f
         )
 
-        // Inner Box: The actual visible pill container, managing the black background shape and size animations
+        // The collapsed pill is not drawn while the widget island is out. Touches still reach the pill underneath
+        // (alpha does not change hit testing), so the glyph tap and the outside tap keep working.
+        val pillHiddenByIsland = ui.widgetIslandShown && !expanded
+        val pillContentAlpha = androidx.compose.animation.core.animateFloatAsState(
+            targetValue = if (pillHiddenByIsland) 0f else 1f,
+            animationSpec = if (pillHiddenByIsland) androidx.compose.animation.core.snap() else androidx.compose.animation.core.tween(120),
+            label = "pillContentAlpha"
+        )
+        val pillContentFade = Modifier.graphicsLayer { alpha = pillContentAlpha.value }
         Box(
             modifier = Modifier
-                .islandPillSurface(settings.forCard(mediaShell), layout, secondary, pillExit, switchScaleAnim, cb, ui, squareTop, pickerSideBySide, twoIslandsDrawn, { mediaShellOpacity.value }, reportBounds = surfaceBack, shellHidden = closingOntoIdle, palette = palette)
+                .graphicsLayer { alpha = if (ui.widgetIslandCovers() && !expanded) 0f else 1f }
+                .islandPillSurface(settings.forCard(mediaShell), layout, secondary, pillExit, switchScaleAnim, cb, ui, squareTop, pickerSideBySide, twoIslandsDrawn, { mediaShellOpacity.value }, reportBounds = surfaceBack, shellHidden = { closingOntoIdle() || FaceIdShell.covering }, palette = palette)
                 .islandMainGestures(
                     settings = settings,
                     isInputActive = isInputActive,
@@ -477,27 +462,25 @@ fun IslandOverlayView(
                 ),
             contentAlignment = Alignment.TopCenter
         ) {
-            // Collapsed content layer (pinned to fixed pill bounds at top-center, cancelling yOffset)
             if (layout.collapsedShown) {
                 CollapsedContentLayer(
                     layout = layout,
                     fade = collapsedContentFade,
                     activeMode = activeMode,
                     settings = settings,
-                    privacyActive = privacyState.active,
                     ui = ui,
                     animSpeed = settings.animationSpeed(isLandscape),
                     idleSuppressed = idleWidgetsSuppressed || tickPillHold,
-                    modifier = Modifier.align(Alignment.TopCenter)
+                    modifier = Modifier.align(Alignment.TopCenter).then(pillContentFade)
                 )
-                // The clock widget's tick on the full hour, over whatever the pill shows (also while the idle widgets are held off after a tap or long press).
-                // Landscape: with the pill hidden by a long press, the pill comes in just for the tick (ui/TickPill.kt).
+                // The clock widget's tick on the full hour, over whatever the pill shows (also while the idle widgets
+                // are held off after a tap or long press).
                 val tickCanHold = isLandscape && !settings.enableNotchMode
-                HourChimeLayer(settings, ui, settings.animationSpeed(isLandscape), Modifier.align(Alignment.TopCenter), canHold = tickCanHold)
+                HourChimeLayer(settings, ui, settings.animationSpeed(isLandscape), Modifier.align(Alignment.TopCenter).then(pillContentFade), canHold = tickCanHold)
                 // The sunrise / afternoon / sunset / midnight glyphs (Day moments widget).
-                DayMomentLayer(settings, ui, settings.animationSpeed(isLandscape), Modifier.align(Alignment.TopCenter), canHold = tickCanHold)
+                DayMomentLayer(settings, ui, settings.animationSpeed(isLandscape), Modifier.align(Alignment.TopCenter).then(pillContentFade), canHold = tickCanHold)
                 // The weather change tick over whatever the pill shows (unless the pill's own weather widget does it).
-                WeatherTickLayer(settings, ui, settings.animationSpeed(isLandscape), Modifier.align(Alignment.TopCenter), canHold = tickCanHold)
+                WeatherTickLayer(settings, ui, settings.animationSpeed(isLandscape), Modifier.align(Alignment.TopCenter).then(pillContentFade), canHold = tickCanHold)
             }
 
             ExpandedCardHost(
@@ -547,7 +530,7 @@ fun IslandOverlayView(
             )
         }
 
-        SecondaryBubble(settings, layout, secondary, pillExit, switchScaleAnim, cornerLockY, notifications, onPageSelected, cb, ui)
+        SecondaryBubble(settings, layout, secondary, pillExit, switchScaleAnim, cornerLockY, cutoutNotifications, onPageSelected, cb, ui)
         WidgetIslandLayer(
             open = widgetIslandOpen,
             expanded = expanded,
@@ -558,17 +541,15 @@ fun IslandOverlayView(
             islandLayout = layout,
             ui = ui,
             screenWidthDp = screenWidth.value,
+            isLandscape = isLandscape,
             animSpeed = settings.animationSpeed(isLandscape),
             onOpenChange = onWidgetIslandChange,
+            onShownChange = onWidgetIslandShownChange,
             modifier = Modifier.align(Alignment.TopCenter)
         )
         TertiaryPill(settings, layout, secondary, switchScaleAnim, cornerLockY, screenCenter, onPageSelected, cb)
 
-        // Portrait: no separate idle pill. While expanded, the pill's glyph-free centre closes the island. It is drawn
-        // here, in the outer Box and AFTER the secondary / tertiary cutouts, at the pill's own spot at the top of the window:
-        // while expanded the secondary cutout is a full pill on the camera spot (a tap on it switches cards), and the expanded
-        // island itself may sit lower than the pill row (a Y offset), so a target inside the shell was under that pill or
-        // below it and the centre tap switched cards instead of closing. Only the glyphs left and right keep the switch.
+        // Portrait: no separate idle pill. While expanded, the pill's glyph-free centre closes the island.
         val closeZone = rememberExpandedCloseZone(settings, isLandscape)
         // Collapsed, centre band clear of the camera cutout: a long press on the cutout itself hides / shows the pill. The window
         // is the pill's row, so the target sits at the cutout's spot inside it (the service adds the same rectangle to the touchable region).
@@ -603,7 +584,7 @@ fun IslandOverlayView(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .graphicsLayer {
-                    // On a detected camera cutout: its own spot. Otherwise the pill's sideways offset, as before.
+                    // On a detected camera cutout: its own spot. Otherwise the pill's sideways offset.
                     translationX = (closeZone.offsetXDp?.dp ?: layout.collapsedMainOffset).toPx()
                     translationY = closeZone.topDp.dp.toPx()
                 },
@@ -622,9 +603,8 @@ fun IslandOverlayView(
             }
         )
 
-        // Landscape idle dot (see idleDotShown); portrait has none, its pill centre is the control. Drawn last, above the pill, so it can always be pressed. Own composable: keeps the null check and the float
-        // maths out of this very large function (a VerifyError was seen when they lived here).
-        // On or off only: the pill's slide in and out does not animate it (it just stays on while the pill leaves, see PillExitState.dotAlpha).
+        // Landscape idle dot; portrait has none, its pill centre is the control. Drawn last, above the pill, so it
+        // can always be pressed.
         LandscapeIdleDotView(
             dot = landscapeDot,
             alpha = { if (closingOntoIdle()) 1f else pillExit.dotAlpha(secondary.idleDotAlpha) },
@@ -643,27 +623,30 @@ fun IslandOverlayView(
                 }
             }
         )
+
+        // Face ID scan (ui/FaceIdLayer.kt): drawn last, above the pill and every cutout. OverlayIsland keeps
+        // everything else off while it plays.
+        FaceIdLayer(
+            settings = settings,
+            pillColor = layout.pillBackgroundColor,
+            centerOffsetX = layout.collapsedMainOffset,
+            isLandscape = isLandscape,
+            topOffset = layout.yOffset,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
     }
 }
 
-/**
- * The island is still: no finger lean, pull, step or swap is running. Read by the shell-state watchdog (inside a snapshot flow),
- * so every state it looks at is a snapshot state.
- */
 private fun shellAtRest(ui: IslandInteractionState): Boolean =
     ui.cardDragX == 0f && ui.dragOffset == 0f && ui.swipeDownPull == 0f && ui.handlePull == 0f &&
         ui.pendingCardEnterSign == 0 && ui.cardPop.value >= 1f && ui.cardLeanFromPx == 0f && !ui.stepDrag.active
 
-/** How close (dp, and opacity) the shell must be to the idle settings before the dot hands over to it. */
 private const val SHELL_SETTLED_DP = 0.6f
 private const val SHELL_SETTLED_OPACITY = 0.02f
 
-/** Length of the fade between the shared and the media shell opacity (at Normal speed). */
 private const val MEDIA_SHELL_OPACITY_FADE_MS = 200
 
-/** Extra time the overlay keeps the two-island layout after the picker's close length, so the last frame is never cut. */
 private const val SIDE_BY_SIDE_HOLD_MARGIN_MS = 0L
 
-/** How many cards' split widths are remembered, and how close two widths must be to count as the same. */
 private const val SPLIT_WIDTH_CACHE_MAX = 32
 private const val SPLIT_WIDTH_SAME_DP = 0.5f

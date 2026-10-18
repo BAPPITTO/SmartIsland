@@ -10,22 +10,16 @@ package com.agupta07505.smartisland.model
 import kotlin.math.abs
 
 /**
- * What the collapsed pill's "incoming card slide" ([com.agupta07505.smartisland.ui.IslandInteractionState.pillEnter]) has to do when the
- * shown card (or idle widget) changes, or when the pill's content layer comes back on screen.
- *
- * The slide offset lives in the shared interaction state, not in the content layer. A slide that is cancelled half way (a second card
- * arrives while it runs, or the island expands and the layer leaves the composition) used to leave the offset where it was, so the
- * whole pill content (app icon, dots, widgets) stayed shifted to one side, partly outside the pill. Every run that is NOT a fresh
- * swipe slide therefore has to bring a left-over offset back to 0.
+ * What the pill's incoming-card slide ([IslandInteractionState.pillEnter]) does when the shown card or widget changes
+ * or the content layer returns.
  */
 enum class PillEnterStep {
-    /** A swipe asked for this card: start the slide from the side opposite to the swipe. */
+    /** A swipe asked for this card: start the slide from the side opposite the swipe. */
     Start,
 
-    /** No swipe is waiting, but an earlier slide was cut off: ease the left-over offset back to 0. */
+    /** No swipe is waiting but an earlier slide was cut off: ease the left-over offset back to 0. */
     SettleStale,
 
-    /** Nothing waiting and the offset is already 0. */
     Nothing
 }
 

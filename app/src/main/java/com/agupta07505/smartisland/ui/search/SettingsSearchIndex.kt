@@ -12,6 +12,7 @@ import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.Face
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.FlashOn
 import androidx.compose.material.icons.rounded.Gesture
@@ -32,7 +33,6 @@ import com.agupta07505.smartisland.ui.StudioTab
 import com.agupta07505.smartisland.ui.sections.eventSearchKey
 import com.agupta07505.smartisland.ui.sections.iconFor
 
-/** Where a search result takes you. */
 internal sealed interface SearchTarget {
     /** One of the four bottom tabs. [landscape] also switches the Portrait / Landscape switch. */
     data class Tab(val tab: StudioTab, val landscape: Boolean? = null) : SearchTarget
@@ -42,8 +42,8 @@ internal sealed interface SearchTarget {
 }
 
 /**
- * One result: the text that is matched ([item]), where it leads ([target]), the row to scroll to
- * and flash once there ([rowKey], null = just open the screen) and the icon shown in the list.
+ * One result: the text that is matched ([item]), where it leads ([target]), the row to scroll to and flash once there
+ * ([rowKey], null = just open the screen) and the icon shown in the list.
  */
 internal data class SettingsSearchEntry(
     val item: SearchableSetting,
@@ -101,7 +101,6 @@ internal fun buildSettingsSearchIndex(str: (Int) -> String): List<SettingsSearch
 
     fun detail(section: FeatureDetailSection) = SearchTarget.Detail(section)
 
-    // --- Home tab: one tile per event -------------------------------------------------------
     IslandEvent.entries.forEach { event ->
         add(
             id = "event.${event.id}",
@@ -114,7 +113,6 @@ internal fun buildSettingsSearchIndex(str: (Int) -> String): List<SettingsSearch
         )
     }
 
-    // --- Layout tab ---------------------------------------------------------------------------
     add(
         "layout.anim_portrait", str(R.string.anim_speed_title_portrait), SearchTarget.Tab(StudioTab.Position, false),
         layout, Icons.Rounded.Tune, str(R.string.anim_speed_desc),
@@ -171,19 +169,16 @@ internal fun buildSettingsSearchIndex(str: (Int) -> String): List<SettingsSearch
         listOf("landscape", "camera", "circle", "corner bar", "inset", "rotate", "rotation", "horizontal", "width", "height", "size", "cutout with content")
     )
 
-    // --- Demo tab ---------------------------------------------------------------------------------
     add(
         "demo", str(R.string.tab_demo), SearchTarget.Tab(StudioTab.Demo), str(R.string.tab_demo),
         Icons.Rounded.FlashOn, "", listOf("sample", "test", "preview", "show card", "try")
     )
 
-    // --- Settings tab: theme ----------------------------------------------------------------------
     add(
         "settings.theme", "Theme", SearchTarget.Tab(StudioTab.Settings), settingsTab,
         Icons.Rounded.Settings, "", listOf("dark", "light", "system", "mode", "night", "appearance")
     )
 
-    // --- Notifications & Privacy ------------------------------------------------------------------
     val np = detail(FeatureDetailSection.NotificationRules)
     fun npToggle(key: String, title: Int, desc: Int, keywords: List<String>) =
         add("np.$key", str(title), np, notifScreen, Icons.Rounded.Notifications, str(desc), keywords, "np.$key")
@@ -275,7 +270,6 @@ internal fun buildSettingsSearchIndex(str: (Int) -> String): List<SettingsSearch
         listOf("xiaomi", "samsung", "oneplus", "huawei", "autostart", "background", "device", "oem", "battery manager")
     )
 
-    // --- Idle widgets (Settings page) ---------------------------------------------------------------
     val idle = detail(FeatureDetailSection.IdleWidgets)
     add(
         "idle.screen", idleScreen, idle, idleScreen, Icons.Rounded.Timer, str(R.string.idle_widgets_desc),
@@ -299,15 +293,39 @@ internal fun buildSettingsSearchIndex(str: (Int) -> String): List<SettingsSearch
     )
     add(
         "idle.select", str(R.string.idle_select_title), idle, idleScreen, Icons.Rounded.Timer,
-        str(R.string.idle_select_desc), listOf("select", "choose", "pick", "all", "widgets"), "idle.select"
+        str(R.string.idle_select_desc), listOf("select", "choose", "pick", "all", "widgets", "order", "reorder", "drag", "pin", "first"), "idle.select"
     )
     add(
         "idle.tick_timer", str(R.string.idle_tick_timer_title), idle, idleScreen, Icons.Rounded.Timer,
         str(R.string.idle_tick_timer_desc), listOf("tick", "glyph", "timer", "slider", "seconds"), "idle.tick_timer"
     )
     add(
+        "idle.beat_only_change", str(R.string.idle_beat_only_change_title), idle, idleScreen, Icons.Rounded.Timer,
+        str(R.string.idle_beat_only_change_desc), listOf("beat", "tick", "glyph", "change", "changed", "still", "quiet", "calm"), "idle.beat_only_change"
+    )
+    add(
+        "idle.schedule", str(R.string.idle_sched_title), idle, idleScreen, Icons.Rounded.Timer,
+        str(R.string.idle_sched_intro), listOf("schedule", "work", "hours", "night", "charging", "rotate", "widgets"), "idle.schedule"
+    )
+    add(
         "idle.units", str(R.string.idle_units_title), idle, idleScreen, Icons.Rounded.Timer,
         str(R.string.idle_units_note), listOf("celsius", "fahrenheit", "temperature", "unit", "wind", "kmh", "mph", "knots", "metric", "imperial"), "idle.units"
+    )
+    add(
+        "idle.weather", str(R.string.weather_cfg_title), detail(FeatureDetailSection.WeatherSettings), idleScreen, Icons.Rounded.Timer,
+        str(R.string.weather_cfg_intro), listOf("weather", "location", "city", "manual", "refresh", "interval", "provider", "open-meteo", "api", "key", "gps", "battery", "network", "pill", "feels like", "condition", "humidity", "uv", "sunrise", "sunset", "air quality", "rain", "forecast", "hourly", "animated", "icon", "battery saver", "notable", "only when", "hide at night", "night", "hot", "cold", "threshold", "severe", "alert", "storm", "smart"), "idle.weather"
+    )
+    add(
+        "idle.calendar", str(R.string.cal_cfg_title), detail(FeatureDetailSection.CalendarSettings), idleScreen, Icons.Rounded.Timer,
+        str(R.string.cal_cfg_intro), listOf("calendar", "event", "next event", "meeting", "standup", "agenda", "date", "window", "permission"), "idle.calendar"
+    )
+    add(
+        "idle.netspeed", str(R.string.net_cfg_title), detail(FeatureDetailSection.NetSpeedSettings), idleScreen, Icons.Rounded.Timer,
+        str(R.string.net_cfg_intro), listOf("network", "net", "speed", "download", "upload", "threshold", "kb/s", "mb/s", "busy", "arrow", "only when", "off", "wifi", "wi-fi", "mobile data", "data saver", "daily", "usage", "connection"), "idle.netspeed"
+    )
+    add(
+        "idle.battery_only_charging", str(R.string.idle_battery_only_charging_title), idle, idleScreen, Icons.Rounded.Timer,
+        str(R.string.idle_battery_only_charging_desc), listOf("battery", "charging", "plugged", "only", "percentage", "till", "run out", "drain"), "idle.battery_only_charging"
     )
     add(
         "idle.led_tick", str(R.string.led_tick_switch_title), idle, idleScreen, Icons.Rounded.Timer,
@@ -318,7 +336,6 @@ internal fun buildSettingsSearchIndex(str: (Int) -> String): List<SettingsSearch
         str(R.string.idle_switch_timer_desc), listOf("switch", "rotate", "auto", "timer", "slider", "seconds"), "idle.switch_timer"
     )
 
-    // --- Timing -------------------------------------------------------------------------------------
     val timing = detail(FeatureDetailSection.Timing)
     add(
         "timing.screen", timingScreen, timing, timingScreen, Icons.Rounded.Timer, str(R.string.timing_intro),
@@ -345,7 +362,6 @@ internal fun buildSettingsSearchIndex(str: (Int) -> String): List<SettingsSearch
         str(R.string.timing_merge_hint), listOf("merge", "secondary", "round cutout", "delay"), "timing.merge"
     )
 
-    // --- Appearance & colours -----------------------------------------------------------------------
     val color = detail(FeatureDetailSection.ColorStudio)
     add(
         "color.screen", colorScreen, color, colorScreen, Icons.Rounded.Palette, str(R.string.card_color_studio_desc),
@@ -361,7 +377,7 @@ internal fun buildSettingsSearchIndex(str: (Int) -> String): List<SettingsSearch
     )
     add(
         "color.blur", str(R.string.toggle_expanded_blur_title), color, colorScreen, Icons.Rounded.Palette,
-        "", listOf("blur", "backdrop", "artwork", "album")
+        str(R.string.toggle_expanded_blur_desc), listOf("blur", "backdrop", "artwork", "album", "live", "frosted", "glass", "behind", "card", "off")
     )
     add(
         "color.media_look", str(R.string.media_look_title), color, colorScreen, Icons.Rounded.Palette,
@@ -376,7 +392,6 @@ internal fun buildSettingsSearchIndex(str: (Int) -> String): List<SettingsSearch
         "", listOf("gradient", "colour", "fade")
     )
 
-    // --- Gestures -----------------------------------------------------------------------------------
     val gestures = detail(FeatureDetailSection.GesturesGuide)
     add(
         "gestures.screen", gestureScreen, gestures, gestureScreen, Icons.Rounded.Gesture,
@@ -411,7 +426,6 @@ internal fun buildSettingsSearchIndex(str: (Int) -> String): List<SettingsSearch
         Icons.Rounded.Gesture, "", listOf("expanded", "swipe", "pager", "dismiss all", "floating window")
     )
 
-    // --- App shortcuts --------------------------------------------------------------------------------
     val shortcuts = detail(FeatureDetailSection.AppShortcuts)
     add(
         "shortcuts.screen", shortcutScreen, shortcuts, shortcutScreen, Icons.Rounded.Apps,
@@ -430,7 +444,6 @@ internal fun buildSettingsSearchIndex(str: (Int) -> String): List<SettingsSearch
         "", listOf("favourite", "favorite", "pin", "apps")
     )
 
-    // --- Notification history ---------------------------------------------------------------------------
     val history = detail(FeatureDetailSection.NotificationHistory)
     add(
         "history.screen", historyScreen, history, historyScreen, Icons.Rounded.History,
@@ -445,7 +458,6 @@ internal fun buildSettingsSearchIndex(str: (Int) -> String): List<SettingsSearch
         "", listOf("auto clean", "keep", "days", "delete old", "clear")
     )
 
-    // --- Backup & restore -----------------------------------------------------------------------------------
     val backup = detail(FeatureDetailSection.BackupRestore)
     add(
         "backup.export", str(R.string.backup_export_card_title), backup, backupScreen, Icons.Rounded.SettingsBackupRestore,
@@ -460,7 +472,6 @@ internal fun buildSettingsSearchIndex(str: (Int) -> String): List<SettingsSearch
         str(R.string.backup_reset_card_desc), listOf("factory", "default", "clear", "wipe", "restore defaults")
     )
 
-    // --- Permissions --------------------------------------------------------------------------------------------
     val perms = detail(FeatureDetailSection.PermissionsCenter)
     add(
         "perm.screen", permScreen, perms, permScreen, Icons.Rounded.Shield, str(R.string.card_permissions_setup_desc),
@@ -483,21 +494,24 @@ internal fun buildSettingsSearchIndex(str: (Int) -> String): List<SettingsSearch
         str(R.string.shizuku_card_desc), listOf("shizuku", "adb", "one tap", "auto setup", "necessary", "all permissions", "optional", "screen sharing", "cast")
     )
 
-    // --- Diagnostics ---------------------------------------------------------------------------------------------
+    add(
+        "faceid.screen", "Face ID settings", detail(FeatureDetailSection.FaceIdSettings), home, Icons.Rounded.Face,
+        "Animation style, fingerprint animation and App Face ID",
+        listOf("face id", "face unlock", "animation", "style", "expanded", "mix", "cutout", "app lock", "app face id", "scan", "fingerprint")
+    )
+
     add(
         "diag.screen", diagScreen, detail(FeatureDetailSection.Diagnostics), diagScreen, Icons.Rounded.BugReport,
         "Record what the island does, to find problems",
         listOf("log", "debug", "bug", "report", "export", "record", "crash", "developer", "trace")
     )
 
-    // --- About ---------------------------------------------------------------------------------------------------
     add(
         "about.screen", aboutScreen, detail(FeatureDetailSection.About), aboutScreen, Icons.Rounded.Info,
         str(R.string.card_about_subtitle),
         listOf("creator", "author", "original", "github", "link", "credits", "licence", "license", "gpl", "version", "animesh gupta")
     )
 
-    // --- Updates and Downloads -----------------------------------------------------------------------------------
     val updatesScreen = str(R.string.card_updates_downloads_title)
     add(
         "updates.screen", updatesScreen, detail(FeatureDetailSection.UpdatesAndDownloads), updatesScreen, Icons.Rounded.Download,
@@ -505,7 +519,6 @@ internal fun buildSettingsSearchIndex(str: (Int) -> String): List<SettingsSearch
         listOf("update", "download", "version", "github", "release", "apk", "check", "changelog")
     )
 
-    // --- Support & Community -------------------------------------------------------------------------------------
     val supportScreen = str(R.string.card_support_requests_title)
     add(
         "support.screen", supportScreen, detail(FeatureDetailSection.SupportCommunity), supportScreen, Icons.Rounded.People,
@@ -513,7 +526,6 @@ internal fun buildSettingsSearchIndex(str: (Int) -> String): List<SettingsSearch
         listOf("support", "telegram", "community", "bug", "issue", "feedback", "feature request", "contact")
     )
 
-    // --- Developer Options ---------------------------------------------------------------------------------------
     val devScreen = str(R.string.card_developer_options_title)
     add(
         "dev.screen", devScreen, detail(FeatureDetailSection.DeveloperOptions), devScreen, Icons.Rounded.Code,

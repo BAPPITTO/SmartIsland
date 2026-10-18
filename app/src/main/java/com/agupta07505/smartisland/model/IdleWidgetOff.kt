@@ -8,11 +8,9 @@
 package com.agupta07505.smartisland.model
 
 /**
- * When the idle widgets are taken off the collapsed cutout on purpose (Settings > Idle widgets), per orientation:
- *  - after a tap on the cutout closed the open island: the widgets stay off until the next time the island is opened or the screen turns off;
- *  - after a long press hid the pill: the widgets stay off for as long as the pill is hidden;
- *  - while the island holds any stored notification (even one the idle timeout put away): the widgets stay off until none is left.
- * Pure rules, so they can be unit tested; the state lives in IslandViewModel.
+ * Idle widgets are taken off the cutout on purpose (Settings > Idle widgets), per orientation: after a tap closed the
+ * island (until it reopens or the screen turns off), after a long press hid the pill (while hidden), and while any
+ * notification is stored (until none is left).
  */
 object IdleWidgetOff {
     fun suppressed(
@@ -24,10 +22,12 @@ object IdleWidgetOff {
         offWhenStored: Boolean = false
     ): Boolean = (closedByTap && offAfterTapClose) || (pillHidden && offAfterLongPress) || (hasStoredNotifications && offWhenStored)
 
-    /** The slider choices for the widget switch timer: whole seconds from [IdleWidgets.MIN_CYCLE_SECONDS] to [IdleWidgets.MAX_CYCLE_SECONDS]. */
+    /**
+     * Slider choices for the widget switch timer: whole seconds from [IdleWidgets.MIN_CYCLE_SECONDS] to
+     * [IdleWidgets.MAX_CYCLE_SECONDS].
+     */
     fun normalizeCycleSeconds(seconds: Int): Int =
         seconds.coerceIn(IdleWidgets.MIN_CYCLE_SECONDS, IdleWidgets.MAX_CYCLE_SECONDS)
 
-    /** Every widget ([IdleWidgetKind.values]) as the stored list, for the selector's "Select all". */
     fun allIds(): String = IdleWidgets.serialize(IdleWidgetKind.values().toList())
 }

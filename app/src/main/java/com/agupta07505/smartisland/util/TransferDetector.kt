@@ -43,7 +43,6 @@ data class TransferInput(
             Notification.CATEGORY_EVENT
         )
 
-        /** Reads one value, treating a throwing getter (malformed OEM extras) as "absent". */
         private inline fun <T> safe(default: T, block: () -> T): T = runCatching(block).getOrDefault(default)
 
         fun fromNotification(n: Notification, packageName: String, isMessageSync: Boolean): TransferInput {
@@ -174,17 +173,6 @@ object TransferTextAnalyzer {
     }
 }
 
-/**
- * Decides whether a notification is a transfer (download, upload, backup, copy, install, ...).
- *
- * Two kinds of evidence are scored. *Semantic* evidence says "this is about moving data" (words in
- * many languages, a transfer speed, "12 of 40 MB", a download manager or cloud app, a channel named
- * "downloads", Pause/Cancel buttons, CATEGORY_PROGRESS). *Structural* evidence says "this is a live
- * progress thing" (a progress bar, a percentage, an ETA, an ongoing/foreground-service flag, the
- * Android 16 progress style). A transfer needs at least one semantic point and a total of
- * [THRESHOLD]; wording without a progress bar needs a real transfer word, a size or a speed, so
- * network-speed meters and chat messages that mention "50%" do not turn into downloads.
- */
 object TransferDetector {
     const val THRESHOLD = 3
 

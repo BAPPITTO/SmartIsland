@@ -21,7 +21,6 @@ class SmartIslandApp : Application() {
         bypassHiddenApis()
     }
 
-    /** Puts the stack trace of any crash into the diagnostic log, then lets the system handle it as usual. */
     private fun installCrashLogger() {
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->

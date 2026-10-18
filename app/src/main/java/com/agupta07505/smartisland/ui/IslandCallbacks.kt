@@ -15,10 +15,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import com.agupta07505.smartisland.data.SmartIslandSettings
 import com.agupta07505.smartisland.model.IslandNotification
 
-/**
- * The island's callbacks and a few values, always as fresh as the latest composition. Gesture blocks such as
- * `pointerInput(Unit)` never restart their coroutine, so they read these instead of capturing the parameters.
- */
+/** The island's callbacks and a few values, always as fresh as the latest composition. */
 internal class IslandCallbacks(
     private val onToggle: State<() -> Unit>,
     private val hasIdleStoredCards: State<Boolean>,

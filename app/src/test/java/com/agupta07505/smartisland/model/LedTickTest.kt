@@ -23,7 +23,7 @@ class LedTickTest {
 
     @Test
     fun anEmptyOrUnusablePatternFallsBackToTheDefault() {
-        val default = listOf(1, 2, 3, 2, 5)
+        val default = listOf(4, 5, 4)
         assertEquals(default, LedTick.parsePattern("abc"))
         assertEquals(default, LedTick.parsePattern(""))
         assertEquals(default, LedTick.parsePattern(null))
@@ -118,8 +118,8 @@ class LedTickTest {
         assertEquals(29, LedFont.text("12:45").cols)
         assertEquals(LedFont.GLYPH_ROWS, LedFont.text("12:45").rows)
         assertTrue(LedFont.text("a").bits.contentEquals(LedFont.text("A").bits))
-        assertTrue(LedFont.text("~").bits.none { it })
-        for (c in " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:-.%/+°") {
+        assertTrue(LedFont.text("^").bits.none { it })
+        for (c in " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:-.%/+°~") {
             val glyph = LedFont.text(c.toString())
             assertEquals("glyph $c", 5, glyph.cols)
             assertEquals("glyph $c", 7, glyph.rows)
@@ -127,12 +127,25 @@ class LedTickTest {
     }
 
     @Test
-    fun everyDotIconIsSevenBySevenAndNotBlank() {
+    fun everyDotIconIsSquareAndNotBlank() {
+        val weather = setOf(LedIcon.Sun, LedIcon.Moon, LedIcon.Cloud, LedIcon.Rain, LedIcon.Snow, LedIcon.Bolt)
         for (icon in LedIcon.values()) {
             val grid = LedFont.icon(icon)
-            assertEquals(7, grid.cols)
-            assertEquals(7, grid.rows)
+            val size = if (icon in weather) LedFont.WEATHER_SIZE else 7
+            assertEquals("$icon", size, grid.cols)
+            assertEquals("$icon", size, grid.rows)
             assertTrue("$icon", grid.bits.any { it })
+        }
+    }
+
+    @Test
+    fun weatherIconsFillTheBoardHeight() {
+        assertEquals(LedTick.ROWS, LedFont.WEATHER_SIZE)
+        // Each weather icon lights its top and bottom row somewhere, so it uses the whole height of the board.
+        for (icon in listOf(LedIcon.Sun, LedIcon.Moon, LedIcon.Rain, LedIcon.Snow, LedIcon.Bolt)) {
+            val g = LedFont.icon(icon)
+            assertTrue("$icon top", (0 until g.cols).any { g.bits[it] })
+            assertTrue("$icon bottom", (0 until g.cols).any { g.bits[(g.rows - 1) * g.cols + it] })
         }
     }
 
@@ -159,8 +172,8 @@ class LedTickTest {
     @Test
     fun aNarrowFaceIsCentredOnAWideBoard() {
         val board = LedFrames.place(LedFont.icon(LedIcon.Sun), 29, LedTick.ROWS, 0)
-        // The Sun's top ray is column 3 of the icon; the icon starts at column 11 and row 1.
-        assertTrue(board[1 * 29 + 11 + 3])
+        // The Sun's top ray is column 4 of the 9 by 9 icon; the icon starts at column 10 and row 0.
+        assertTrue(board[0 * 29 + 10 + 4])
     }
 
     @Test
@@ -201,10 +214,27 @@ class LedTickTest {
     fun theDefaultsKeepTheOriginalSmoothTick() {
         val defaults = SmartIslandSettings.Default
         assertEquals(LedTick.STYLE_SMOOTH, defaults.idleTickStyle)
-        assertEquals("1, 2, 3, 2, 5", defaults.ledTickPattern)
+        assertEquals("4, 5, 4", defaults.ledTickPattern)
         assertEquals(LedTick.DEFAULT_PACE_MS, defaults.ledTickPaceMs)
         assertEquals(LedTick.FONT_BUILTIN, defaults.ledTickFont)
         assertEquals(LedTick.COLOR_RED, defaults.ledTickColor)
         assertTrue(defaults.ledTickStagger)
+    }
+
+    @Test
+    fun blendCrossFadesTwoFramesWithoutMovingAnything() {
+        val glow = LedGlow(cols = 2, rows = 2)
+        val from = booleanArrayOf(true, true, false, false)
+        val to = booleanArrayOf(true, false, false, true)
+        glow.blend(from, to, 0f)
+        assertEquals(listOf(1f, 1f, 0f, 0f), glow.level.toList())
+        glow.blend(from, to, 1f)
+        assertEquals(listOf(1f, 0f, 0f, 1f), glow.level.toList())
+        glow.blend(from, to, 0.5f)
+        // A dot lit in both stays lit, a dot lit in neither stays dark, the others are half way.
+        assertEquals(listOf(1f, 0.5f, 0f, 0.5f), glow.level.toList())
+        // Out-of-range mix is clamped, and a short frame counts as dark.
+        glow.blend(booleanArrayOf(true), booleanArrayOf(), 3f)
+        assertEquals(listOf(0f, 0f, 0f, 0f), glow.level.toList())
     }
 }

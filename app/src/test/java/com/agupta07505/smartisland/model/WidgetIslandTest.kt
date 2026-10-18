@@ -115,9 +115,10 @@ class WidgetIslandTest {
     }
 
     @Test
-    fun closeTimerDefaultsToThreeSecondsAndRunsFromTwoToNever() {
-        assertEquals(3, WidgetIslandTimer.DEFAULT_SECONDS)
-        assertEquals(3_000L, WidgetIslandTimer.closeDelayMs(WidgetIslandTimer.DEFAULT_SECONDS))
+    fun closeTimerDefaultsToNeverAndRunsFromTwoToNever() {
+        assertEquals(WidgetIslandTimer.NEVER, WidgetIslandTimer.DEFAULT_SECONDS)
+        assertNull(WidgetIslandTimer.closeDelayMs(WidgetIslandTimer.DEFAULT_SECONDS))
+        assertEquals(3_000L, WidgetIslandTimer.closeDelayMs(3))
         assertEquals(2_000L, WidgetIslandTimer.closeDelayMs(2))
         assertEquals(10_000L, WidgetIslandTimer.closeDelayMs(10))
         assertNull(WidgetIslandTimer.closeDelayMs(WidgetIslandTimer.NEVER))
@@ -131,5 +132,13 @@ class WidgetIslandTest {
         assertEquals(WidgetIslandTimer.MIN_SECONDS, WidgetIslandTimer.normalize(1))
         assertEquals(5, WidgetIslandTimer.normalize(5))
         assertEquals(WidgetIslandTimer.MAX_SECONDS, WidgetIslandTimer.normalize(9_999))
+    }
+
+    @Test
+    fun widgetIslandHoldsExpandWhileOpenAndWhileShrinking() {
+        assertFalse(widgetIslandHoldsExpand(open = false, shown = false))
+        assertTrue(widgetIslandHoldsExpand(open = true, shown = false))
+        assertTrue(widgetIslandHoldsExpand(open = true, shown = true))
+        assertTrue(widgetIslandHoldsExpand(open = false, shown = true))
     }
 }

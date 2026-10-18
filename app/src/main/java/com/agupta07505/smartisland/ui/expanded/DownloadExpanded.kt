@@ -88,7 +88,7 @@ fun DownloadExpanded(
         }
     }
 
-    // Strip out duplicate percentage text from subtitle so percentage is displayed ONCE on the right side
+    // Strip the duplicate percentage from the subtitle so it shows once, on the right.
     val cleanSubtitle = remember(notification.text, kind) {
         notification.text
             .replace(Regex("""\s*[•·-]?\s*\d+%\s*"""), "")
@@ -111,13 +111,11 @@ fun DownloadExpanded(
             .padding(start = 18.dp, top = 20.dp, end = 18.dp, bottom = bottomPadding),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Top Header Row matching NotificationExpanded alignment
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // App Icon (42.dp matching NotificationExpanded)
             val largeIcon = notification.largeIcon
             val icon = notification.icon
             val mainIcon = largeIcon ?: icon
@@ -165,7 +163,6 @@ fun DownloadExpanded(
                 }
             }
 
-            // Title & Subtitle Column matching NotificationExpanded font sizes
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = notification.title.ifBlank { kind.fallbackTitle },
@@ -186,7 +183,6 @@ fun DownloadExpanded(
                 )
             }
 
-            // Right side: Badge Tag & Timestamp
             Column(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -223,7 +219,6 @@ fun DownloadExpanded(
             }
         }
 
-        // Progress Bar & Percentage Row
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -290,7 +285,6 @@ fun DownloadExpanded(
             )
         }
 
-        // Action Intents (if present)
         if (notification.actionIntents.isNotEmpty()) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),

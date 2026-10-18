@@ -12,12 +12,10 @@ import android.service.notification.StatusBarNotification
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Helpers for the diagnostic log's notification trace: which posts deserve a detailed line, how to
- * keep progress-bar spam out of a 3000-entry buffer, and a short description of a post. Nothing here
- * logs by itself; the listener service calls it while [AppLogRecorder] is recording.
+ * Helpers for the diagnostic log's notification trace: which posts deserve a detailed line, how to keep progress-bar
+ * spam out of a 3000-entry buffer, and a short description of a post.
  */
 object NotificationTrace {
-    /** WhatsApp and its business variant: the apps the trace is mainly asked about. */
     private val MESSENGER_PACKAGES = setOf("com.whatsapp", "com.whatsapp.w4b")
 
     private const val SAME_LINE_MIN_GAP_MS = 5_000L
@@ -27,14 +25,12 @@ object NotificationTrace {
 
     fun isMessenger(packageName: String): Boolean = packageName in MESSENGER_PACKAGES
 
-    /** True for posts that get the detailed line: messengers and anything that looks like a call. */
     fun isDetailed(packageName: String, notification: Notification): Boolean =
         isMessenger(packageName) || runCatching { CallDiagnostics.isCallLike(notification) }.getOrDefault(false)
 
     /**
-     * Rate limit for repeated identical decisions (a progress bar that re-posts every second would
-     * otherwise fill the buffer). A changed [signature] always passes; the same one repeats at most
-     * every [SAME_LINE_MIN_GAP_MS]. Detailed posts are never limited.
+     * Rate limit for repeated identical decisions (a progress bar that re-posts every second would otherwise fill the
+     * buffer).
      */
     fun shouldLog(key: String, signature: String, detailed: Boolean, nowMs: Long = System.currentTimeMillis()): Boolean {
         if (detailed) return true

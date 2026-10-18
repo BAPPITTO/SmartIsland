@@ -14,11 +14,7 @@ import kotlin.math.hypot
 import kotlin.math.pow
 import kotlin.math.sin
 
-/**
- * CIELAB / LCh maths for the media card's colours. Android's shade builds its media colours from tones (a fixed perceptual
- * lightness: 90 for the buttons, about 10 for the glyphs), not from HSL lightness, which is why a green cover looked pale on the
- * island and vivid in the shade. Pure maths, no Android classes.
- */
+/** CIELAB / LCh maths for the media card's colours. */
 object LabColor {
     private const val XN = 0.95047
     private const val YN = 1.0
@@ -40,10 +36,7 @@ object LabColor {
         return doubleArrayOf(116.0 * fy - 16.0, 500.0 * (fx - fy), 200.0 * (fy - fz))
     }
 
-    /**
-     * sRGB (0..1 channels, [r, g, b]) of the LCh colour with lightness [l], chroma [c] and hue [hueDeg]. A chroma the screen cannot
-     * show is reduced (lightness and hue kept) until it fits, the way Material's tones are gamut-mapped.
-     */
+    /** sRGB (0..1 channels, [r, g, b]) of the LCh colour with lightness [l], chroma [c] and hue [hueDeg]. */
     fun lchToSrgb(l: Double, c: Double, hueDeg: Double): FloatArray {
         var lo = 0.0
         var hi = c.coerceAtLeast(0.0)
@@ -80,7 +73,6 @@ object LabColor {
         )
     }
 
-    /** Chroma and hue (degrees, 0 until 360) of a mean (a, b) pair. */
     fun chromaOf(a: Double, b: Double): Double = hypot(a, b)
 
     fun hueOf(a: Double, b: Double): Double {
@@ -102,7 +94,6 @@ object LabColor {
         return if (v <= 0.0031308) 12.92 * v else 1.055 * v.pow(1.0 / 2.4) - 0.055
     }
 
-    /** Lightness (L*) of an sRGB colour, for tests. */
     fun lightnessOf(rgb: FloatArray): Double =
         fromSrgb(Math.round(rgb[0] * 255f), Math.round(rgb[1] * 255f), Math.round(rgb[2] * 255f))[0]
 }

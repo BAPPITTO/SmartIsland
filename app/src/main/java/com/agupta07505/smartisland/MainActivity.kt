@@ -29,7 +29,6 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var settingsRepository: SmartIslandSettingsRepository
     @Inject lateinit var notificationRepository: INotificationRepository
 
-    /** The settings screen the island asked for (the Utilities page's settings button), until the home screen has opened it. */
     private var requestedSection by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {

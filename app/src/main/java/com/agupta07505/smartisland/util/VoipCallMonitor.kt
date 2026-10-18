@@ -21,10 +21,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Watches the system audio mode. VoIP apps switch it to MODE_IN_COMMUNICATION for the whole call,
- * which needs no permission. Android 12+ delivers changes through a listener; older versions are
- * polled. A microphone callback adds a second signal (VOICE_COMMUNICATION capture), and a short
- * delay before "call over" keeps route switches (earpiece to Bluetooth) from flickering the card.
+ * Watches the system audio mode. VoIP apps switch it to MODE_IN_COMMUNICATION for the whole call, which needs no
+ * permission.
  */
 class VoipCallMonitor(
     private val context: Context,

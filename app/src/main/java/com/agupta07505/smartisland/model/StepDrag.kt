@@ -11,28 +11,30 @@ import kotlin.math.abs
 import kotlin.math.exp
 
 /**
- * The numbers behind a card step (preview, reader, picture) that follows the finger. A vertical drag
- * moves the step's progress 0..1; the island's height runs from the height it had to the height of the new step, and the
- * new step's content brightens with it. Lifting past [COMMIT_PROGRESS] finishes the step, lifting short of it goes back.
+ * Numbers behind a card step (preview, reader, picture) that follows the finger: a vertical drag moves progress 0..1;
+ * lifting past [COMMIT_PROGRESS] finishes the step, short of it goes back.
  */
 object StepDrag {
-    /** How far (dp) the finger travels, past the tap slop, for the step to be fully open. */
+    /** Finger travel (dp), past the tap slop, for the step to be fully open. */
     const val RANGE_DP = 110f
 
     /** Lifting at or beyond this progress completes the step; below it the step goes back. */
     const val COMMIT_PROGRESS = 0.4f
 
-    /** After the lift the shell keeps the dragged height until its own spring is this close (dp), or [HANDOVER_MAX_MS] has passed. */
+    /**
+     * After the lift the shell keeps the dragged height until its spring is this close (dp), or [HANDOVER_MAX_MS] has
+     * passed.
+     */
     const val HANDOVER_TOLERANCE_DP = 1.5f
     const val HANDOVER_MAX_MS = 300L
 
     /** Base length of the finish / go-back animation after the lift (speed setting applied by the caller). */
     const val SETTLE_MS = 240
 
-    /** The go-back (short pull) settle is shorter than a finish: nothing new is being revealed, the old step just returns. */
+    /** Go-back settles faster than a finish: nothing new is revealed, the old step just returns. */
     const val GO_BACK_SETTLE_MS = 160
 
-    /** The drag has reached its far end (the step is fully open). */
+    /** The drag has reached its far end (step fully open). */
     const val MAX_PROGRESS = 1f
 
     fun progress(signedDragPx: Float, slopPx: Float, rangePx: Float): Float =
@@ -41,19 +43,17 @@ object StepDrag {
     fun commits(progress: Float): Boolean = progress >= COMMIT_PROGRESS
 
     /**
-     * Light smoothing of the finger-driven progress. Raw touch samples arrive unevenly (and a quick flick delivers a few big
-     * jumps), which showed as a stepped, janky height. The shown progress now eases toward the finger's progress with this time
-     * constant (about 75 ms: enough to hide the steps, short enough that the island still feels attached to the finger). The
-     * commit decision at the lift still uses the finger's own progress, not the eased one.
+     * Light smoothing of the finger-driven progress (about 75 ms) so uneven touch samples do not make the height
+     * stepped. The commit decision at the lift uses the finger's own progress.
      */
     const val SMOOTH_TAU_MS = 75f
 
-    /** Closer than this to the finger's progress, the shown progress just lands on it (no endless tiny writes). */
+    /** Closer than this to the finger's progress, the shown progress lands on it (no endless tiny writes). */
     const val SMOOTH_SNAP = 0.002f
 
     /**
-     * One frame of the ease: [current] moves toward [target] by `1 - e^(-dt / tau)` of the gap. Frame-rate independent, never
-     * overshoots, and an idle finger lets it arrive exactly.
+     * One frame of the ease: [current] moves toward [target] by `1 - e^(-dt / tau)` of the gap. Frame-rate
+     * independent, never overshoots, and an idle finger lets it arrive exactly.
      */
     fun smoothed(current: Float, target: Float, dtMs: Float): Float {
         if (dtMs <= 0f) return current
@@ -63,16 +63,13 @@ object StepDrag {
     }
 
     /**
-     * The old and the new step trade places within the first [CROSSFADE_END] of the move, not over all of it, so
-     * the two copies of the card (drawn at two heights while the shell resizes) overlap for a short part of the drag only. The two
-     * alphas add up to 1 at every progress, so the card never goes see-through in between.
+     * Old and new step trade places within the first [CROSSFADE_END] of the move; alphas sum to 1 so the card never
+     * goes see-through.
      */
     const val CROSSFADE_END = 0.4f
 
-    /** The step being left: 1 at the start of the move, 0 from [CROSSFADE_END] on. */
     fun oldStepAlpha(progress: Float): Float = 1f - newStepAlpha(progress)
 
-    /** The step being opened: 0 at the start of the move, 1 from [CROSSFADE_END] on. */
     fun newStepAlpha(progress: Float): Float = (progress / CROSSFADE_END).coerceIn(0f, 1f)
 
     fun heightDp(fromDp: Float, targetDp: Float, progress: Float): Float =
@@ -80,9 +77,8 @@ object StepDrag {
 }
 
 /**
- * One buzz per step drag, never two. It plays the moment the finger reaches the far end of the drag ([StepDrag.MAX_PROGRESS]);
- * a drag lifted past [StepDrag.COMMIT_PROGRESS] without ever reaching the end buzzes once at the lift instead. Taps (arrow,
- * thumbnail) do not use this: they buzz once at the tap. Make a new one for every touch.
+ * One buzz per step drag: at the far end, or at the lift for a drag past [StepDrag.COMMIT_PROGRESS] that never
+ * reached it. Taps buzz once at the tap. Make a new one per touch.
  */
 class StepDragHaptic {
     private var played = false

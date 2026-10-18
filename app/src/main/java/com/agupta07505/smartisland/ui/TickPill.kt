@@ -11,13 +11,10 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
-/** The pill needs this long (ms) to slide in and settle (its spring) before a tick starts on it, so the tick is not drawn while the pill still moves. */
 private const val TICK_PILL_SETTLE_MS = 550L
 
-/** The pill must be wide within this long (ms) after it was asked for, else this tick is skipped (the island is busy or the shade is open). */
 private const val TICK_PILL_WAIT_MS = 3000L
 
-/** The pill stays this long (ms) after a tick has faded out, so two ticks in a row do not slide it away and back. */
 private const val TICK_PILL_KEEP_MS = 400L
 
 /**

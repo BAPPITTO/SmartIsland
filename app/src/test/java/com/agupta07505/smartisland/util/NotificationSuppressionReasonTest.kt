@@ -22,8 +22,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * [NotificationFilter.suppressionReason] names the rule; [NotificationFilter.shouldSuppressFromIsland]
- * must stay exactly "reason != null" so the diagnostic log never disagrees with the real decision.
+ * [NotificationFilter.suppressionReason] names the rule; [NotificationFilter.shouldSuppressFromIsland] must stay
+ * exactly "reason != null" so the diagnostic log never disagrees with the real decision.
  */
 class NotificationSuppressionReasonTest {
 

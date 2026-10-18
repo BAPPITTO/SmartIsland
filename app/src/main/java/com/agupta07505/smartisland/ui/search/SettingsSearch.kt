@@ -30,13 +30,6 @@ data class SearchableSetting(
 
 /**
  * Pure matching for the settings search box. No Android classes, so it is unit-tested on the JVM.
- *
- * Rules:
- * - Case, accents and punctuation do not matter ("Wi-Fi", "wifi" and "WI FI" all match each other).
- * - The query is split into words and every word must match somewhere in the row.
- * - A word scores higher the closer to the title it matches: start of the title, start of a title
- *   word, inside the title, a keyword, then the subtitle or screen name.
- * - Results are ordered by score, then in index order, and capped at [MAX_RESULTS].
  */
 object SettingsSearch {
     const val MAX_RESULTS = 25
@@ -54,7 +47,6 @@ object SettingsSearch {
             .trim()
     }
 
-    /** The query as normalised words; empty when there is nothing to search for. */
     fun tokens(query: String): List<String> =
         normalize(query).split(' ').filter { it.isNotEmpty() }
 

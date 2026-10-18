@@ -12,13 +12,6 @@
         <item name="android:fontFamily">sans</item>
         <item name="android:colorAccent">#1B73E8</item>
     </style>
-    <!-- The privacy-usage dialog sits on a see-through window. -->
-    <style name="Theme.SmartIsland.Dialog" parent="Theme.SmartIsland">
-        <item name="android:windowIsTranslucent">true</item>
-        <item name="android:windowBackground">@android:color/transparent</item>
-        <item name="android:windowAnimationStyle">@null</item>
-        <item name="android:backgroundDimEnabled">true</item>
-    </style>
     <!-- The island's picker window: see-through, and no dim of its own (the dialog draws its own scrim). -->
     <style name="Theme.SmartIsland.Picker" parent="Theme.SmartIsland">
         <item name="android:windowIsTranslucent">true</item>

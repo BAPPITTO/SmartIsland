@@ -88,7 +88,6 @@ private val EXPANDED_TEXT_MAX_HEIGHT = 150.dp
 private val PREVIEW_ROW_HEIGHT = 96.dp
 private val PREVIEW_MEDIA_MAX_WIDTH = 140.dp
 
-/** The text shown once expanded: the notification's longer body when it has one, else the short text. */
 internal fun expandableNotificationText(shortText: String, bigText: String): String =
     if (bigText.isNotBlank() && bigText != shortText && bigText.length > shortText.length) bigText else shortText
 
@@ -102,8 +101,7 @@ fun NotificationExpanded(
     settings: SmartIslandSettings = SmartIslandSettings.Default,
     onReplyStateChanged: (Boolean) -> Unit = {},
     onTextExpandedChanged: (Boolean) -> Unit = {},
-    // The copy drawn under a card step that follows the finger (the step it is leaving). It shows the
-    // given steps, reports nothing and owns no state of the real card.
+    // The copy drawn under a card step that follows the finger: shows the given steps, reports nothing, owns no state.
     frozen: Boolean = false,
     stepsOverride: com.agupta07505.smartisland.model.CardSteps? = null
 ) {
@@ -115,7 +113,6 @@ fun NotificationExpanded(
     val replyDrafts = LocalReplyDrafts.current
     var replyText by remember(notification?.key) { mutableStateOf(notification?.key?.let { replyDrafts.get(it) }.orEmpty()) }
 
-    // The open step lives in the view model (arrow and swipe gestures share it): first state, preview, reader, picture.
     val cardSteps = LocalCardSteps.current
     val steps = stepsOverride ?: cardSteps.stepsFor(notification?.key)
     val stepDrag = LocalStepDrag.current
@@ -123,10 +120,8 @@ fun NotificationExpanded(
         // The step the card is at while nothing follows the finger: what a drag that starts now fades away from.
         androidx.compose.runtime.SideEffect { if (!stepDrag.active) stepDrag.fromSteps = steps }
     }
-    // Like the shade: a long message is cut short until the arrow (or a swipe down) opens the reader.
     val textExpanded = steps.reader
-    // Cards with 2 or more pictures have a middle step before the full reader: last text left, last picture right.
-    // One picture skips it (CardSteps).
+    // Cards with 2 or more pictures have a middle preview step before the reader; one picture skips it (CardSteps).
     val previewOpen = steps.preview
     var titleCutOff by remember(notification?.key) { mutableStateOf(false) }
     var textCutOff by remember(notification?.key) { mutableStateOf(false) }
@@ -137,12 +132,10 @@ fun NotificationExpanded(
     val fullText = expandableNotificationText(shortText, notification?.bigText.orEmpty())
     val mediaList = notification?.media.orEmpty()
     val hasMedia = mediaList.isNotEmpty()
-    // No arrows beside pictures. A card with a sticker has no preview and no picture steps (the sticker just stays a moving
-    // thumbnail); the step logic counts no pictures for it.
+    // No arrows beside pictures. A card with a sticker has no preview or picture steps; the step logic counts no pictures for it.
     val stepMediaCount = if (mediaList.any { it.isSticker }) 0 else mediaList.size
     val canExpandText = titleCutOff || textCutOff || fullText != shortText || stepMediaCount > 0
     val previewShown = previewOpen && stepMediaCount >= 2 && !textExpanded
-    // Tell the view model whether a text without pictures has a reader to open (the swipe down needs to know).
     LaunchedEffect(notification?.key, canExpandText, frozen) {
         if (!frozen) notification?.key?.let { cardSteps.reportExpandable(it, canExpandText) }
     }
@@ -163,8 +156,7 @@ fun NotificationExpanded(
         }
     }
 
-    // Pictures: one per attached image or sticker. The one open at full size comes from the overlay,
-    // so a tap outside the island can close it first.
+    // The picture open at full size comes from the overlay, so a tap outside the island can close it first.
     val mediaExpansion = LocalMediaExpansion.current
     val openMediaIndex = if (frozen) {
         steps.pictureIndex?.takeIf { it in mediaList.indices }
@@ -205,7 +197,6 @@ fun NotificationExpanded(
     if (notification != null && openMediaIndex != null && !mediaExpansion.besideCard) {
         ExpandedMediaViewer(
             media = mediaList[openMediaIndex],
-            // Half-size step: the picture island is only halfway between the card and the full-size picture.
             onClose = { if (!frozen) mediaExpansion.onChange(null, 0) },
             modifier = Modifier.fillMaxWidth().height(if (steps.pictureHalf) PICTURE_MID_HEIGHT else EXPANDED_MEDIA_HEIGHT)
         )
@@ -215,8 +206,8 @@ fun NotificationExpanded(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            // Top-anchored while a card step follows the finger: the frozen copy of the step being left is laid out in the new
-            // step's (taller) slot and used to be centred in it, which drew its text lower than the real card's.
+            // Top-anchored while a card step follows the finger: the frozen copy of the step being left is laid out
+            // in the new step's (taller) slot, and centring it there would draw its text lower than the real card's.
             .wrapContentHeight(align = rememberStepAwareAlignment())
             .padding(start = 18.dp, top = 20.dp, end = 18.dp, bottom = bottomPadding),
         verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -275,7 +266,6 @@ fun NotificationExpanded(
                     .weight(1f)
                     .then(
                         if (textExpanded) {
-                            // Long messages scroll here so the whole text can be read from the island.
                             Modifier
                                 .heightIn(max = EXPANDED_TEXT_MAX_HEIGHT)
                                 .verticalScroll(textScrollState)
@@ -311,8 +301,8 @@ fun NotificationExpanded(
                 )
             }
 
-            // Expanded reader with pictures: one thumbnail per picture or sticker on the right (stickers
-            // keep moving), each with its own down arrow beside it that opens just that one at full size.
+            // Expanded reader with pictures: a thumbnail per picture or sticker on the right, each with its own arrow
+            // that opens just that one at full size.
             if (notification != null && textExpanded && hasMedia) {
                 val thumbScrollState = rememberScrollState()
                 if (!frozen) ReportReaderScroll(thumbScrollState)
@@ -350,7 +340,6 @@ fun NotificationExpanded(
                 }
             }
 
-            // Preview step: the last picture or sticker (it keeps moving) fills the height of the row.
             if (previewShown) {
                 val last = mediaList.last()
                 val ratio = (last.still.width.toFloat() / last.still.height.coerceAtLeast(1)).coerceIn(0.7f, 1.6f)
@@ -370,7 +359,6 @@ fun NotificationExpanded(
                 )
             }
 
-            // Time text on top right using the internal helper in IslandCollapsedContent
             Text(
                 text = notification?.let { formatNotificationTime(it.timeMillis) } ?: "",
                 color = LocalIslandPalette.current.textTertiary,
@@ -379,7 +367,6 @@ fun NotificationExpanded(
             )
         }
 
-        // Bottom Section: Inline Quick Reply OR Action Buttons
         if (isReplying && notification != null) {
             val quickReplyAction = notification.actionIntents.firstOrNull { it.isQuickReply }
                 ?: notification.actionIntents.firstOrNull { it.title.lowercase().contains("reply") }
@@ -423,7 +410,7 @@ fun NotificationExpanded(
                         repo.updateNotification(notification.key) { it.withSentReply(sentText) }
                         replyText = ""
                     } else {
-                        // Nothing was really sent (no reply action): behave as before.
+                        // Nothing was really sent (no reply action).
                         repo.removeNotification(notification.key)
                         repo.sendCommand(com.agupta07505.smartisland.data.SmartIslandCommand.CancelNotification(notification.key))
                         onCollapse()
@@ -481,7 +468,6 @@ fun NotificationExpanded(
                     )
                 }
 
-                // Send Button
                 Box(
                     modifier = Modifier
                         .size(36.dp)
@@ -502,7 +488,6 @@ fun NotificationExpanded(
                     )
                 }
 
-                // Cancel Button
                 Box(
                     modifier = Modifier
                         .size(36.dp)
@@ -529,7 +514,6 @@ fun NotificationExpanded(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Left part of Bottom Section: Action Buttons Row
                 if (showActions && notification != null && notification.actionIntents.isNotEmpty()) {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -542,7 +526,7 @@ fun NotificationExpanded(
                                 modifier = Modifier
                                     .height(28.dp)
                                     .clip(RoundedCornerShape(14.dp))
-                                    .background(LocalIslandPalette.current.chipFill) // light grey background matching the Telegram button
+                                    .background(LocalIslandPalette.current.chipFill)
                                     .bounceClick {
                                         if (isReplyAction) {
                                             isReplying = true
@@ -563,7 +547,7 @@ fun NotificationExpanded(
                             ) {
                                 Text(
                                     text = action.title,
-                                    color = Color(0xFF1F2937), // dark grey text
+                                    color = Color(0xFF1F2937),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Medium
                                 )
@@ -574,8 +558,7 @@ fun NotificationExpanded(
                     Spacer(modifier = Modifier.weight(1f))
                 }
 
-                // Bottom right: expands / collapses a shortened message. A message that is not cut
-                // off has nothing to expand, so no button is shown (tapping the card opens the app).
+                // Expands / collapses a shortened message; a message that is not cut off has no button (tapping the card opens the app).
                 if (canExpandText) {
                     Box(
                         modifier = Modifier
@@ -604,10 +587,6 @@ fun NotificationExpanded(
     }
 }
 
-/**
- * A small preview of one picture or sticker. No arrow: the picture itself is the tap target ([onExpand], null for a sticker or
- * a frozen copy), which opens it at half size (one picture) or opens the image selector (several).
- */
 @Composable
 private fun MediaThumbnail(media: com.agupta07505.smartisland.model.NotificationMedia, onExpand: (() -> Unit)?) {
     Box(
@@ -631,8 +610,8 @@ private fun MediaThumbnail(media: com.agupta07505.smartisland.model.Notification
 }
 
 /**
- * One picture or sticker at the largest size an expanded island gets, with an arrow in the corner
- * that closes it. A tap on the picture itself does nothing (it must not open the app by accident).
+ * One picture or sticker at the largest size an expanded island gets, with a corner arrow that closes it. A tap on
+ * the picture itself does nothing (it must not open the app by accident).
  */
 @Composable
 internal fun ExpandedMediaViewer(

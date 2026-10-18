@@ -37,33 +37,28 @@ object SwipeSideways {
     fun leanPx(dragX: Float, density: Float, share: Float = 1f): Float =
         softFollow(dragX, FOLLOW, maxLeanPx(density) * share)
 
-    /** The largest lean (px) at [density]: what [progress] is measured against. */
     fun maxLeanPx(density: Float): Float = MAX_LEAN_DP * density
 
-    /** 0 at rest, 1 at the largest lean; clamped. */
     fun progress(leanPx: Float, maxLeanPx: Float): Float =
         if (maxLeanPx <= 0f) 0f else (abs(leanPx) / maxLeanPx).coerceIn(0f, 1f)
 
     fun scaleX(progress: Float): Float = 1f + STRETCH_X * progress
     fun scaleY(progress: Float): Float = 1f - SQUEEZE_Y * progress
 
-    /**
-     * The shell scales around its centre, so a wider shell would grow on both sides. Moving it towards the lean by half of the added
-     * width keeps the trailing edge where it is: the stretch reaches in the direction of the swipe only. [widthPx] is the unscaled width.
-     */
+    /** The shell scales around its centre, so a wider shell would grow on both sides. */
     fun edgeAnchorShiftPx(scaleX: Float, widthPx: Float, lean: Float): Float = sign(lean) * (scaleX - 1f) * widthPx / 2f
 
     /**
-     * The island's total lean (px) while a swipe's swap runs: what the finger still holds ([dragLean]) plus what the release has left
-     * of the lean the finger let go with ([releaseLean] x the part of the swap still to run, `1 - swapProgress`).
+     * The island's total lean (px) while a swipe's swap runs: what the finger still holds ([dragLean]) plus what the
+     * release has left of the lean the finger let go with ([releaseLean] x the part of the swap still to run, `1 -
+     * swapProgress`).
      */
     fun totalLeanPx(dragLean: Float, releaseLean: Float, swapProgress: Float): Float =
         dragLean + releaseLean * (1f - swapProgress.coerceIn(0f, 1f))
 
     /**
-     * Where the two cards stand during a swap (px, signed): the new card comes from [sign] x [widthPx] to 0 and the old one leaves from 0
-     * to -[sign] x [widthPx], one card apart the whole time, so no gap opens between them. [swapProgress] is 0 at the lift and 1 when done.
-     * [sign] is +1 after a swipe left (the new card arrives from the right) and -1 after a swipe right.
+     * Where the two cards stand during a swap (px, signed): the new card comes from [sign] x [widthPx] to 0 and the
+     * old one leaves from 0 to -[sign] x [widthPx], one card apart the whole time, so no gap opens between them.
      */
     fun incomingX(sign: Int, widthPx: Float, swapProgress: Float): Float = sign * widthPx * (1f - swapProgress.coerceIn(0f, 1f))
     fun outgoingX(sign: Int, widthPx: Float, swapProgress: Float): Float = -sign * widthPx * swapProgress.coerceIn(0f, 1f)

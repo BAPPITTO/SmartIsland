@@ -55,7 +55,6 @@ object LiveActivityParser {
         val progress = extras.getInt(Notification.EXTRA_PROGRESS, 0)
         val progressMax = extras.getInt(Notification.EXTRA_PROGRESS_MAX, 0)
 
-        // 1. Extract ETA
         val etaMatcher = ETA_PATTERN.matcher("$title $text")
         var extractedMins: Float? = null
         val etaText = if (etaMatcher.find()) {
@@ -71,7 +70,6 @@ object LiveActivityParser {
             null
         }
 
-        // Detect if this is a tracking notification vs a promo notification
         val isPromo = isPromoNotification(combinedContent)
         val isTrackingNotification = !isPromo && (
             etaText != null ||
@@ -83,14 +81,12 @@ object LiveActivityParser {
             return null
         }
 
-        // 2. Determine Stage
         val stage = when {
             STATUS_STAGE_3.any { combinedContent.contains(it) } -> 3
             STATUS_STAGE_1.any { combinedContent.contains(it) } -> 1
             else -> 2
         }
 
-        // 3. Calculate Progress Ratio (0.0f to 1.0f)
         val progressRatio = when {
             progressMax > 0 -> (progress.toFloat() / progressMax.toFloat()).coerceIn(0f, 1f)
             extractedMins != null -> {
@@ -101,13 +97,11 @@ object LiveActivityParser {
             else -> 0.65f
         }
 
-        // 4. Extract Distance if present
         val distMatcher = DISTANCE_PATTERN.matcher("$title $text")
         val distanceText = if (distMatcher.find()) {
             distMatcher.group(0)
         } else null
 
-        // 5. Construct Status and SubStatus
         val finalStatusTitle = if (title.isNotBlank()) title else "Order / Ride in progress"
         val subStatusText = when {
             distanceText != null -> "Distance: $distanceText • $text"

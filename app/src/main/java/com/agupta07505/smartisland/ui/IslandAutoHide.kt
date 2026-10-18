@@ -24,13 +24,11 @@ internal fun AutoHideEffects(
     settings: SmartIslandSettings,
     ui: IslandInteractionState
 ) {
-    // Reset auto-hide whenever active notifications change or selection changes
     LaunchedEffect(notifications.map { it.key }, selectedIndex) {
         ui.isAutoHidden = false
         ui.touch()
     }
 
-    // Auto-hide countdown timer when pill is collapsed and autoHidePill is enabled
     LaunchedEffect(expanded, settings.autoHidePill, settings.autoHideTimeoutSeconds, ui.userInteractionTimestamp, ui.widgetIslandOpen) {
         // An open widget island has its own close timer: the pill underneath stays until the island is gone.
         if (expanded || ui.widgetIslandOpen || !settings.autoHidePill) {

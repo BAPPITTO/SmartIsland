@@ -8,6 +8,18 @@
 package com.agupta07505.smartisland.ui.sections
 
 import androidx.compose.animation.animateContentSize
+import com.agupta07505.smartisland.model.IdleSchedule
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInParent
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.key
+import androidx.compose.material.icons.rounded.PushPin
+import androidx.compose.material.icons.rounded.DragHandle
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -21,11 +33,10 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.material3.AlertDialog
 import com.agupta07505.smartisland.ui.glass.Card
@@ -34,6 +45,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -71,16 +83,17 @@ import com.agupta07505.smartisland.ui.search.searchAnchor
 import kotlinx.coroutines.launch
 
 /**
- * Settings > Idle widgets. Three cards:
- *  - the switches, one set for portrait and one for landscape (the Portrait / Landscape tabs choose which one is shown): show idle widgets,
- *    turn them off after a tap on the cutout closed the island, turn them off while a long press has the pill hidden;
- *  - the widget selector, like the App shortcuts one but every widget can be ticked;
- *  - the two timers, shared by both orientations: the sideways tick of the glyphs and the automatic widget switch.
+ * Settings > Idle widgets, three cards: the switches (one set for portrait and one for landscape, chosen by the
+ * tabs), the widget selector (every widget can be ticked), and the two timers shared by both orientations (the
+ * glyphs' sideways tick and the automatic widget switch).
  */
 @Composable
 fun IdleWidgetsSettingsSection(
     settings: SmartIslandSettings,
-    repository: SmartIslandSettingsRepository
+    repository: SmartIslandSettingsRepository,
+    onOpenWeatherSettings: () -> Unit = {},
+    onOpenNetSpeedSettings: () -> Unit = {},
+    onOpenCalendarSettings: () -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
     var tab by rememberSaveable { mutableStateOf(OrientationTab.Portrait) }
@@ -91,9 +104,12 @@ fun IdleWidgetsSettingsSection(
     val offAfterTap = if (landscape) settings.idleOffAfterTapCloseLandscape else settings.idleOffAfterTapClose
     val offAfterLongPress = if (landscape) settings.idleOffAfterLongPressLandscape else settings.idleOffAfterLongPress
     val offWhenStored = if (landscape) settings.idleOffWhenStoredLandscape else settings.idleOffWhenStored
-    val selected = remember(settings.idleWidgetIds) { IdleWidgets.parse(settings.idleWidgetIds) }
+    val selected = remember(settings.idleWidgetIds, settings.idleWidgetPinnedFirst) {
+        IdleSchedule.ordered(IdleWidgets.parse(settings.idleWidgetIds), settings.idleWidgetPinnedFirst)
+    }
 
-    // The mode widget can only tell Bedtime / Driving / ... apart with Do Not Disturb access; the answer is read again when the user comes back from the system page.
+    // The mode widget can only tell Bedtime / Driving / ... apart with Do Not Disturb access; the answer is read
+    // again when the user comes back from the system page.
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var dndAccess by remember { mutableStateOf(DndModeReader.hasPolicyAccess(context)) }
@@ -113,7 +129,6 @@ fun IdleWidgetsSettingsSection(
     ) {
         OrientationTabs(selected = tab, onSelected = { tab = it })
 
-        // ---- Switches (per orientation) ----
         SectionCard {
             Column(modifier = Modifier.animateContentSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 SwitchRow(
@@ -161,7 +176,6 @@ fun IdleWidgetsSettingsSection(
             }
         }
 
-        // ---- Widget selector ----
         SectionCard(modifier = Modifier.searchAnchor("idle.select")) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(
@@ -184,7 +198,6 @@ fun IdleWidgetsSettingsSection(
                     }
                     CountBadge("${selected.size} / ${IdleWidgetKind.values().size}")
                 }
-                // What is selected now, in the order the widgets take turns.
                 selected.forEach { kind ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -194,10 +207,41 @@ fun IdleWidgetsSettingsSection(
                         KindIcon(kind, checked = true)
                         Text(
                             text = stringResource(kindTitle(kind)),
+                            modifier = Modifier.weight(1f),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
+                        // A gear on the right of the widgets that have settings of their own (only the ticked ones are listed here).
+                        val openSettings: (() -> Unit)? = when (kind) {
+                            IdleWidgetKind.Weather, IdleWidgetKind.Wind -> onOpenWeatherSettings
+                            IdleWidgetKind.NetSpeed -> onOpenNetSpeedSettings
+                            IdleWidgetKind.Date -> onOpenCalendarSettings
+                            else -> null
+                        }
+                        if (openSettings != null) {
+                            IconButton(onClick = openSettings, modifier = Modifier.size(36.dp)) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Settings,
+                                    contentDescription = stringResource(
+                                        when (kind) {
+                                            IdleWidgetKind.NetSpeed -> R.string.net_cfg_open
+                                            IdleWidgetKind.Date -> R.string.cal_cfg_open
+                                            else -> R.string.weather_cfg_open
+                                        }
+                                    ),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                        if (kind.id == settings.idleWidgetPinnedFirst) {
+                            Icon(
+                                imageVector = Icons.Rounded.PushPin,
+                                contentDescription = stringResource(R.string.idle_select_pinned),
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
                 FilledTonalButton(
@@ -208,6 +252,15 @@ fun IdleWidgetsSettingsSection(
                     Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.idle_select_button), fontWeight = FontWeight.SemiBold)
+                }
+                if (IdleWidgetKind.Battery in selected) {
+                    SwitchRow(
+                        title = stringResource(R.string.idle_battery_only_charging_title),
+                        subtitle = stringResource(R.string.idle_battery_only_charging_desc),
+                        checked = settings.batteryOnlyWhenCharging,
+                        modifier = Modifier.searchAnchor("idle.battery_only_charging"),
+                        onCheckedChange = { scope.launch { repository.setBatteryOnlyWhenCharging(it) } }
+                    )
                 }
                 if (IdleWidgetKind.NextAlarm in selected) {
                     SwitchRow(
@@ -241,7 +294,8 @@ fun IdleWidgetsSettingsSection(
             }
         }
 
-        // ---- Timers (shared by portrait and landscape) ----
+        IdleScheduleCard(settings = settings, repository = repository, selected = selected, modifier = Modifier.searchAnchor("idle.schedule"))
+
         SectionCard {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Text(
@@ -259,6 +313,13 @@ fun IdleWidgetsSettingsSection(
                     modifier = Modifier.searchAnchor("idle.tick_timer"),
                     label = { stringResource(R.string.idle_seconds_decimal, it) },
                     onCommit = { scope.launch { repository.setIdleGlyphTickSeconds(it) } }
+                )
+                SwitchRow(
+                    title = stringResource(R.string.idle_beat_only_change_title),
+                    subtitle = stringResource(R.string.idle_beat_only_change_desc),
+                    checked = settings.idleBeatOnlyOnChange,
+                    modifier = Modifier.searchAnchor("idle.beat_only_change"),
+                    onCheckedChange = { scope.launch { repository.setIdleBeatOnlyOnChange(it) } }
                 )
                 TimerSlider(
                     title = stringResource(R.string.idle_switch_timer_title),
@@ -278,32 +339,75 @@ fun IdleWidgetsSettingsSection(
             }
         }
 
-        // ---- Units: temperature and wind speed ----
         IdleUnitsCard(settings = settings, repository = repository)
 
-        // ---- Tick style: the smooth tick or the LED footsteps (shared by portrait and landscape) ----
+        // Weather, Calendar and Network speed settings live on their own pages, opened from the gear on the widget's row in the list above.
+
         LedTickSettingsCard(settings = settings, repository = repository)
     }
 
     if (showSelector) {
         WidgetSelectorDialog(
+            onOpenWeather = onOpenWeatherSettings,
+            onOpenNetSpeed = onOpenNetSpeedSettings,
             storedIds = settings.idleWidgetIds,
+            pinnedFirst = settings.idleWidgetPinnedFirst,
             onChange = { ids -> scope.launch { repository.setIdleWidgetIds(ids) } },
+            onOrder = { ids, pinned -> scope.launch { repository.setIdleWidgetOrder(ids, pinned) } },
             onDismiss = { showSelector = false }
         )
     }
 }
 
-/** The modal selector: a checkbox row per widget (icon, name, what it shows), Select all and Clear on top, like the pinned apps dialog. */
 @Composable
 private fun WidgetSelectorDialog(
     storedIds: String,
+    pinnedFirst: String,
     onChange: (String) -> Unit,
-    onDismiss: () -> Unit
+    /** Saves the order together with the pinned widget (empty = none). */
+    onOrder: (ids: String, pinned: String) -> Unit,
+    onDismiss: () -> Unit,
+    onOpenWeather: () -> Unit = {},
+    onOpenNetSpeed: () -> Unit = {}
 ) {
-    val selected = IdleWidgets.parse(storedIds)
+    val selected = remember(storedIds) { IdleWidgets.parse(storedIds) }
+    val pinned = remember(selected, pinnedFirst) { IdleWidgetKind.fromId(pinnedFirst)?.takeIf { it in selected } }
+    val others = IdleWidgetKind.values().filter { it !in selected }
+    // The dragged row follows the finger on the rows as they rest; the order is saved once, when the finger lifts.
+    var dragged by remember { mutableStateOf<IdleWidgetKind?>(null) }
+    var dragOffsetY by remember { mutableFloatStateOf(0f) }
+    var dragTarget by remember { mutableStateOf<IdleWidgetKind?>(null) }
+    val bounds = remember { HashMap<String, androidx.compose.ui.geometry.Rect>() }
+
+    // The row the dragged one would take the place of: the farthest one whose middle the dragged row's middle has
+    // crossed. The pinned row stays first.
+    fun dropFor(kind: IdleWidgetKind, offsetY: Float): IdleWidgetKind? {
+        val from = bounds[kind.id] ?: return null
+        val centerY = from.center.y + offsetY
+        var best: IdleWidgetKind? = null
+        var bestDistance = 0f
+        for (other in selected) {
+            if (other == kind || other == pinned) continue
+            val rect = bounds[other.id] ?: continue
+            val crossed = if (rect.center.y > from.center.y) centerY >= rect.center.y else centerY <= rect.center.y
+            val distance = kotlin.math.abs(rect.center.y - from.center.y)
+            if (crossed && distance > bestDistance) {
+                best = other
+                bestDistance = distance
+            }
+        }
+        return best
+    }
+
+    fun toggle(kind: IdleWidgetKind) {
+        val next = IdleWidgets.toggle(storedIds, kind)
+        if (kind == pinned && next != storedIds) onOrder(next, "") else onChange(next)
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.padding(horizontal = 12.dp),
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
         icon = {
             Icon(
                 imageVector = Icons.Rounded.Widgets,
@@ -333,50 +437,173 @@ private fun WidgetSelectorDialog(
                     TextButton(onClick = { onChange(IdleWidgetOff.allIds()) }) {
                         Text(stringResource(R.string.idle_select_all), fontWeight = FontWeight.SemiBold)
                     }
-                    TextButton(onClick = { onChange(IdleWidgets.DEFAULT_IDS) }) {
+                    TextButton(onClick = { onOrder(IdleWidgets.DEFAULT_IDS, "") }) {
                         Text(stringResource(R.string.idle_select_reset), fontWeight = FontWeight.SemiBold)
                     }
                 }
-                LazyColumn(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 380.dp),
+                        .heightIn(max = 380.dp)
+                        .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    items(IdleWidgetKind.values().toList(), key = { it.id }) { kind ->
-                        val checked = kind in selected
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .clickable { onChange(IdleWidgets.toggle(storedIds, kind)) }
-                                .padding(vertical = 6.dp, horizontal = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            KindIcon(kind, checked)
-                            Spacer(Modifier.width(10.dp))
-                            Column(modifier = Modifier.weight(1f)) {
+                    selected.forEach { kind ->
+                        key(kind.id) {
+                            val isDragged = dragged == kind
+                            val isPinned = pinned == kind
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .onGloballyPositioned { bounds[kind.id] = it.boundsInParent() }
+                                    .zIndex(if (isDragged) 1f else 0f)
+                                    .graphicsLayer { translationY = if (isDragged) dragOffsetY else 0f }
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(
+                                        when {
+                                            isDragged -> MaterialTheme.colorScheme.surfaceVariant
+                                            dragTarget == kind -> MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                            else -> androidx.compose.ui.graphics.Color.Transparent
+                                        }
+                                    )
+                                    .clickable(enabled = dragged == null) { toggle(kind) }
+                                    .padding(vertical = 4.dp, horizontal = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Handle: drag to move the row. The pinned widget leads the rotation, so it has none.
+                                if (isPinned || selected.size < 2) {
+                                    Spacer(Modifier.width(24.dp))
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Rounded.DragHandle,
+                                        contentDescription = stringResource(R.string.idle_select_drag, stringResource(kindTitle(kind))),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .pointerInput(kind, storedIds, pinned) {
+                                                detectDragGestures(
+                                                    onDragStart = {
+                                                        dragged = kind
+                                                        dragOffsetY = 0f
+                                                        dragTarget = null
+                                                    },
+                                                    onDrag = { change, amount ->
+                                                        change.consume()
+                                                        dragOffsetY += amount.y
+                                                        dragTarget = dropFor(kind, dragOffsetY)
+                                                    },
+                                                    onDragEnd = {
+                                                        val target = dropFor(kind, dragOffsetY)
+                                                        dragged = null
+                                                        dragOffsetY = 0f
+                                                        dragTarget = null
+                                                        if (target != null) {
+                                                            val moved = IdleSchedule.move(storedIds, kind, target)
+                                                            if (moved != storedIds) onOrder(moved, pinned?.id ?: "")
+                                                        }
+                                                    },
+                                                    onDragCancel = {
+                                                        dragged = null
+                                                        dragOffsetY = 0f
+                                                        dragTarget = null
+                                                    }
+                                                )
+                                            }
+                                    )
+                                }
+                                Spacer(Modifier.width(6.dp))
+                                KindIcon(kind, checked = true)
+                                Spacer(Modifier.width(8.dp))
                                 Text(
                                     text = stringResource(kindTitle(kind)),
+                                    modifier = Modifier.weight(1f),
                                     fontWeight = FontWeight.SemiBold,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 2
                                 )
-                                Text(
-                                    text = stringResource(kindDesc(kind)),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                // Weather's and Network speed's settings tabs: a gear on the right of the row, only while the widget is on.
+                                if (kind == IdleWidgetKind.Weather) {
+                                    IconButton(onClick = onOpenWeather, modifier = Modifier.size(36.dp)) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Settings,
+                                            contentDescription = stringResource(R.string.weather_cfg_open),
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+                                if (kind == IdleWidgetKind.NetSpeed) {
+                                    IconButton(onClick = onOpenNetSpeed, modifier = Modifier.size(36.dp)) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Settings,
+                                            contentDescription = stringResource(R.string.net_cfg_open),
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+                                // Pin: this widget always comes first. Tap it again to let it go.
+                                IconButton(
+                                    onClick = {
+                                        val next = IdleSchedule.togglePinned(pinned?.id ?: "", kind)
+                                        onOrder(if (next.isEmpty()) storedIds else IdleSchedule.moveToFront(storedIds, kind), next)
+                                    },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.PushPin,
+                                        contentDescription = stringResource(
+                                            if (isPinned) R.string.idle_select_unpin else R.string.idle_select_pin,
+                                            stringResource(kindTitle(kind))
+                                        ),
+                                        tint = if (isPinned) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                // The last widget stays ticked: the master switch is what turns the widgets off.
+                                Checkbox(
+                                    checked = true,
+                                    enabled = selected.size > 1 && dragged == null,
+                                    onCheckedChange = { toggle(kind) }
                                 )
                             }
-                            // The last widget stays ticked: the master switch is what turns the widgets off.
-                            Checkbox(
-                                checked = checked,
-                                enabled = !(checked && selected.size == 1),
-                                onCheckedChange = { onChange(IdleWidgets.toggle(storedIds, kind)) }
-                            )
+                        }
+                    }
+                    others.forEach { kind ->
+                        key(kind.id) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable { toggle(kind) }
+                                    .padding(vertical = 6.dp, horizontal = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                KindIcon(kind, checked = false)
+                                Spacer(Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = stringResource(kindTitle(kind)),
+                                        fontWeight = FontWeight.SemiBold,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = stringResource(kindDesc(kind)),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Checkbox(checked = false, onCheckedChange = { toggle(kind) })
+                            }
                         }
                     }
                 }
+                Text(
+                    text = stringResource(R.string.idle_select_order_note),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Text(
                     text = stringResource(R.string.idle_select_last_note),
                     style = MaterialTheme.typography.labelSmall,
@@ -466,7 +693,6 @@ private fun SwitchRow(
     }
 }
 
-/** A slider that follows the finger on its own copy and writes the setting once, when the finger lifts. */
 @Composable
 private fun TimerSlider(
     title: String,

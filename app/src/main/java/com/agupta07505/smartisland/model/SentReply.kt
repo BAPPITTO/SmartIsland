@@ -11,9 +11,8 @@ package com.agupta07505.smartisland.model
 const val SENT_REPLY_LABEL = "You: "
 
 /**
- * The card after a reply was sent from the island: the typed message is added to the card itself (short text and
- * the long text the reader shows) instead of the card being closed and the app's echo coming back as a new one.
- * When the app re-posts the same key, its own text replaces this.
+ * Card after a reply was sent: the typed message is added to the card (short and reader text) instead of closing it
+ * and getting the app's echo as a new card. A re-post of the same key replaces it.
  */
 fun IslandNotification.withSentReply(message: String): IslandNotification {
     val sent = message.trim()

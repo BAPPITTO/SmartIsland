@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.Icon
 import com.agupta07505.smartisland.ui.IslandText as Text
@@ -50,9 +51,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.agupta07505.smartisland.data.SmartIslandSettings
+import com.agupta07505.smartisland.data.SmartIslandCommand
 import com.agupta07505.smartisland.di.SmartIslandRepositories
 import com.agupta07505.smartisland.model.IslandNotification
 import com.agupta07505.smartisland.ui.bounceClick
+import com.agupta07505.smartisland.util.TimerClock
 import com.agupta07505.smartisland.util.TimerStopwatchParser
 import androidx.compose.runtime.getValue
 import android.widget.Toast
@@ -207,7 +210,6 @@ private fun TimerExpandedMiui(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Left: Hourglass / Timer Glyph
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)
@@ -267,12 +269,10 @@ private fun TimerExpandedMiui(
             }
         }
 
-        // Right: Interactive Quick Actions (Pause/Resume, Stop/Reset)
         Row(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 1. Pause / Resume Button
             val pauseAction = if (isPaused) {
                 notification?.actionIntents?.firstOrNull { act ->
                     val t = act.title.lowercase()
@@ -344,7 +344,6 @@ private fun TimerExpandedMiui(
                 )
             }
 
-            // 2. Reset / Stop / Cancel Button
             val stopAction = notification?.actionIntents?.firstOrNull { act ->
                 val t = act.title.lowercase()
                 destructiveKeywords.any { t.contains(it) }
@@ -407,9 +406,16 @@ private fun TimerExpandedCurrent(
         mutableLongStateOf(notification?.timeMillis ?: (System.currentTimeMillis() + 300000L))
     }
 
+    // Exact cards truncate to whole seconds like the shade.
+    val exact = notification?.exactClock == true
+
     var remainingSec by remember(notification?.key) {
         val parsed = notification?.let { TimerStopwatchParser.parseTimerRemainingSeconds(it) }
-        val rem = if (parsed != null && parsed > 0) {
+        val startTarget = notification?.timeMillis ?: 0L
+        val rem = if (exact && !isPaused && startTarget > System.currentTimeMillis()) {
+            // The deadline beats the rounded text, which can be a second off.
+            TimerClock.secondsLeft(startTarget - System.currentTimeMillis())
+        } else if (parsed != null && parsed > 0) {
             parsed
         } else {
             val t = notification?.timeMillis ?: (System.currentTimeMillis() + 300000L)
@@ -424,7 +430,7 @@ private fun TimerExpandedCurrent(
 
     // The paused remaining time the listener froze; the text of a paused timer can still show its full length.
     val frozenSec = if (isPaused && notification?.recordingPaused == true) {
-        notification.recordingFrozenMs?.let { (it + 500L) / 1000L }
+        notification.recordingFrozenMs?.let { TimerClock.displaySeconds(it, exact, 500L) }
     } else {
         null
     }
@@ -442,21 +448,31 @@ private fun TimerExpandedCurrent(
         }
     }
 
+    // "Time's up!" only after the real deadline; the last second reads 00:00.
+    var timeUp by remember(notification?.key, targetTime, isPaused) { mutableStateOf(false) }
+
     LaunchedEffect(notification?.key, targetTime, isPaused) {
         if (!isPaused) {
             while (true) {
                 val now = System.currentTimeMillis()
-                val rem = if (targetTime > now) {
-                    ((targetTime - now + 500L) / 1000L).coerceAtLeast(0L)
-                } else {
-                    0L
-                }
+                val remMs = (targetTime - now).coerceAtLeast(0L)
+                val rem = TimerClock.displaySeconds(remMs, exact, 500L)
                 remainingSec = rem
-                if (rem <= 0L) break
-                kotlinx.coroutines.delay(500L)
+                if (exact) {
+                    if (remMs <= 0L) {
+                        timeUp = true
+                        break
+                    }
+                    // Wake just after the shown second changes.
+                    kotlinx.coroutines.delay(TimerClock.msToNextTick(remMs))
+                } else {
+                    if (rem <= 0L) break
+                    kotlinx.coroutines.delay(500L)
+                }
             }
         }
     }
+    val finished = if (exact) timeUp else remainingSec == 0L
 
     val shownSec = frozenSec ?: remainingSec
     val displayTime = remember(shownSec) {
@@ -486,7 +502,6 @@ private fun TimerExpandedCurrent(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Left: Hourglass / Timer Glyph
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)
@@ -522,7 +537,7 @@ private fun TimerExpandedCurrent(
                     letterSpacing = 0.5.sp
                 )
                 Spacer(Modifier.height(2.dp))
-                val timerSubtitle = if (remainingSec == 0L && !isPaused) {
+                val timerSubtitle = if (finished && !isPaused) {
                     "Time's up!"
                 } else if (isPaused) {
                     "Paused"
@@ -539,19 +554,18 @@ private fun TimerExpandedCurrent(
                 }
                 Text(
                     text = timerSubtitle,
-                    color = if (remainingSec == 0L && !isPaused) LocalIslandPalette.current.danger else timerColor,
+                    color = if (finished && !isPaused) LocalIslandPalette.current.danger else timerColor,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold
                 )
             }
         }
 
-        // Right: Interactive Quick Actions (Pause/Resume, +1 min, Stop/Reset)
         Row(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 1. Pause / Resume: only shown when the timer app offers that button.
+            // Pause / Resume: only shown when the timer app offers that button.
             val toggleAction = if (isPaused) notification.actionWithRole(ActionRole.Resume)
             else notification.actionWithRole(ActionRole.Pause)
 
@@ -579,7 +593,7 @@ private fun TimerExpandedCurrent(
                 }
             }
 
-            // 2. +1 min: only shown when the timer app offers its own add-a-minute button.
+            // +1 min: only shown when the timer app offers its own add-a-minute button.
             val addMinuteAction = notification.actionWithRole(ActionRole.AddMinute)
             if (addMinuteAction != null && notification != null) {
                 Box(
@@ -613,7 +627,7 @@ private fun TimerExpandedCurrent(
                 }
             }
 
-            // 3. Stop / Reset / Cancel: fires the app's own button, then clears the island card.
+            // Stop / Reset / Cancel: fires the app's own button, then clears the island card.
             val stopAction = notification.actionWithRole(ActionRole.Stop, ActionRole.Reset)
             if (stopAction != null && notification != null) {
                 Box(
@@ -622,14 +636,26 @@ private fun TimerExpandedCurrent(
                         .clip(CircleShape)
                         .background(LocalIslandPalette.current.pick(Color(0xFF27272A), Color(0xFFD9D8DB)))
                         .bounceClick {
-                            notification.fireAction(context, stopAction)
-                            SmartIslandRepositories.notificationRepository(context).removeNotification(notification.key)
-                            onCollapse()
+                            // The card only goes once the app's button was delivered; a replaced intent must not
+                            // make a timer that is still running vanish from the island.
+                            if (notification.fireAction(context, stopAction)) {
+                                val repository = SmartIslandRepositories.notificationRepository(context)
+                                repository.sendCommand(SmartIslandCommand.TimerStopped(notification.packageName))
+                                repository.removeNotification(notification.key)
+                                onCollapse()
+                            }
                         },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.Stop,
+                        imageVector = if (
+                            classifyAction(stopAction.title) == ActionRole.Reset &&
+                            com.agupta07505.smartisland.util.TimerStopwatchParser.usesShadeFixes(notification.packageName)
+                        ) {
+                            Icons.Rounded.Refresh
+                        } else {
+                            Icons.Rounded.Stop
+                        },
                         contentDescription = stopAction.title,
                         tint = LocalIslandPalette.current.danger,
                         modifier = Modifier.size(18.dp)
@@ -637,7 +663,7 @@ private fun TimerExpandedCurrent(
                 }
             }
 
-            // 4. Any other button the timer app put in its notification, shown as the app labels it.
+            // Any other button the timer app put in its notification, shown as the app labels it.
             if (notification != null) {
                 notification.leftoverActions(toggleAction, addMinuteAction, stopAction).forEach {
                     ShadeActionChip(notification, it, timerColor)
@@ -647,5 +673,4 @@ private fun TimerExpandedCurrent(
     }
 }
 
-/** Text that is only a clock reading (digits, colons, dots); built once. */
 private val ClockOnlyRegex = Regex("""^[\d:.]+$""")

@@ -14,17 +14,7 @@ import android.os.Looper
 import android.provider.Settings
 
 /**
- * The system's "Animator duration scale" (Developer options, and "Remove animations" in Accessibility, which sets it to 0).
- *
- * Two jobs:
- *  - [timeScale]: the real scale, for plain wall-clock waits that Compose does not know about (the idle-circle close lead
- *    in the ViewModel). 0 means "do not animate": those waits become 0.
- *  - [extraScale]: what [AnimationSpeed] still has to multiply into Compose springs and tweens. Compose's window recomposer
- *    already hands the system scale to every animation on its own (through the coroutine context), so by default this is 1
- *    and nothing is scaled twice. If the overlay's probe finds Compose is NOT applying it ([composeAppliesScale] false),
- *    this becomes the real scale and AnimationSpeed does it itself.
- *
- * At scale 0 a spring gets a huge stiffness and a tween a 1 ms length, so the island snaps to its end state.
+ * The system's "Animator duration scale"; "Remove animations" in Accessibility sets it to 0.
  */
 object SystemAnimScale {
     /** Largest scale honoured (Developer options offers up to 10x). */
@@ -42,13 +32,10 @@ object SystemAnimScale {
 
     private var observer: ContentObserver? = null
 
-    /** The system scale now (1 when it could not be read). */
     fun timeScale(): Float = scale
 
-    /** True when the system asks for no animation at all. */
     fun animationsOff(): Boolean = scale <= 0f
 
-    /** The part of the scale [AnimationSpeed] must apply itself. */
     fun extraScale(): Float = if (composeAppliesScale) 1f else scale
 
     /** Reads the setting and keeps it current until [stop]. Safe to call again. */
@@ -82,7 +69,6 @@ object SystemAnimScale {
             }.getOrDefault(1f)
         )
 
-    /** Not a number, negative or absurd values fall back to 1; the rest is clamped to 0..[MAX_SCALE]. */
     fun sanitize(raw: Float): Float = when {
         raw.isNaN() || raw.isInfinite() || raw < 0f -> 1f
         else -> raw.coerceAtMost(MAX_SCALE)
@@ -92,7 +78,6 @@ object SystemAnimScale {
     fun scaledStiffness(base: Float, scale: Float): Float =
         if (scale <= 0f) SNAP_STIFFNESS else base / (scale * scale)
 
-    /** A tween just takes [scale] times as long; never below 1 ms. */
     fun scaledDurationMs(baseMs: Int, scale: Float): Int =
         if (scale <= 0f) 1 else (baseMs * scale).toInt().coerceAtLeast(1)
 }

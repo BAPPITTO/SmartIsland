@@ -25,12 +25,8 @@ import com.agupta07505.smartisland.model.TimerState
 import com.agupta07505.smartisland.receiver.TimerActionReceiver
 
 /**
- * The Timer utility: a countdown the island runs itself, so it needs no clock app. It shows as the normal Timer card (collapsed
- * cutout countdown, expanded card with Pause / +1 min / Stop) because it posts the same kind of card the listener builds from a
- * clock app's notification. Its buttons are broadcasts to [TimerActionReceiver].
- *
- * The state is saved, so the timer survives the process being restarted ([restore] is called when the overlay service starts).
- * The end is watched twice: by a handler while the process lives, and by an alarm that wakes the app if it was stopped.
+ * A countdown the island runs itself, shown as the normal Timer card. Its buttons are broadcasts to
+ * [TimerActionReceiver].
  */
 object InAppTimer {
     const val KEY = "smartisland.timer"
@@ -44,7 +40,6 @@ object InAppTimer {
     private const val PREFS = "in_app_timer"
     private const val PREF_STATE = "state"
 
-    /** How long "Time's up" stays on the island and rings before the timer clears itself. */
     private const val FINISHED_LINGER_MS = 60_000L
     private const val RING_MS = 8_000L
 
@@ -63,7 +58,7 @@ object InAppTimer {
     /** True while a timer exists (running, paused or finished and not yet stopped): the Timer tile lights up. */
     val isActive: Boolean get() = state.active
 
-    /** Loads the saved timer and shows its card again. Safe to call repeatedly. */
+    /** Safe to call repeatedly. */
     fun restore(context: Context) {
         val app = context.applicationContext
         val saved = TimerState.decode(prefs(app).getString(PREF_STATE, null))
@@ -84,7 +79,7 @@ object InAppTimer {
         schedule(app)
     }
 
-    /** Starts a countdown of [seconds], replacing any timer that exists. */
+    /** Replaces any timer that exists. */
     fun start(context: Context, seconds: Int) {
         val app = context.applicationContext
         silence()
@@ -107,7 +102,6 @@ object InAppTimer {
         runCatching { SmartIslandRepositories.notificationRepository(app).removeNotification(KEY) }
     }
 
-    /** Runs a button of the card or the end alarm (see the ACTION_* constants). */
     fun handle(context: Context, action: String?) {
         when (action) {
             ACTION_TOGGLE -> toggle(context)
@@ -128,7 +122,6 @@ object InAppTimer {
         schedule(app)
     }
 
-    /** The countdown reached zero: ring, show "Time's up" and clear the card after a while. */
     private fun finish(app: Context) {
         state = state.finish()
         save(app)
@@ -143,7 +136,6 @@ object InAppTimer {
     private val finishRunnable = Runnable { appContext?.let { if (state.isDue(System.currentTimeMillis())) finish(it) } }
     @Volatile private var appContext: Context? = null
 
-    /** Watches the end of a running timer; nothing is scheduled for a paused or finished one. */
     private fun schedule(app: Context) {
         appContext = app
         main.removeCallbacks(finishRunnable)
@@ -170,8 +162,6 @@ object InAppTimer {
         runCatching { (app.getSystemService(Context.ALARM_SERVICE) as AlarmManager).cancel(broadcast(app, ACTION_FINISH)) }
     }
 
-    // ---- Ringing ----
-
     private fun ring(app: Context) {
         silence()
         runCatching {
@@ -191,8 +181,6 @@ object InAppTimer {
         runCatching { ringtone?.stop() }
         ringtone = null
     }
-
-    // ---- The card ----
 
     private fun post(app: Context) {
         val s = state

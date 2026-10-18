@@ -11,8 +11,7 @@ import kotlin.math.abs
 
 /**
  * Locks one touch to one axis. Once the finger has moved [slopPx] in either direction, the longer axis wins and the
- * other axis is ignored until the finger lifts. A swipe up / down can no longer pick up sideways movement (and the other
- * way round), which is what made the island fight itself and bounce on a slightly diagonal drag.
+ * other is ignored until the finger lifts.
  *
  * One instance per touch. Feed it the raw drag so far with [update], and pass each move through [filterX] / [filterY].
  */
@@ -31,9 +30,7 @@ class AxisLock(private val slopPx: Float) {
         return true
     }
 
-    /** A horizontal move after the lock: zero while the touch is locked vertical. */
     fun filterX(dx: Float): Float = if (axis == Axis.Vertical) 0f else dx
 
-    /** A vertical move after the lock: zero while the touch is locked horizontal. */
     fun filterY(dy: Float): Float = if (axis == Axis.Horizontal) 0f else dy
 }

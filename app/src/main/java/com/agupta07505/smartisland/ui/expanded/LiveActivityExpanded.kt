@@ -87,7 +87,6 @@ fun LiveActivityExpanded(
             .padding(start = 18.dp, top = 20.dp, end = 18.dp, bottom = bottomPadding),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Top Section: Icon on Left (42.dp like NotificationExpanded) + Title/Text in Middle + ETA Badge on Right
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -142,7 +141,6 @@ fun LiveActivityExpanded(
                 }
             }
 
-            // Middle Column: Title & Text (Matching NotificationExpanded layout)
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = statusTitle,
@@ -163,7 +161,6 @@ fun LiveActivityExpanded(
                 )
             }
 
-            // Right: ETA Status Badge
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(14.dp))
@@ -180,7 +177,6 @@ fun LiveActivityExpanded(
             }
         }
 
-        // Route & Distance Progress Visualizer
         Column(
             modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -198,7 +194,6 @@ fun LiveActivityExpanded(
                     val cy = size.height / 2f
                     val strokeWidth = 4.dp.toPx()
 
-                    // Background path line
                     drawLine(
                         color = trackColor,
                         start = Offset(12.dp.toPx(), cy),
@@ -207,7 +202,6 @@ fun LiveActivityExpanded(
                         cap = StrokeCap.Round
                     )
 
-                    // Traveled progress fill line
                     val currentX = (12.dp.toPx() + (width - 24.dp.toPx()) * progressRatio).coerceIn(12.dp.toPx(), width - 12.dp.toPx())
                     drawLine(
                         color = brandColor,
@@ -217,14 +211,11 @@ fun LiveActivityExpanded(
                         cap = StrokeCap.Round
                     )
 
-                    // Start node dot (Origin)
                     drawCircle(color = brandColor, radius = 4.dp.toPx(), center = Offset(12.dp.toPx(), cy))
 
-                    // Current position dot (Traveled position)
                     drawCircle(color = currentRing, radius = 6.dp.toPx(), center = Offset(currentX, cy))
                     drawCircle(color = brandColor, radius = 4.dp.toPx(), center = Offset(currentX, cy))
 
-                    // Destination node dot
                     drawCircle(color = Color(0xFF64748B), radius = 4.dp.toPx(), center = Offset(width - 12.dp.toPx(), cy))
                 }
             }
@@ -239,7 +230,6 @@ fun LiveActivityExpanded(
             }
         }
 
-        // Action Buttons Row & Collapse Arrow (Matching NotificationExpanded)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,

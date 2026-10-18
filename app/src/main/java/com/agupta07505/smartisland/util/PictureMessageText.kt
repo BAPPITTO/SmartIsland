@@ -13,11 +13,7 @@ internal data class MessageLine(val text: String, val hasPicture: Boolean)
 private const val MAX_READER_LINES = 6
 private const val MAX_READER_CHARS = 1500
 
-/**
- * The chat text the reader shows next to a message's pictures: only the messages that carry no
- * picture. A picture message's own text (its "Photo" / "Sticker" label or its caption) is left out
- * because the thumbnail stands for it. Empty when every message has a picture.
- */
+/** The chat text the reader shows next to a message's pictures: only the messages that carry no picture. */
 internal fun textWithoutPictureMessages(messages: List<MessageLine>): String =
     messages
         .filter { !it.hasPicture }
@@ -35,8 +31,8 @@ private val PICTURE_WORDS = setOf(
 private val PICTURE_COUNT = Regex("^\\d+\\s+(new\\s+)?(photos|images|pictures|stickers|fotos|bilder|images)$")
 
 /**
- * True when [text] is only the app's label for a picture ("Photo", "📷 Photo", "Sticker", "2 photos"),
- * not real content. Used for picture notifications that are not chat messages.
+ * True when [text] is only the app's label for a picture ("Photo", "📷 Photo", "Sticker", "2 photos"), not real
+ * content. Used for picture notifications that are not chat messages.
  */
 internal fun isPictureLabel(text: String): Boolean {
     val cleaned = text.trim()
@@ -47,6 +43,5 @@ internal fun isPictureLabel(text: String): Boolean {
     return cleaned in PICTURE_WORDS || PICTURE_COUNT.matches(cleaned)
 }
 
-/** The last non-blank line of the reader text: what the preview step shows next to the last picture. */
 internal fun lastReaderLine(text: String): String =
     text.lineSequence().map { it.trim() }.lastOrNull { it.isNotEmpty() }.orEmpty()

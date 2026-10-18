@@ -37,6 +37,7 @@
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
     <!-- Lets the app appear in "Do Not Disturb access": the mode idle widget reads which mode (Bedtime, Driving, ...) is on. Nothing is changed. -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
@@ -45,11 +46,6 @@
     <!-- Lets the call card mute the mic and switch earpiece / speaker / Bluetooth for apps whose call
          notification has no such buttons. A normal permission, granted at install. -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <!-- Never granted by the install dialog. Lets the privacy dots see camera/microphone/location
-         use when it is granted from Shizuku or adb; without it the dots fall back to public APIs. -->
-    <uses-permission
-        android:name="android.permission.WATCH_APPOPS"
-        tools:ignore="ProtectedPermissions" />
 
     <queries>
         <!-- Lets the Shizuku check see the Shizuku app (Android 11+ hides apps that are not listed here). -->
@@ -103,13 +99,6 @@
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|uiMode|density|fontScale|layoutDirection|locale"
             android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.SmartIsland.Picker" />
-
-        <activity
-            android:name=".ui.PrivacyUsageActivity"
-            android:exported="false"
-            android:excludeFromRecents="true"
-            android:taskAffinity=""
-            android:theme="@style/Theme.SmartIsland.Dialog" />
 
         <service
             android:name=".service.SmartIslandOverlayService"

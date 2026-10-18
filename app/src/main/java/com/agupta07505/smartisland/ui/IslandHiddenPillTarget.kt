@@ -19,8 +19,8 @@ import androidx.compose.ui.unit.dp
 import com.agupta07505.smartisland.data.SmartIslandSettings
 
 /**
- * Invisible touch target over the pill's spot while the pill is hidden, so tapping the area reveals the pill
- * (auto-hide), brings back put-away idle cards, or opens the shortcuts.
+ * Invisible touch target over the pill's spot while the pill is hidden, so tapping the area reveals the pill (auto-
+ * hide), brings back put-away idle cards, or opens the shortcuts.
  */
 @Composable
 internal fun HiddenPillTouchTarget(
@@ -40,11 +40,9 @@ internal fun HiddenPillTouchTarget(
                 .pointerInput(Unit) {
                     detectTapGestures {
                         if (settings.autoHidePill && ui.isAutoHidden) {
-                            // First tap on auto-hidden pill: awaken and reveal the pill
                             ui.isAutoHidden = false
                             ui.touch()
                         } else if (cb.currentNotifications.isEmpty() && cb.currentHasIdleStoredCards) {
-                            // Idle cutout with cards put away by the idle timeout: bring them back
                             cb.currentOnRevealIdleCards()
                         } else if (cb.currentNotifications.isNotEmpty()) {
                             cb.currentOnToggle()

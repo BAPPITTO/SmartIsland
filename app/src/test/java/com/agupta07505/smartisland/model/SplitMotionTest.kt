@@ -93,7 +93,7 @@ class SplitMotionTest {
         assertTrue(a in 0f..1f && b in 0f..1f && b > a)
     }
 
-    // --- The slow spring tail is trimmed from the geometry ---
+    // The slow spring tail is trimmed from the geometry
 
     @Test
     fun theGeometryIsZeroThroughTheTailAndOneAtTheFullProgress() {
@@ -146,8 +146,7 @@ class SplitMotionTest {
 
     @Test
     fun theReflowAndTheShadowStillSitInsideTheMovingPartOfTheProgress() {
-        // They read the raw progress. The re-wrap point is well inside the geometry's run (after the tail, before the end), so the
-        // islands are neither at the single island's size nor at the split's final size when the lines switch.
+        // They read the raw progress.
         assertTrue(SplitMotion.REFLOW_AT > SplitMotion.TAIL + SplitMotion.REFLOW_FADE_HALF)
         // The re-wrap moved early (REFLOW_AT 0.3, geometry about 0.22) so it happens while the beside island is still a sliver.
         assertTrue(SplitMotion.geometry(SplitMotion.REFLOW_AT) in 0.15f..0.7f)
@@ -167,7 +166,7 @@ class SplitMotionTest {
     fun theTwoIslandLayoutIsHeldUntilTheShellIsReady() {
         // Closing: held whatever the shell says.
         assertTrue(SplitMotion.holdTwoIslandLayout(true, false, 0.5f, shellSingleReady = true))
-        // Progress gone but the shell is not the single island yet: still held (this is the frame that used to flash).
+        // Progress gone but the shell is not the single island yet: still held (no flash on this frame).
         assertTrue(SplitMotion.holdTwoIslandLayout(true, false, 0f, shellSingleReady = false))
         // The shell confirmed: the content may flip.
         assertFalse(SplitMotion.holdTwoIslandLayout(true, false, 0f, shellSingleReady = true))

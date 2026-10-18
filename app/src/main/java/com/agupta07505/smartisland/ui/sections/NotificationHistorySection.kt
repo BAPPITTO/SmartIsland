@@ -152,7 +152,6 @@ data class AppNotificationSummary(
     val count: Int
 )
 
-/** Saves an optional [AppNotificationSummary] across rotation (an empty list means null). */
 private val AppSummarySaver: Saver<AppNotificationSummary?, Any> = listSaver(
     save = { summary ->
         if (summary == null) emptyList<Any>() else listOf(summary.packageName, summary.appName, summary.count)
@@ -195,7 +194,6 @@ fun NotificationHistorySection(
     val selectedEntryForDetails = selectedEntryIdForDetails?.let { id -> historyEntries.firstOrNull { it.id == id } }
     var retentionMenuExpanded by rememberSaveable { mutableStateOf(false) }
 
-    // Aggregate unique apps for "Delete by App" feature
     val appSummaries = remember(historyEntries) {
         historyEntries
             .groupBy { it.packageName }
@@ -230,7 +228,6 @@ fun NotificationHistorySection(
         groupEntriesByDay(filteredEntries)
     }
 
-    // Confirm Clear All Dialog
     if (showClearAllConfirm) {
         AlertDialog(
             onDismissRequest = { showClearAllConfirm = false },
@@ -258,7 +255,6 @@ fun NotificationHistorySection(
         )
     }
 
-    // Confirm Delete By Package Dialog
     packageToDeleteConfirm?.let { targetApp ->
         AlertDialog(
             onDismissRequest = { packageToDeleteConfirm = null },
@@ -289,7 +285,6 @@ fun NotificationHistorySection(
         )
     }
 
-    // App Filter Dialog
     if (showAppFilterDialog) {
         AppFilterDialog(
             appSummaries = appSummaries,
@@ -303,7 +298,6 @@ fun NotificationHistorySection(
         )
     }
 
-    // Delete By App Manager Dialog
     if (showDeleteByAppDialog) {
         DeleteByAppDialog(
             appSummaries = appSummaries,
@@ -318,7 +312,6 @@ fun NotificationHistorySection(
         )
     }
 
-    // Notification Details Dialog
     selectedEntryForDetails?.let { entry ->
         NotificationDetailDialog(
             entry = entry,
@@ -345,7 +338,6 @@ fun NotificationHistorySection(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(bottom = 28.dp)
     ) {
-        // Master Toggle Hero Card
         item(key = "header_master_toggle") {
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -479,7 +471,6 @@ fun NotificationHistorySection(
                 }
             }
         } else {
-            // Settings & Retention & Search Card
             item(key = "header_controls") {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -491,7 +482,6 @@ fun NotificationHistorySection(
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Retention row
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
@@ -593,7 +583,6 @@ fun NotificationHistorySection(
 
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
 
-                        // Search Box
                         OutlinedTextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
@@ -617,7 +606,6 @@ fun NotificationHistorySection(
                             modifier = Modifier.fillMaxWidth()
                         )
 
-                        // Quick App Filter Chips (All Apps at top/start, followed by individual apps)
                         if (appSummaries.isNotEmpty()) {
                             LazyRow(
                                 modifier = Modifier.fillMaxWidth(),
@@ -691,7 +679,6 @@ fun NotificationHistorySection(
                             }
                         }
 
-                        // Active Filter Badge (if any)
                         if (!selectedFilterPackage.isNullOrBlank()) {
                             val activeAppName = appSummaries.find { it.packageName == selectedFilterPackage }?.appName ?: selectedFilterPackage
                             Surface(
@@ -720,7 +707,6 @@ fun NotificationHistorySection(
                             }
                         }
 
-                        // Action Buttons: Filter by App, Delete By App & Clear All
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
@@ -826,7 +812,6 @@ fun NotificationHistorySection(
                     }
                 }
             } else {
-                // High-performance virtualized items grouped by day
                 groupedByDay.forEach { (dateHeader, entriesForDay) ->
                     item(key = "date_header_$dateHeader") {
                         Row(
@@ -906,7 +891,6 @@ private fun NotificationHistoryItemCard(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Header Row: App icon, app name, mode badge, time, delete button
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -983,7 +967,6 @@ private fun NotificationHistoryItemCard(
                 }
             }
 
-            // Message Title & Body
             if (entry.title.isNotBlank()) {
                 Text(
                     text = entry.title,
@@ -1016,7 +999,6 @@ private fun NotificationHistoryItemCard(
                 )
             }
 
-            // Action Intent Buttons List (if any)
             if (entry.actionTitles.isNotEmpty()) {
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -1040,7 +1022,6 @@ private fun NotificationHistoryItemCard(
                 }
             }
 
-            // Action Bar: Copy, Launch App
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1145,7 +1126,6 @@ private fun AppFilterDialog(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // TOP OPTION: "All Apps" (view all app notifications together)
                     item(key = "filter_dialog_all_apps") {
                         val isAllSelected = selectedPackage == null
                         Card(
@@ -1208,7 +1188,6 @@ private fun AppFilterDialog(
                         }
                     }
 
-                    // Individual App Items
                     items(appSummaries, key = { it.packageName }) { app ->
                         val isSelected = selectedPackage == app.packageName
                         val icon = rememberAppIcon(app.packageName)
@@ -1445,7 +1424,6 @@ private fun NotificationDetailDialog(
                     .fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -1467,7 +1445,6 @@ private fun NotificationDetailDialog(
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
-                // Scrollable Detail Fields
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1500,7 +1477,6 @@ private fun NotificationDetailDialog(
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
-                // Footer Buttons
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(6.dp)

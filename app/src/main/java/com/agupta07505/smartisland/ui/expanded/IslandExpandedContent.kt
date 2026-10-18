@@ -92,26 +92,19 @@ import com.agupta07505.smartisland.R
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
-/**
- * The measured heights of the cards, kept by the host so they outlive the card's own composition (the host rebuilds the card
- * every time the island closes). A card that was measured while collapsed or on an earlier visit then already has its height
- * when the island opens or a swipe heads for it, instead of the shell aiming at a guess and correcting later.
- */
+/** Card heights kept by the host so they outlive the card's own composition (the host rebuilds the card each time the island closes). */
 class CardHeightCache {
     val heights = androidx.compose.runtime.mutableStateOf(emptyMap<String, Dp>())
-    /** What each card looked like when it was measured (see notificationHeightSignature): a changed card is measured again. */
+    /** Content signature of each card at measure time; a changed card is measured again. */
     val signatures = mutableMapOf<String, Int>()
 }
 
-/** The pager's bookkeeping between compositions (plain values: written by effects, never read to draw). */
+/** Pager bookkeeping between compositions: written by effects, never read to draw. */
 internal class PagerSyncState {
-    /** The pages (see [com.agupta07505.smartisland.model.PagerSelection.pageGroups]) of the last composition that was applied; null before the first. */
     var committedGroups: List<String>? = null
 
-    /** A finger dragged the pager since its last scroll ended. */
     var draggedByFinger = false
 
-    /** The pages changed shape while that drag was still running. */
     var shapeChangedDuringDrag = false
 }
 
@@ -134,21 +127,17 @@ fun IslandExpandedContent(
     siblingPickerOpen: Boolean = false,
     onSiblingSelected: (String) -> Unit = {},
     onSiblingPickerClose: () -> Unit = {},
-    // Landscape: the open picker sits to the right of the card instead of replacing it.
     sideBySidePicker: Boolean = false,
-    // Reverse landscape: the picker island opens on the left, away from the camera on the right.
     pickerOnLeft: Boolean = false,
-    // Split layout sizes: the card island hugs its content up to [splitCardMaxWidth]; the picker
-    // island is [splitPickerWidth] wide. The measured card width is reported back so the overlay
-    // can size its window to card + gap + picker.
+    // The measured card width is reported back so the overlay can size its window to card + gap + picker.
     splitCardMaxWidth: Dp = 560.dp,
     splitPickerWidth: Dp = 320.dp,
-    // Landscape: the width of the single (no picker) expanded island; the active island grows back to it as the picker closes.
     singleIslandWidth: Dp = 420.dp,
     onSplitCardWidthMeasured: (Dp) -> Unit = {},
-    // True while a swipe is swapping the card (the island slides the cards itself): the pager jumps to the page.
+    // True while a swipe swaps the card itself: the pager jumps to the page.
     snapPageSync: () -> Boolean = { false },
-    // Written while laying out: the key of the card the pager really draws this frame (the host parks the outgoing card of a swipe by it).
+    sideBarsAlpha: () -> Float = { 1f },
+    // Written during layout: the key of the card the pager draws this frame (the host parks a swipe's outgoing card by it).
     drawnCardKey: Array<String?>? = null,
     heightCache: CardHeightCache? = null
 ) {
@@ -195,21 +184,17 @@ fun IslandExpandedContent(
     val ownHeightCache = remember { CardHeightCache() }
     val cardHeightCache = heightCache ?: ownHeightCache
     var pageHeights by cardHeightCache.heights
-    // A picture open at full size takes the tallest height an expanded island ever gets.
     val mediaExpansion = LocalMediaExpansion.current
     // Landscape draws the picture as its own island, so the card keeps its normal height there.
     val mediaOpenKey = if (sideBySidePicker) null else mediaExpansion.key
-    // The open picture's step (half or full size) decides how tall its island is.
     val cardStepsAccess = LocalCardSteps.current
 
-    // Clean up stale keys not present in notifications
     val activeKeys = remember(notifications) { notifications.map { it.key }.toSet() }
     LaunchedEffect(activeKeys) {
         pageHeights = pageHeights.filterKeys { it in activeKeys }
     }
 
-    // One page per app: swiping left / right moves between apps, never through an app's siblings
-    // (the sibling picker and the sibling gestures do that).
+    // One page per app; siblings are reached through the sibling picker and gestures.
     val pageCards = com.agupta07505.smartisland.model.appGroupPageIndices(notifications, selectedIndex)
     val selectedPage = com.agupta07505.smartisland.model.appGroupPageOf(notifications, selectedIndex)
         .coerceIn(0, (pageCards.size - 1).coerceAtLeast(0))
@@ -221,8 +206,7 @@ fun IslandExpandedContent(
         pageCount = { pageCards.size }
     )
 
-    // A measured height only holds for the content it was measured with: when a card that is not on screen changes its text,
-    // pictures or buttons, its height is forgotten so the probe measures it again (the shown card re-measures itself).
+    // A measured height is forgotten when the card's content changes, so the probe measures it again.
     val heightSignatures = cardHeightCache.signatures
     LaunchedEffect(notifications) {
         val shownKey = notifications.getOrNull(selectedIndex)?.key
@@ -236,14 +220,6 @@ fun IslandExpandedContent(
         if (stale.isNotEmpty()) pageHeights = pageHeights.filterKeys { it !in stale }
     }
 
-    // How the pager and the selection follow each other (rules in model/PagerSelection.kt).
-    //  - A DELIBERATE selection change (a tap on a cutout, a swipe action, the picker) moves the selection between pages that stay the
-    //    same: the pager scrolls to it as before (animated, or a jump while a swipe swaps the card).
-    //  - A LIST change (a recording starts or ends, a card arrives or goes) changes the pages themselves, so page numbers shift. The pager
-    //    then only JUMPS (no animation) to the shown card's new page, in the same frame as the change (an effect that runs right after the
-    //    composition, before the pager measures), so a card that was inserted in front is never drawn and nothing swipes in or out.
-    //  - A page that settled is written back as the open card ONLY when a finger dragged the pager. A scroll the app started itself
-    //    never writes back, so a stale page can no longer make another card the open card.
     val pageGroups = com.agupta07505.smartisland.model.PagerSelection.pageGroups(notifications, selectedIndex)
     val pagerSync = remember { PagerSyncState() }
     val shapeChanged = com.agupta07505.smartisland.model.PagerSelection.shapeChanged(pagerSync.committedGroups, pageGroups)
@@ -266,21 +242,17 @@ fun IslandExpandedContent(
     val selectedPageNow = androidx.compose.runtime.rememberUpdatedState(selectedPage)
     val pageGroupsNow = androidx.compose.runtime.rememberUpdatedState(pageGroups)
 
-    // A drag of the pager by a finger (the pager reports it on its interaction source; its own scrolls never do).
     LaunchedEffect(pagerState) {
         pagerState.interactionSource.interactions.collect { interaction ->
             if (interaction is androidx.compose.foundation.interaction.DragInteraction.Start) pagerSync.draggedByFinger = true
         }
     }
 
-    // The deliberate sync. It restarts when the pages change shape (that cancels a running scroll that aimed at the old page numbers) and then
-    // leaves the work to the jump above.
+    // Restarts when the pages change shape, which cancels a running scroll aimed at the old page numbers.
     LaunchedEffect(selectedPage, pageCards.size, pageGroups, siblingPickerOpen) {
         if (shapeChanged) return@LaunchedEffect
-        // Sync external selectedIndex updates ONLY when not currently user-scrolling,
-        // preventing gesture interrupts mid-swipe that cause half-page frozen states.
-        // The pager is not composed while the sibling picker is open, so it also re-syncs when the
-        // picker closes (a pick changes selectedIndex at the same moment).
+        // Sync external selectedIndex updates only when not user-scrolling, so a gesture is never interrupted mid-
+        // swipe.
         if (!siblingPickerOpen &&
             selectedPage in pageCards.indices &&
             !pagerState.isScrollInProgress &&
@@ -290,7 +262,7 @@ fun IslandExpandedContent(
         }
     }
 
-    // When a scroll has ended: a page that a finger dragged to becomes the open card; any other scroll writes nothing back.
+    // A page a finger dragged to becomes the open card; any other scroll writes nothing back.
     LaunchedEffect(pagerState) {
         androidx.compose.runtime.snapshotFlow { pagerState.isScrollInProgress }.collect { moving ->
             if (moving) return@collect
@@ -328,7 +300,7 @@ fun IslandExpandedContent(
         }
     }
 
-    // Safety net: Ensure pager never stays stuck at a non-zero offset fraction when scroll finishes
+    // Never leave the pager stuck at a non-zero offset fraction when a scroll finishes.
     LaunchedEffect(pagerState.isScrollInProgress) {
         if (!pagerState.isScrollInProgress && pagerState.currentPageOffsetFraction != 0f) {
             val targetPage = pagerState.settledPage.coerceIn(0, (pageCards.size - 1).coerceAtLeast(0))
@@ -342,25 +314,19 @@ fun IslandExpandedContent(
 
     Column(modifier = modifier.fillMaxWidth().wrapContentHeight()) {
 
-        // Interpolate height between pages based on swipe progress
-        // FIX: Clamp battery/call heights to match music/notification style to avoid
-        // glitch where battery/call expand more (taller) than other modes.
+        // Interpolate height between pages by swipe progress; battery/call heights are clamped to match the other cards.
         val offsetFraction = pagerState.currentPageOffsetFraction
-        // A swipe action puts the new card in through the selection, and the pager only follows a moment later (an effect, then a
-        // scroll, then another composition), so the island's height used to start heading for the new card a few frames after the
-        // card began to slide in. While the pager is idle the height follows the selected card at once; while the pager itself
-        // moves (a finger on it, an animated scroll) it keeps interpolating between the two pages as before.
+        // A swipe action selects the new card and the pager follows a few frames later, so while the pager is idle the height
+        // follows the selection at once; while it moves it interpolates between the two pages.
         val pagerIdle = !pagerState.isScrollInProgress && offsetFraction == 0f
         val currentPage = if (pagerIdle && !siblingPickerOpen && selectedPage in pageCards.indices) selectedPage else pagerState.currentPage
         val currentNotification = cardAt(currentPage)
 
         fun clampHeightForMode(notif: IslandNotification?, height: Dp): Dp {
             if (notif != null && notif.mode == IslandMode.Notification) {
-                // Tall enough for the card with its text expanded (arrow button).
                 val shownSteps = cardStepsAccess.stepsFor(notif.key)
                 return when {
                     notif.key == mediaOpenKey -> if (shownSteps.pictureHalf) PICTURE_MID_HEIGHT else EXPANDED_MEDIA_HEIGHT
-                    // Portrait: the image selector takes the card's place at half size.
                     !sideBySidePicker && shownSteps.depth == com.agupta07505.smartisland.model.CardDepth.Selector -> PICTURE_MID_HEIGHT
                     else -> clampCardHeightForMode(notif.mode, height)
                 }
@@ -387,13 +353,10 @@ fun IslandExpandedContent(
             val fraction = kotlin.math.abs(offsetFraction)
             (currentPageHeight + (nextHeight - currentPageHeight) * fraction).coerceIn(72.dp, 260.dp)
         }
-        // The step that follows the finger gets its height from the gesture (the shell reads it directly), so
-        // nothing here depends on the drag progress and the content does not recompose per frame. The natural height of the
-        // shown step is handed to the gesture.
+        // The gesture supplies the dragged step's height (the shell reads it directly), so nothing here recomposes per frame.
         val stepDrag = LocalStepDrag.current
         val targetHeight = naturalTargetHeight
 
-        // The sibling picker replaces the pager and sets the island's height while it is open.
         val pickerSiblings = if (siblingPickerOpen) {
             com.agupta07505.smartisland.model.siblingIndices(notifications, pageCards.getOrNull(currentPage) ?: selectedIndex)
                 .map { notifications[it] }
@@ -404,7 +367,7 @@ fun IslandExpandedContent(
             siblingsHold.clear()
             siblingsHold.addAll(pickerSiblings)
         }
-        // Landscape: the rows the picker island keeps while it shrinks away (the open flag is already false then).
+        // Rows the picker island keeps while it shrinks away (the open flag is already false).
         val splitPickerSiblings = if (pickerShown) pickerSiblings else siblingsHold.toList()
         val pictureBeside = pictureShownBesideCard(
             isLandscape = sideBySidePicker,
@@ -414,17 +377,14 @@ fun IslandExpandedContent(
             cardMediaCount = currentNotification?.media?.size ?: 0,
             selectorOpen = mediaExpansion.selectorOpen
         )
-        // The step the island beside the card shows: the selector and the half picture are half size, the full picture is the tallest.
         val besideSteps = cardStepsAccess.stepsFor(currentNotification?.key)
         val sideBySideWanted = pictureBeside || (pickerShown && sideBySidePicker)
-        // Landscape: ONE progress value for the two islands (0 = the card alone, 1 = card and picker side by
-        // side), the same curve and lengths as the portrait swap. A close runs it back down while the two-island layout is
-        // kept (the overlay holds its window and surface for the same length), then the layout flips to the single island.
+        // ONE progress for the two islands (0 = card alone, 1 = card and picker), on the same curve and lengths as the portrait swap.
+        // A close runs it back down while the overlay holds its window and surface.
         val splitProgress = remember { androidx.compose.animation.core.Animatable(0f) }
         val splitSpeed = settings.animationSpeed(sideBySidePicker)
         val splitWasPicker = remember { booleanArrayOf(false) }
-        // The island that comes and goes beside the card is animated alike whether it is the picker or a picture: the flag keeps
-        // the two-island layout while it shrinks away, and which island it was (the picture keeps what it showed).
+        // The flag keeps the two-island layout while the island shrinks away, and remembers which island it was.
         val splitIslandIsPicture = remember { booleanArrayOf(false) }
         val besideHold = remember { arrayOfNulls<com.agupta07505.smartisland.model.CardSteps>(1) }
         if (sideBySideWanted) {
@@ -432,9 +392,8 @@ fun IslandExpandedContent(
             splitIslandIsPicture[0] = pictureBeside
             if (pictureBeside) besideHold[0] = besideSteps
         }
-        // Landscape finger drag: a step that opens or closes the picture island runs the ONE split progress with the finger (the card
-        // gives up the island's width as it grows), instead of the timed tween. The lift hands over to the tween from wherever the
-        // progress is (the drag state is "settled" once the finger-driven settle has finished).
+        // A finger drag that opens or closes the picture island runs the split progress with the finger; the lift hands over
+        // to the tween from wherever the progress is.
         val dragOwnsSplit = sideBySidePicker && stepDrag.active && !stepDrag.settled &&
             stepDrag.cardKey == currentNotification?.key &&
             (stepDrag.fromSteps?.let { stepsOpenBesideCard(it) } ?: false) != pictureBeside
@@ -442,12 +401,10 @@ fun IslandExpandedContent(
             if (dragOwnsSplit) {
                 val opening = pictureBeside
                 androidx.compose.runtime.snapshotFlow { stepDrag.progress }.collect { p ->
-                    // The islands' sizes follow the geometry of the progress, so the finger stays 1:1 with them.
                     splitProgress.snapTo(com.agupta07505.smartisland.model.SplitMotion.fromGeometry(besideDragSplitProgress(opening, p)))
                 }
             } else {
-                // A spring (no bounce) instead of the timed tween. A turn-around in the middle keeps the speed it had,
-                // and the overlay no longer times the close itself: it waits for [StepDragState.splitShown] to go false (below).
+                // A spring without bounce: a turn-around keeps its speed. The overlay waits for [StepDragState.splitShown] to go false.
                 splitProgress.animateTo(
                     targetValue = if (sideBySideWanted) 1f else 0f,
                     animationSpec = androidx.compose.animation.core.spring(
@@ -460,10 +417,8 @@ fun IslandExpandedContent(
                 )
             }
         }
-        // The phase has a name (model/SplitMotion.kt). Only the derived flag is read here, so the content does
-        // not recompose per frame of the swap.
-        // The two-island layout is kept through the close and until the shell confirms it is the single island again
-        // (model/SplitMotion.holdTwoIslandLayout), so the single layout is never drawn before its surface is there.
+        // Only the derived flag is read so the content does not recompose per frame. The two-island layout is kept until the
+        // shell confirms the single island (model/SplitMotion.holdTwoIslandLayout).
         val splitHolding by remember(sideBySideWanted) {
             androidx.compose.runtime.derivedStateOf {
                 com.agupta07505.smartisland.model.SplitMotion.holdTwoIslandLayout(
@@ -471,7 +426,7 @@ fun IslandExpandedContent(
                 )
             }
         }
-        // The progress is gone (the shell may switch now); read in composition so its flip recomposes this scope.
+        // The progress is gone: the shell may switch now.
         val splitGone by remember(sideBySideWanted) {
             androidx.compose.runtime.derivedStateOf {
                 splitWasPicker[0] && !sideBySideWanted && com.agupta07505.smartisland.model.SplitMotion.phase(
@@ -510,11 +465,7 @@ fun IslandExpandedContent(
             else -> targetHeight
         }
 
-        // The gesture runs the shell's height between the height it had and the height of the step now shown.
         androidx.compose.runtime.SideEffect {
-            // The shell once dipped to about two thirds of the step's height while a step closed. Nothing in the
-            // cards animates its own size and the finger-driven height cannot leave the from / target range, so the only way down
-            // is a target that is itself wrong for a moment. Log every target change while a step is open to see which one it is.
             if (stepDrag.active && !stepDrag.settled && kotlin.math.abs(stepDrag.targetDp - shownHeight.value) > 1f) {
                 android.util.Log.d(
                     "StepHeight",
@@ -530,10 +481,8 @@ fun IslandExpandedContent(
             onHeightMeasured(shownHeight)
         }
 
-        // Portrait / single island: the card and the picker trade places by size, driven by ONE progress value
-        // (0 = card, 1 = picker; model/PickerSwap.kt). Opening runs it up, closing runs it back down from wherever it is, so the
-        // two directions mirror each other and a close that starts mid-open reverses in place. The picker keeps the rows it had
-        // while it fades out (the open flag is already false then).
+        // Portrait / single island: card and picker trade places by size on ONE progress (0 = card, 1 = picker;
+        // model/PickerSwap.kt).
         val portraitPickerOpen = pickerShown && !sideBySide
         val swap = remember { androidx.compose.animation.core.Animatable(0f) }
         val swapSpeed = settings.animationSpeed(sideBySidePicker)
@@ -557,27 +506,20 @@ fun IslandExpandedContent(
             }
         }
 
-        // Landscape with the picker open: two separate islands with a gap. The pager is not
-        // composed here (the same as the portrait picker); the card island is the current card at
-        // its natural width and height, so nothing empty is left around its elements. Each island
-        // draws its own surface because the overlay switches its single island surface off.
+        // Landscape with the picker open: two islands with a gap. The pager is not composed; each island draws its own surface
+        // because the overlay switches the single surface off.
         val splitCard = if (sideBySide) currentNotification else null
         if (splitCard != null) {
-            // Landscape: ONE progress for both islands. The picker island's width is [splitPickerWidth] x
-            // progress and the active island gives up (or takes back) the same width, so the active island grows exactly as fast
-            // as the picker shrinks. A picture beside the card is not animated this way (progress reads 1).
-            // [splitRaw] is the animation's own progress (the phase, the re-wrap and the shadow read it); [splitEase] is the
-            // geometry (the islands' widths and the gap): 0 through the spring's slow tail, so the close ends on the single island's exact size.
+            // ONE progress for both islands: the picker is [splitPickerWidth] x progress wide and the active island
+            // gives up the same width.
             val splitRaw: () -> Float = { if (splitWasPicker[0]) splitProgress.value else 1f }
             val splitEase: () -> Float = { com.agupta07505.smartisland.model.SplitMotion.geometry(splitRaw()) }
             val naturalReported = remember { intArrayOf(-1) }
-            // The card's natural width, measured once per card instead of an intrinsic pass over the whole card in
-            // every frame of the swap. [0] = the width (px), [1] = the height it was measured at; a card update starts it again.
+            // The card's natural width, measured once per card rather than per frame. [0] = width (px), [1] = height it was measured at.
             val naturalCache = remember(splitCard) { intArrayOf(-1, -1) }
             // [0] = 1 while the card's content fades through its one re-wrap (set in layout, read when drawing).
             val reflowFade = remember { intArrayOf(0) }
-            // The widest the card island gets during the swap (px), written while it is laid out and read by the card's backdrop, so the
-            // backdrop fills the island while the content is narrower than it (the grey strip between the re-wrap and the end of the swap).
+            // Widest the card island gets during the swap (px); the backdrop uses it to fill the island while the content is narrower.
             val islandWidthPx = remember { intArrayOf(0) }
             androidx.compose.foundation.layout.BoxWithConstraints(
                 modifier = Modifier
@@ -604,19 +546,18 @@ fun IslandExpandedContent(
                 val cardIsland: @Composable () -> Unit = {
                 Box(
                     modifier = Modifier
-                        // No fixed height. The island is as tall as the card is at the width it is drawn at (measured below).
+                        // No fixed height: as tall as the card at its drawn width.
                         .islandSurface(
                             settings, settings.forCard(splitCard.mode == IslandMode.Music).opacity,
                             shadowStrength = { com.agupta07505.smartisland.model.SplitMotion.shadowStrength(splitRaw()) },
                             palette = LocalIslandPalette.current
                         )
                         .layout { measurable, constraints ->
-                            // The card's natural width (what the window is sized from) is measured every time; the width it
-                            // is DRAWN at runs from the single island's width (progress 0) to its natural width (progress 1),
-                            // never wider than what the picker leaves of the window.
+                            // The natural width (what the window is sized from) is measured every time; the drawn
+                            // width runs from the single island's width to the natural width, capped by what the
+                            // picker leaves of the window.
                             val minPx = SPLIT_CARD_MIN_WIDTH.roundToPx()
                             val maxPx = splitCardMaxWidth.roundToPx().coerceAtLeast(minPx)
-                            // The most the island may be: the row's height (the picture island's, or the picker's).
                             val capPx = constraints.maxHeight
                             val h = targetHeight.roundToPx().coerceAtMost(capPx)
                             if (naturalCache[0] < 0 || naturalCache[1] != h) {
@@ -627,10 +568,7 @@ fun IslandExpandedContent(
                             val raw = splitRaw()
                             val p = com.agupta07505.smartisland.model.SplitMotion.geometry(raw)
                             val singlePx = singleIslandWidth.roundToPx()
-                            // The window is sized from the card slot reported here. While the picker is opening or closing
-                            // the slot is at least what makes card + gap + picker as wide as the single island, so the
-                            // active island can start (and end) at the single island's exact width: no jump when the layout
-                            // flips. Once the picker has fully opened the slot is the card's natural width again.
+                            // The window is sized from this slot.
                             val swapping = splitWasPicker[0] && com.agupta07505.smartisland.model.SplitMotion.swapping(
                                 com.agupta07505.smartisland.model.SplitMotion.phase(sideBySideWanted, raw)
                             )
@@ -645,11 +583,8 @@ fun IslandExpandedContent(
                             val w = (singlePx + (natural - singlePx) * p).roundToInt()
                                 .coerceAtMost((rowWidthPx - sidePx).roundToInt())
                                 .coerceAtLeast(1)
-                            // The island's width still runs every frame (it is only a clip), but the card
-                            // inside is measured at one of two fixed widths, so its text re-wraps once instead of in every
-                            // frame (a measure with the same constraints is not repeated). Before the re-wrap point it keeps the
-                            // single island's layout; from it on, the split layout (the island's width at progress 1). The
-                            // content fades through the switch (below). A picture beside the card (progress 1) is untouched.
+                            // The island's width runs every frame (it is only a clip), but the card is measured at
+                            // one of two fixed widths so its text re-wraps once, not per frame.
                             val finalW = natural.coerceAtMost((rowWidthPx - (SPLIT_ISLAND_GAP.roundToPx() + splitPickerWidth.roundToPx())).coerceAtLeast(1))
                                 .coerceAtLeast(1)
                             val wideW = maxOf(singlePx, finalW)
@@ -658,9 +593,8 @@ fun IslandExpandedContent(
                                 if (com.agupta07505.smartisland.model.SplitMotion.reflowed(raw)) finalW else wideW
                             } else w
                             reflowFade[0] = if (splitWasPicker[0] && wideW != finalW) 1 else 0
-                            // The card is measured at its natural height at this width. It used to be forced to the height it
-                            // had at the single island's width, so once its text re-wrapped narrower the last lines and the buttons
-                            // were cut off (and the page never reported its taller natural height, so nothing corrected it).
+                            // Measured at its natural height at this width: forcing the single-island height cuts off
+                            // the last lines and buttons once the text re-wraps narrower.
                             val placeable = measurable.measure(
                                 androidx.compose.ui.unit.Constraints(
                                     minWidth = contentW, maxWidth = contentW,
@@ -672,8 +606,8 @@ fun IslandExpandedContent(
                             layout(w, islandH) { placeable.place(0, 0) }
                         }
                 ) {
-                  // The dip through the re-wrap is on the card's foreground only (ExpandedCardPage's foregroundAlpha), so the
-                  // backdrop and scrim stay and the island is never a bare translucent slab; no recomposition.
+                  // The re-wrap dip is on the card's foreground only, so the backdrop and scrim stay and the island
+                  // is never a bare translucent slab.
                   androidx.compose.foundation.layout.Box {
                     androidx.compose.runtime.CompositionLocalProvider(
                         LocalMediaExpansion provides MediaExpansion(
@@ -702,7 +636,8 @@ fun IslandExpandedContent(
                         foregroundAlpha = {
                             if (reflowFade[0] == 1) com.agupta07505.smartisland.model.SplitMotion.reflowAlpha(splitRaw()) else 1f
                         },
-                        // The widest the island is during the swap (a constant per card), so the backdrop is not measured again every frame.
+                        // The widest the island is during the swap (a constant per card), so the backdrop is not
+                        // measured again every frame.
                         backdropWidthPx = { islandWidthPx[0] }
                     )
                     }
@@ -718,16 +653,15 @@ fun IslandExpandedContent(
                     onClose = { if (sideBySideWanted) onSiblingPickerClose() },
                     tapSlop = GestureSensitivity.fromId(settings.gestureSensitivity).scaled(PICKER_TAP_SLOP_DP).dp,
                     modifier = Modifier
-                        // No fade of the surface while it shrinks away: a layer alpha turned the black island grey and see-through over a
-                        // light page (the grey ghost of the close). The island is clipped by its shrinking width instead.
+                        // No surface fade while it shrinks away: a layer alpha turned the black island grey and see-
+                        // through over a light page. The island is clipped by its shrinking width instead.
                         .islandSurface(
                             settings, maxOf(settings.opacity, SIBLING_PICKER_SURFACE_OPACITY),
                             shadowStrength = { com.agupta07505.smartisland.model.SplitMotion.shadowStrength(splitRaw()) },
                             palette = LocalIslandPalette.current
                         )
                         .layout { measurable, constraints ->
-                            // The list keeps its full width (no re-wrapping) and is clipped by the island, which is only as
-                            // wide as the progress allows. Anchored to the card's side so it grows out of / back into it.
+                            // The list keeps its full width (no re-wrap) and is clipped by the island, anchored to the card's side.
                             val full = splitPickerWidth.roundToPx()
                             val w = (full * splitEase()).roundToInt().coerceIn(0, full)
                             val placeable = measurable.measure(
@@ -736,8 +670,8 @@ fun IslandExpandedContent(
                                     minHeight = constraints.minHeight, maxHeight = constraints.maxHeight
                                 )
                             )
-                            // Fix 1: the island grows in height with its width, from the card's height, so a few pixels of width are never a
-                            // full-height black sliver. The surface clips the list.
+                            // The island grows in height with its width, from the card's height, so a few pixels of
+                            // width are never a full-height black sliver.
                             val pickerCardH = targetHeight.roundToPx().coerceIn(1, maxOf(1, placeable.height))
                             val islandH = (pickerCardH + (placeable.height - pickerCardH) * splitEase()).roundToInt()
                             layout(w, islandH) { placeable.place(if (pickerOnLeft) w - full else 0, 0) }
@@ -750,11 +684,8 @@ fun IslandExpandedContent(
                     val islandSteps = if (pictureBeside) besideSteps else (besideHold[0] ?: besideSteps)
                     val shown = splitCard.media.getOrNull(islandSteps.pictureIndex ?: mediaExpansion.index)
                     val selectorShown = islandSteps.depth == com.agupta07505.smartisland.model.CardDepth.Selector
-                    // Like the sibling picker's island: the list / picture keeps its full width and is clipped by the island, which is
-                    // only as wide as the progress allows (the finger, in a drag), anchored to the card's side. The island's height
-                    // follows the gesture's height while a step is dragged (read at layout time, no recomposition).
-                    // No layer alpha on the surface while it shrinks away (it turned the black island grey over a light page); the island is
-                    // clipped by its shrinking width, like the picker's.
+                    // Like the sibling picker's island: content keeps its full width, clipped by the island and
+                    // anchored to the card's side.
                     val islandModifier = Modifier
                         .layout { measurable, constraints ->
                             val naturalPx = shownHeight.roundToPx()
@@ -778,7 +709,7 @@ fun IslandExpandedContent(
                                     minHeight = constraints.minHeight, maxHeight = constraints.maxHeight
                                 )
                             )
-                            // Fix 1 (not while a finger drives the step: its height is 1:1 with the finger).
+                            // Grow in height with width, except while a finger drives the step (its height is 1:1 with the finger).
                             val sideCardH = targetHeight.roundToPx().coerceIn(1, maxOf(1, placeable.height))
                             val sideGrow = if (stepDrag.active) 1f else splitEase()
                             val islandH = (sideCardH + (placeable.height - sideCardH) * sideGrow).roundToInt()
@@ -814,8 +745,7 @@ fun IslandExpandedContent(
             }
         }
 
-        // The single-island layout (side by side is handled above): the card layer and, on top of it while the swap runs or
-        // the picker is open, the picker layer.
+        // Single-island layout: the card layer, with the picker layer on top while the swap runs or the picker is open.
         if (!sideBySide) Box(modifier = Modifier.fillMaxWidth()) {
         if (cardLayerShown) Row(
             modifier = Modifier
@@ -842,16 +772,15 @@ fun IslandExpandedContent(
             val horizontalSwipeActionsActive = settings.enableSwipeActions &&
                 (com.agupta07505.smartisland.model.SwipeAction.fromId(settings.swipeLeftAction) != com.agupta07505.smartisland.model.SwipeAction.None ||
                     com.agupta07505.smartisland.model.SwipeAction.fromId(settings.swipeRightAction) != com.agupta07505.smartisland.model.SwipeAction.None)
-            // Light look only: while the island's height catches up with a shorter card (a swipe or an open from a taller card), the
-            // shell is briefly taller than the page, and the page's backdrop ends at the page. The shell's pale surface then showed
-            // as a whitish strip under the card (on the dark look the bare shell is black and blends in). The pager clips its pages
-            // tightly, so the strip is filled here, behind the pager: the colour the backdrop ends in, from the page's bottom edge
-            // down. Drawn outside this box's bounds; the shell's own clip cuts it at the island's edge.
+            // Light look only: while the island's height catches up with a shorter card, the pale shell shows as a
+            // strip under the page's backdrop.
             val overscanPalette = LocalIslandPalette.current
             if (overscanPalette.isLight && currentNotification != null) {
                 val overscanFromDp = pageHeights[currentNotification.key] ?: targetHeight
-                val overscanColor = if (notificationHasPictureBackdrop(currentNotification, settings)) {
-                    Color.Black.copy(alpha = 0.85f * cardScrimScale(settings))
+                val overscanHasPicture = notificationHasPictureBackdrop(currentNotification, settings)
+                val overscanScrimScale = cardScrimScale(settings)
+                val overscanColor = if (overscanHasPicture) {
+                    Color.Black.copy(alpha = 0.85f * overscanScrimScale)
                 } else {
                     overscanPalette.scrim.copy(alpha = 0.45f)
                 }
@@ -864,6 +793,34 @@ fun IslandExpandedContent(
                                 topLeft = Offset(0f, overscanFromDp.toPx()),
                                 size = androidx.compose.ui.geometry.Size(size.width, 300.dp.toPx())
                             )
+                            // The same at the sides: while the island opens, the shell is briefly wider than the page
+                            // and a pale sliver shows at both ends of a dark picture card.
+
+                            val sideBars = sideBarsAlpha()
+                            if (overscanHasPicture && sideBars > 0f) {
+                                val pageHeightPx = overscanFromDp.toPx()
+                                val sideWidthPx = 48.dp.toPx()
+                                val dim = Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Black.copy(alpha = 0.35f *
+                                overscanScrimScale * sideBars),
+                                        Color.Black.copy(alpha = 0.85f *
+                                overscanScrimScale * sideBars)
+                                    ),
+                                    startY = 0f,
+                                    endY = pageHeightPx
+                                )
+                                drawRect(
+                                    brush = dim,
+                                    topLeft = Offset(-sideWidthPx, 0f),
+                                    size = androidx.compose.ui.geometry.Size(sideWidthPx, pageHeightPx)
+                                )
+                                drawRect(
+                                    brush = dim,
+                                    topLeft = Offset(size.width, 0f),
+                                    size = androidx.compose.ui.geometry.Size(sideWidthPx, pageHeightPx)
+                                )
+                            }
                         }
                 )
             }
@@ -875,9 +832,8 @@ fun IslandExpandedContent(
                     com.agupta07505.smartisland.model.CardDepth.First,
                 modifier = Modifier
                     .fillMaxWidth()
-                    // unbounded = true: pages measure at natural height even when parent Box has explicit height.
-                    // Top-aligned, so a shell that is briefly shorter than the page only ever cuts the page's
-                    // bottom (the default centred alignment split the overflow, and the avatar / name row was cut first).
+                    // unbounded: pages measure at natural height even with an explicit parent height. Top-aligned, so a briefly shorter
+                    // shell cuts only the page's bottom.
                     .wrapContentHeight(align = Alignment.Top, unbounded = true)
             ) { page ->
                 val notification = cardAt(page)
@@ -908,8 +864,7 @@ fun IslandExpandedContent(
                     )
                 }
             }
-            // The cards next to the shown one are measured while the island sits idle, so a swipe to one of them already knows its
-            // height (otherwise the shell first heads for a guess and corrects itself when the card has composed).
+            // Cards next to the shown one are measured while the island is idle, so a swipe to one already knows its height.
             val cardShown = LocalCardShown.current
             var probeReady by remember { mutableStateOf(false) }
             LaunchedEffect(cardShown) {
@@ -921,9 +876,8 @@ fun IslandExpandedContent(
             // A left / right swipe that may bring a card is being dragged: measure the neighbours now, the likely target first.
             val swipeHint = stepDrag.swipeNeighbour
             if ((probeReady || (cardShown && swipeHint != 0)) && !siblingPickerOpen) {
-                // Open: the two cards next to the shown one. Collapsed: every card of the stack, so whichever one is swiped to
-                // already has its height. One probe at a time (a burst of notifications never composes them all together), and each
-                // is dropped as soon as its height is known.
+                // Open: the two cards next to the shown one. Collapsed: every card of the stack, so whichever one is
+                // swiped to already has its height.
                 val toMeasure = (if (cardShown) {
                     com.agupta07505.smartisland.util.neighbourProbeOrder(swipeHint).mapNotNull { cardAt(pagerState.currentPage + it) }
                 } else {
@@ -1026,16 +980,15 @@ internal fun ExpandedCardPage(
     onTextExpandedChanged: (Boolean) -> Unit,
     onHeightChanged: (Dp) -> Unit,
     // The landscape split dips only the card's foreground (text, buttons, pictures) through its re-wrap; the backdrop
-    // and scrim stay at full strength so the island is never a bare translucent slab. Null (the pager's pages) = no layer at all.
+    // and scrim stay at full strength so the island is never a bare translucent slab.
     foregroundAlpha: (() -> Float)? = null,
-    // The landscape split measures the card at one of two fixed widths while its island is wider for part of the swap. The backdrop
-    // (glow and scrim) is drawn at least this wide (px, read while measuring) and clipped by the island, so no bare island
-    // surface shows beside the content. Null = the page's own width.
+    // The landscape split measures the card at one of two fixed widths while its island is wider for part of the
+    // swap.
     backdropWidthPx: (() -> Int)? = null
 ) {
     val density = LocalDensity.current
-    // A card with a picture behind it (the sender's photo, an album cover) keeps the picture's own look: black dim and white text on
-    // either theme. The whole card then reads the dark palette; a card without a picture follows the island's theme.
+    // A card with a picture behind it (the sender's photo, an album cover) keeps the picture's own look: black dim
+    // and white text on either theme.
     val hasPicture = notificationHasPictureBackdrop(notification, settings)
     androidx.compose.runtime.CompositionLocalProvider(
         LocalIslandPalette provides if (hasPicture) IslandPalette.Dark else LocalIslandPalette.current
@@ -1061,9 +1014,8 @@ internal fun ExpandedCardPage(
                     .then(
                         if (backdropWidthPx != null) {
                             Modifier.layout { measurable, constraints ->
-                                // Reports the page's size, lays the backdrop out wider; the island's clip cuts it at its edge.
-                                // An intrinsic / unbounded pass (the card's natural width is measured that way) has no fixed size
-                                // to widen: measure as usual there, a fixed size built from an infinite one crashes.
+                                // Reports the page's size, lays the backdrop out wider; the island's clip cuts it at
+                                // its edge.
                                 if (!constraints.hasBoundedWidth || !constraints.hasBoundedHeight) {
                                     val plain = measurable.measure(constraints)
                                     layout(plain.width, plain.height) { plain.place(0, 0) }
@@ -1120,8 +1072,9 @@ internal fun ExpandedCardPage(
                             modifier = Modifier
                                 .matchParentSize()
                                 // The old step is never taller than the shell (it is measured at its own size but
-                                // laid out, and so clipped, at the shell's current height), and it is gone within the first part of
-                                // the move, so two copies of the text are not drawn at two heights for long.
+                                // laid out, and so clipped, at the shell's current height), and it is gone within the
+                                // first part of the move, so two copies of the text are not drawn at two heights for
+                                // long.
                                 .layout { measurable, constraints ->
                                     val placeable = measurable.measure(constraints)
                                     val shellPx = if (stepDrag.heightDp >= 0f) (stepDrag.heightDp * density.density).roundToInt() else placeable.height
@@ -1240,8 +1193,8 @@ internal fun ExpandedCardPage(
 }
 
 /**
- * True when the card draws a picture behind itself (a notification's large icon or icon as a blurred backdrop). The music card has its own
- * artwork rule and is handled inside it. Mirrors what [NotificationBackdrop] draws, so the two never disagree.
+ * True when the card draws a picture behind itself (a notification's large icon or icon as a blurred backdrop). The
+ * music card has its own artwork rule and is handled inside it.
  */
 internal fun notificationHasPictureBackdrop(notification: IslandNotification, settings: SmartIslandSettings): Boolean {
     if (!settings.enableNotificationBackdrop || notification.mode == IslandMode.Music) return false
@@ -1252,18 +1205,14 @@ internal fun notificationHasPictureBackdrop(notification: IslandNotification, se
 /** Saves a new order for the pinned apps (set by the overlay service, which owns the settings repository). */
 internal val LocalReorderPinnedApps = androidx.compose.runtime.staticCompositionLocalOf<(List<String>) -> Unit> { {} }
 
-/** Rows of app tiles (four to a row) the grid needs for [count] entries, shown at least one and at most two rows tall. */
 private fun launcherRows(count: Int): Int = ((count + 3) / 4).coerceIn(1, 2)
 
 private val LAUNCHER_TILE_HEIGHT = 76.dp
 private val LAUNCHER_ROW_GAP = 14.dp
 
-/** Extra height under every launcher page (the page dots sit in it). */
 private val LAUNCHER_PAGE_EXTRA = 8.dp
-/** Tall enough for an open folder's panel (its apps and the padding round them). */
 private val LAUNCHER_FOLDER_PANEL_HEIGHT = 108.dp
 
-/** How long a dragged app has to rest on another app (or a folder) before letting go makes a folder; a quicker drop swaps them. */
 private const val FOLDER_DWELL_MS = 1500L
 
 @Composable
@@ -1305,7 +1254,7 @@ private fun EmptyExpanded(
             }
             // One window height for every page, so swiping never resizes the island: tall enough for the fullest page.
             val rows = maxOf(launcherRows(pinnedApps.size), if (settings.showRecentApps) launcherRows(recentApps.size) else 1)
-            // A little extra under every page: room for the page dots, which used to be cut off at the window's bottom edge.
+            // A little extra under every page: room for the page dots, which would be cut off at the window's bottom edge.
             val pageHeight = maxOf(
                 LAUNCHER_TILE_HEIGHT * rows + LAUNCHER_ROW_GAP * (rows - 1),
                 utilitiesPageHeight(utilityRows),
@@ -1397,11 +1346,6 @@ private fun EmptyExpanded(
     }
 }
 
-/**
- * The launcher window's pages (see [LauncherPage]). A swipe moves to the next page with the page scrolling out and the next one
- * scrolling in from the swiped side, inside the island's own window. The window keeps one height, [pageHeight], for every page.
- * A drag that a child has taken over (an icon being dragged) is left to it.
- */
 @Composable
 private fun LauncherPager(
     recentsEnabled: Boolean,
@@ -1478,7 +1422,6 @@ private fun LauncherPager(
 private val LAUNCHER_SWIPE_THRESHOLD = 40.dp
 private const val LAUNCHER_SCROLL_MS = 280
 
-/** Small dots at the window's edge: down the right for the two levels, along the bottom for Apps / Recents. */
 @Composable
 private fun BoxScope.LauncherPageDots(page: LauncherPage, recentsEnabled: Boolean) {
     val palette = LocalIslandPalette.current
@@ -1507,11 +1450,6 @@ private fun BoxScope.LauncherPageDots(page: LauncherPage, recentsEnabled: Boolea
     }
 }
 
-/**
- * Reads the launcher's page swipes: once the finger has moved past [thresholdPx] along its longer axis the swipe fires, once, and
- * the rest of that touch is taken (so the icons under the finger do not also get a tap, and the island does not treat it as one of
- * its own swipes). A touch that a child has already taken over, such as an icon dragged after a long press, is left alone.
- */
 private fun Modifier.launcherSwipes(thresholdPx: Float, onSwipe: (LauncherSwipe) -> Unit): Modifier =
     pointerInput(thresholdPx) {
         awaitEachGesture {
@@ -1538,10 +1476,6 @@ private fun Modifier.launcherSwipes(thresholdPx: Float, onSwipe: (LauncherSwipe)
         }
     }
 
-/**
- * One page of app tiles: the pinned apps (draggable, with folders) or the recent apps. [apps] fills the page; the long-press
- * actions and the open folder's panel are drawn over it.
- */
 @Composable
 private fun LauncherGrid(
     apps: List<LaunchableApp>,
@@ -1554,11 +1488,8 @@ private fun LauncherGrid(
     val context = LocalContext.current
     // The app whose long-press actions are showing. Reset whenever the list of apps changes underneath it.
     var menuApp by remember(apps) { mutableStateOf<LaunchableApp?>(null) }
-    // Dragging the pinned apps. A long press opens the actions as before; dragging on from it (past the touch slop) swaps the menu
-    // for a floating copy of the icon. Dropped on another pinned app it trades places with it; held over an app (or a folder with
-    // room) for [FOLDER_DWELL_MS] it makes a folder with it instead (the tile grows and the phone buzzes when that is armed). A
-    // folder opens on tap, and an app dragged out of the open folder gets a slot of its own, or is unpinned when all the slots
-    // are taken.
+    // Dragging the pinned apps. A long press opens the actions; dragging on from it (past the touch slop) swaps the
+    // menu for a floating copy of the icon.
     val reorderPinned = LocalReorderPinnedApps.current
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     val pinnedOrder = settings.shortcutPackages
@@ -1618,9 +1549,8 @@ private fun LauncherGrid(
                                     joinHint = dropTarget == pkg && dropIntoFolder,
                                     dimmed = draggedApp?.packageName == pkg,
                                     modifier = Modifier.onGloballyPositioned { slotBounds[pkg] = it.boundsInRoot() },
-                                    // Only pinned entries can be moved; the recent apps after them just keep the long-press menu.
-                                    // The drag sits INSIDE the tile's click handling (see ShortcutApp), so the click's long-press
-                                    // does not swallow the touch before the drag can use it.
+                                    // Only pinned entries can be moved; the recent apps after them just keep the
+                                    // long-press menu.
                                     gestureModifier =
                                             if (pkg !in pinnedOrder) Modifier else Modifier.longPressDrag(
                                                 key = listOf(pkg, pinnedOrder),
@@ -1762,7 +1692,6 @@ private fun LauncherGrid(
             }
 }
 
-/** The plus tile after the pinned apps: opens the picker to pin more. Same size as an app tile. */
 @Composable
 private fun AddAppTile(onClick: () -> Unit) {
     val palette = LocalIslandPalette.current
@@ -1796,12 +1725,7 @@ private fun AddAppTile(onClick: () -> Unit) {
     }
 }
 
-/**
- * Adds a long-press-then-drag gesture. [onLift] fires once the finger has moved past the touch slop after the long press (the drag
- * proper begins); [onMove] then reports the finger's position in root coordinates; [onEnd] reports whether the drag was lifted
- * (a long press that never moved is not) and where the finger was. [topLeft] is the root position of the item the gesture is
- * on. [key] must change whenever anything the lambdas captured does, because the gesture block is only restarted by it.
- */
+/** Adds a long-press-then-drag gesture. */
 internal fun Modifier.longPressDrag(
     key: Any?,
     topLeft: () -> androidx.compose.ui.geometry.Offset,
@@ -1845,11 +1769,7 @@ private fun ShortcutApp(
     highlighted: Boolean = false,
     joinHint: Boolean = false,
     dimmed: Boolean = false,
-    /**
-     * Extra gestures (the drag), applied AFTER the click handling so they are the inner node. Pointer events reach the inner node
-     * first, so the drag sees the touch before the click's long-press consumes it; applied before, the long press consumed the
-     * touch and the drag was cancelled at once.
-     */
+    /** Extra gestures (the drag), applied AFTER the click handling so they are the inner node. */
     gestureModifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -1899,7 +1819,6 @@ private fun ShortcutApp(
     }
 }
 
-/** A folder's icon: a rounded square with its apps (up to four) in a 2 x 2 grid. */
 @Composable
 private fun FolderTile(members: List<String>) {
     val context = LocalContext.current
@@ -1933,10 +1852,6 @@ private fun FolderTile(members: List<String>) {
     }
 }
 
-/**
- * The long-press actions of one launcher app (App info, Floating window, Split screen), laid over the grid. The app itself stays
- * on the left so it is clear which app they act on; a tap on it, or anywhere that is not an action, closes the panel.
- */
 @Composable
 private fun AppActionPanel(
     app: LaunchableApp,
@@ -2085,8 +2000,8 @@ private fun NotificationBackdrop(
 /** What decides a card's height; when it changes, the height measured earlier no longer holds. */
 internal fun notificationHeightSignature(n: IslandNotification): Int =
     if (liveCardTextDoesNotChangeHeight(n.mode)) {
-        // A live card's text ticks (a clock, a progress, a call timer), which made its signature change every second and
-        // its measured height forgotten again and again. Its height is clamped to a narrow range by mode, so the text is left out.
+        // A live card's text ticks (a clock, a progress, a call timer), which made its signature change every second
+        // and its measured height forgotten again and again.
         listOf(n.mode, n.media.size, n.actionIntents.map { it.title }).hashCode()
     } else {
         listOf(n.mode, n.title, n.text, n.bigText, n.readerText, n.media.size, n.callStatusText, n.actionIntents.map { it.title }).hashCode()
@@ -2099,14 +2014,8 @@ internal fun liveCardTextDoesNotChangeHeight(mode: IslandMode?): Boolean = when 
     else -> false
 }
 
-/** How long the island sits open before the neighbouring cards are measured (so the opening is never slowed by it). */
 private const val NEIGHBOUR_PROBE_DELAY_MS = 350L
 
-/**
- * Composes and measures a neighbouring card at the pager's width, reports its height, and is dropped as soon as the height is
- * known (the caller stops composing it). It is never placed, so nothing is drawn or touched; its callbacks do nothing, so it cannot
- * change the reply, reading or auto-collapse state of the card that is shown; its loops run slowly (LocalCardShown is false).
- */
 @Composable
 private fun NeighbourHeightProbe(
     notification: IslandNotification,
@@ -2115,9 +2024,10 @@ private fun NeighbourHeightProbe(
     launcherApps: List<LaunchableApp>?,
     onHeight: (Dp) -> Unit
 ) {
-    // Throw-away copies of the state a card shares with the island: the reader-scroll tracker (the card's removal resets it, which
-    // would make the shown card's fling look finished and let a finger that only stops it count as a tap) and the reply drafts (a
-    // pending draft would open a reply box and ask for the keyboard in a card nobody sees).
+    // Throw-away copies of the state a card shares with the island: the reader-scroll tracker (the card's removal
+    // resets it, which would make the shown card's fling look finished and let a finger that only stops it count as a
+    // tap) and the reply drafts (a pending draft would open a reply box and ask for the keyboard in a card nobody
+    // sees).
     val isolatedReaderScroll = remember { com.agupta07505.smartisland.util.ReaderScrollTracker() }
     val isolatedReplyDrafts = remember { com.agupta07505.smartisland.model.ReplyDrafts() }
     androidx.compose.ui.layout.SubcomposeLayout { constraints ->

@@ -17,10 +17,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.agupta07505.smartisland.model.IslandMode
 
-/**
- * The height the expanded card is (or is expected to be). Starts from an estimate per mode; a card that is pre-composed
- * while collapsed reports its real height itself, so the estimate must not overwrite it (see CardPrewarm).
- */
+/** The height the expanded card is (or is expected to be). */
 @Composable
 internal fun rememberExpandedHeight(
     activeMode: IslandMode,

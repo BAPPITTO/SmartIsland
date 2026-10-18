@@ -39,7 +39,6 @@ import kotlinx.coroutines.launch
 /** What the lab asks the island's ViewModel to do (the ViewModel lives in the overlay service). */
 enum class LabCommand { EXPAND, COLLAPSE, OPEN_PICKER, CLOSE_PICKER, TAP_IDLE_DOT }
 
-/** What the Lab screen shows. */
 data class LabProgress(
     val running: Boolean = false,
     val waitingForLandscape: Boolean = false,
@@ -51,12 +50,11 @@ data class LabProgress(
 )
 
 /**
- * Landscape Lab: plays the scripted landscape situations (model/LandscapeDemoPlan.kt) on the real island.
+ * Plays the scripted landscape situations (model/LandscapeDemoPlan.kt) on the real island.
  *
  * Nothing is stored: the lab only sets [override], which the ViewModel and the overlay service apply on top of the
- * stored settings and the display state while it is set, and clears it when it ends or is stopped. The cards are
- * ordinary demo cards (keys start with [DemoEvents.KEY_PREFIX]) posted into the notification repository.
- * It plays only while the phone is in landscape; started in portrait it waits until the phone is turned.
+ * stored settings while it is set. The cards are ordinary demo cards (keys start with [DemoEvents.KEY_PREFIX]).
+ * It plays only in landscape; started in portrait it waits until the phone is turned.
  */
 object LandscapeDemo {
     private const val KEY = DemoEvents.KEY_PREFIX + "lab_"
@@ -67,7 +65,6 @@ object LandscapeDemo {
 
     private val _override = MutableStateFlow<LabOverride?>(null)
 
-    /** The layout the lab forces right now, or null when it is not running. */
     val override: StateFlow<LabOverride?> = _override.asStateFlow()
 
     private val _commands = MutableSharedFlow<LabCommand>(extraBufferCapacity = 16)

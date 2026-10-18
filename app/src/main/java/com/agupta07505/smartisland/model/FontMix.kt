@@ -8,21 +8,13 @@
 package com.agupta07505.smartisland.model
 
 /**
- * "Mix fonts": the island text can use up to three different fonts at once, the way a system font family ships separate
- * Light, Regular and Medium cuts (SF Pro Display and friends). Every piece of island text already asks for a weight
- * (secondary lines are normal, titles semi-bold, numbers and names bold), so the weight decides which font draws it:
- *
- *  - [FontSlot.Light]   normal weight and lighter: secondary and small detail text
- *  - [FontSlot.Regular] medium and semi-bold: the main line of a card
- *  - [FontSlot.Medium]  bold and heavier: titles, numbers, names
- *
- * A slot left empty uses the island font, so mixing is opt-in per slot. The Compose side that builds the real font family
- * from this is `mixedFontFamily` in ui/IslandFonts.kt; this file is the pure rule so it can be unit tested.
+ * "Mix fonts": island text uses up to three fonts, like a system family's Light, Regular and Medium cuts; the
+ * requested weight picks the font.
  */
 enum class FontSlot(
-    /** The weight whose file is used when the slot holds one of the built-in fonts (they ship 400, 500 and 700). */
+    /** Weight whose file is used for built-in fonts (400, 500, 700). */
     val representativeWeight: Int,
-    /** Every CSS-style weight (100..900) the slot draws. Together the three slots cover all nine, with no gaps and no overlaps. */
+    /** CSS-style weights (100..900) the slot draws; the three slots cover all nine. */
     val weights: List<Int>
 ) {
     Light(400, listOf(100, 200, 300, 400)),
@@ -31,14 +23,13 @@ enum class FontSlot(
 }
 
 object FontMix {
-    /** The slot that draws text asked for at [weight] (any value, it is clamped to 1..1000 like Compose does). */
+    /** Slot for [weight] (clamped to 1..1000 like Compose). */
     fun slotFor(weight: Int): FontSlot = when {
         weight <= 400 -> FontSlot.Light
         weight <= 600 -> FontSlot.Regular
         else -> FontSlot.Medium
     }
 
-    /** The font id a slot really uses: its own choice, or the island font when it has none ([slotId] empty). */
     fun effectiveId(slotId: String, islandFont: String): String = slotId.ifEmpty { islandFont }
 
     fun idOf(slot: FontSlot, light: String, regular: String, medium: String): String = when (slot) {
@@ -47,7 +38,7 @@ object FontMix {
         FontSlot.Medium -> medium
     }
 
-    /** The mix only does something when it is switched on and at least one slot has a font of its own. */
+    /** Active only when enabled and at least one slot has its own font. */
     fun isActive(enabled: Boolean, light: String, regular: String, medium: String): Boolean =
         enabled && (light.isNotEmpty() || regular.isNotEmpty() || medium.isNotEmpty())
 }

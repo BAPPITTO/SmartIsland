@@ -8,26 +8,32 @@
 package com.agupta07505.smartisland.model
 
 /**
- * Idle widgets: small live readouts the collapsed cutout shows while no event is on the island (the time, the weather, ...).
- * One widget is shown at a time; with several switched on they take turns every few seconds.
- *
- * Pure logic only (ids, the stored list, the rotation), so it can be unit tested. Drawing is in ui/IdleWidgets.kt, the data in
- * util/IdleWidgetData.kt.
+ * Idle widgets: small live readouts the collapsed cutout shows while no event is on the island; several take turns.
+ * Pure logic; drawing in ui/IdleWidgets.kt, data in util/IdleWidgetData.kt.
  */
 enum class IdleWidgetKind(val id: String) {
+    /** The hour tick: no widget on the pill, only the hourly tick over the cutout (ui/HourChime.kt). */
     Clock("clock"),
+    /**
+     * Time on the right with a clock glyph on the left; the island adds the full date. Follows the system 12 / 24 h
+     * setting.
+     */
+    LiveClock("liveclock"),
     Date("date"),
     Weather("weather"),
-    /** Wind speed from the same lookup as the weather: a wind glyph on the left, the speed on the right; the island adds the direction. */
+    /** Wind speed from the weather lookup: glyph on the left, speed on the right; the island adds the direction. */
     Wind("wind"),
     Battery("battery"),
     NextAlarm("alarm"),
     NetSpeed("speed"),
-    /** Sunrise, afternoon, sunset and midnight glyphs that tick in on the pill at fixed local times (ui/DayMoment.kt). Never takes a turn on the pill. */
+    /**
+     * Sunrise, afternoon, sunset and midnight glyphs that tick in at fixed local times (ui/DayMoment.kt); never takes
+     * a turn.
+     */
     DayMoments("daymoments"),
-    /** Count of unread messages and mail on the left of the cutout; the island lists the apps (ui/IdleWidgets.kt). Sits out while there are none. */
+    /** Unread messages and mail count on the left; the island lists the apps. Sits out while there are none. */
     Notifications("notifications"),
-    /** The active Do Not Disturb / mode glyph (bedtime, driving, ...) on the left of the cutout; the island names it. Sits out while no mode is on. */
+    /** Active Do Not Disturb / mode glyph on the left; the island names it. Sits out while no mode is on. */
     Modes("modes");
 
     companion object {
@@ -47,13 +53,15 @@ object IdleWidgets {
     const val MAX_CYCLE_SECONDS = 60
     const val DEFAULT_CYCLE_SECONDS = 6
 
-    /** The stored comma list as widget kinds: unknown ids and repeats are dropped, the order is kept. */
     fun parse(stored: String): List<IdleWidgetKind> =
         stored.split(',').map { it.trim() }.mapNotNull { IdleWidgetKind.fromId(it) }.distinct()
 
     fun serialize(kinds: List<IdleWidgetKind>): String = kinds.distinct().joinToString(",") { it.id }
 
-    /** Switches [kind] on (added at the end) or off. The last widget cannot be switched off here: the master switch does that. */
+    /**
+     * Switches [kind] on (added at the end) or off. The last widget cannot be switched off here: the master switch
+     * does that.
+     */
     fun toggle(stored: String, kind: IdleWidgetKind): String {
         val current = parse(stored)
         val next = if (kind in current) {
@@ -64,14 +72,13 @@ object IdleWidgets {
         return serialize(next)
     }
 
-    /** A stored list that has to hold at least one widget: an empty or unreadable one becomes [DEFAULT_IDS]. */
     fun normalize(stored: String): String = parse(stored).let { if (it.isEmpty()) DEFAULT_IDS else serialize(it) }
 
-    /** The widget shown at rotation step [step] (any integer; it wraps around). Null when the list is empty. */
+    /** Widget at rotation step [step] (any integer; wraps around); null when the list is empty. */
     fun pick(kinds: List<IdleWidgetKind>, step: Int): IdleWidgetKind? =
         if (kinds.isEmpty()) null else kinds[Math.floorMod(step, kinds.size)]
 
-    /** Fahrenheit when forced, or when the unit is automatic and the region uses it (US and a few others). */
+    /** Fahrenheit when forced, or when automatic and the region uses it. */
     fun useFahrenheit(unit: String, regionCountry: String): Boolean = when (unit) {
         UNIT_FAHRENHEIT -> true
         UNIT_CELSIUS -> false
@@ -94,13 +101,11 @@ object IdleWidgets {
 
     private val MPH_REGIONS = setOf("US", "GB", "LR", "MM", "BS", "BZ", "KY", "PW", "FM", "MH")
 
-    /** The unit to draw: a forced one as it is, [UNIT_AUTO] by the device region. */
     fun resolveWindUnit(unit: String, regionCountry: String): String = when (unit) {
         WIND_KMH, WIND_MS, WIND_MPH, WIND_KN -> unit
         else -> if (regionCountry.uppercase() in MPH_REGIONS) WIND_MPH else WIND_KMH
     }
 
-    /** [kmh] (what the weather service reports) in [unit] (a resolved unit). */
     fun windValue(kmh: Float, unit: String): Float = when (unit) {
         WIND_MS -> kmh / 3.6f
         WIND_MPH -> kmh * 0.621371f
@@ -115,11 +120,11 @@ object IdleWidgets {
         else -> "km/h"
     }
 
-    /** The pill's wind text: just the rounded number ("12"); "--" while the speed is unknown (negative). */
+    /** Pill wind text: the rounded number ("12"); "--" while the speed is unknown. */
     fun displayWind(kmh: Float, unit: String): String =
         if (kmh < 0f) "--" else Math.round(windValue(kmh, unit)).toString()
 
-    /** The island's wind text with its unit: "12 km/h", "3.3 m/s". */
+    /** Island wind text with its unit: "12 km/h", "3.3 m/s". */
     fun windIslandText(kmh: Float, unit: String): String {
         if (kmh < 0f) return "--"
         val value = windValue(kmh, unit)
@@ -127,14 +132,14 @@ object IdleWidgets {
         else "${Math.round(value)} ${windUnitLabel(unit)}"
     }
 
-    /** The compass point the wind comes from ("N", "NE", ...), null when the direction is unknown (negative). */
+    /** Compass point the wind comes from ("N", "NE", ...); null when the direction is unknown. */
     fun compass(degrees: Int): String? {
         if (degrees < 0) return null
         val points = listOf("N", "NE", "E", "SE", "S", "SW", "W", "NW")
         return points[((degrees % 360) + 22) / 45 % 8]
     }
 
-    /** Short speed text for the pill ("320K", "4.2M"): bytes per second in, a few characters out. */
+    /** Short pill speed text ("320K", "4.2M"). */
     fun shortSpeed(bytesPerSecond: Long): String {
         val b = bytesPerSecond.coerceAtLeast(0L).toDouble()
         return when {
@@ -146,19 +151,25 @@ object IdleWidgets {
     }
 }
 
-/** The result of the weather lookup: temperature in Celsius and the WMO weather code Open-Meteo reports. */
+/** Weather lookup result: temperature in Celsius and the WMO weather code Open-Meteo reports. */
 data class WeatherSnapshot(
     val temperatureC: Float,
     val weatherCode: Int,
     val isDay: Boolean,
     val fetchedAtMs: Long,
-    /** Wind speed in km/h as the weather service reports it; negative = not known (an older stored reading). */
+    /** Wind speed in km/h; negative = not known (an older stored reading). */
     val windKmh: Float = -1f,
-    /** Direction the wind comes from, degrees; negative = not known. */
-    val windDirectionDeg: Int = -1
+    /** Wind direction in degrees; negative = not known. */
+    val windDirectionDeg: Int = -1,
+    /** Feels-like temperature in Celsius; NaN = not known. */
+    val feelsLikeC: Float = Float.NaN,
+    /** True when the lookup asked for the feels-like and humidity fields. */
+    val detailed: Boolean = false,
+    /** Extra readings behind the island rows; null = none asked for. */
+    val extras: WeatherExtras? = null
 )
 
-/** What a weather code looks like, grouped to the few icons the pill can show. */
+/** Weather code grouped to the few icons the pill can show. */
 enum class WeatherLook { Clear, PartlyCloudy, Cloudy, Fog, Rain, Snow, Storm }
 
 fun weatherLook(code: Int): WeatherLook = when (code) {

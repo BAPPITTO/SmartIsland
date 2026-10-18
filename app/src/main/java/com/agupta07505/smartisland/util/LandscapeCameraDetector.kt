@@ -16,10 +16,8 @@ import com.agupta07505.smartisland.data.LandscapeCamera
 import com.agupta07505.smartisland.data.OrientationState
 import com.agupta07505.smartisland.data.SmartIslandSettings
 
-/** Reads the display cutout in the current (landscape) orientation. */
 object LandscapeCameraDetector {
 
-    /** Cutouts closer to the centre than this fraction of half the screen width are not trusted in landscape. */
     private const val CENTRED_CUTOUT_FRACTION = 0.4f
 
     /** Picks the cutout closest to the top/left/right edge and converts it to centre-relative dp. */
@@ -32,9 +30,7 @@ object LandscapeCameraDetector {
         val centerX = (rect.left + rect.right) / 2f
         val centerY = (rect.top + rect.bottom) / 2f
         val xOffsetDp = (centerX - screenWidthPx / 2f) / density
-        // A phone's camera sits on a side edge in landscape. A cutout reported near the horizontal
-        // centre is the portrait position some firmwares (MIUI) report unrotated, so it is
-        // ignored and the caller falls back to the side the display rotation puts the camera on.
+        // A phone's camera sits on a side edge in landscape.
         val halfWidthDp = screenWidthPx / 2f / density
         if (kotlin.math.abs(xOffsetDp) < halfWidthDp * CENTRED_CUTOUT_FRACTION) return null
         return LandscapeCamera(
@@ -43,7 +39,6 @@ object LandscapeCameraDetector {
         )
     }
 
-    /** Display rotation 90 puts the natural top of the phone on the left, 270 on the right. */
     fun sideForRotation(rotation: Int): String = when (rotation) {
         Surface.ROTATION_270 -> SmartIslandSettings.LANDSCAPE_POSITION_RIGHT
         else -> SmartIslandSettings.LANDSCAPE_POSITION_LEFT

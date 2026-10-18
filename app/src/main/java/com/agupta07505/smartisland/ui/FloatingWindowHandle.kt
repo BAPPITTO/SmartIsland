@@ -33,30 +33,17 @@ import com.agupta07505.smartisland.util.IslandHaptics
 import com.agupta07505.smartisland.util.SwipeDownPull
 import kotlinx.coroutines.launch
 
-/** The pull counts as a swipe (lifting opens the floating window) once the finger is this far (dp) down. */
 private const val HANDLE_FIRE_DP = 44f
 
-/** Once armed, the finger has to come back above this (dp) to disarm; the 8 dp gap keeps the tick from flickering on the line. */
 private const val HANDLE_DISARM_DP = 36f
 
-/** Gap (dp) between the drawn pill and the card's bottom edge. */
 private const val PILL_BOTTOM_INSET_DP = 5f
 
-/** The drag inside this many dp is a tap, not a pull: no squeeze yet. */
 private const val HANDLE_SLOP_DP = 4f
 
 /**
  * A small white pill at the bottom of the expanded island. Pulling it down and lifting the finger opens the current
  * notification in a floating window.
- *
- * While the finger is down the island answers it: the card gets a little narrower and taller ([IslandInteractionState.handlePull],
- * read by the shell's graphics layer, so the content is squeezed with it and nothing re-lays out), and the pill follows
- * the card's bottom edge as it stretches (it has no travel of its own). A haptic tick says "lifting now opens it" when the pull crosses the line, and again when the finger
- * comes back over it (the reverse). Letting go returns everything on the island's usual ease-back spring.
- *
- * The handle owns its touch: [IslandInteractionState.handleOwnsTouch] tells the island's own gesture handler to leave that
- * touch alone. It stays composed while the island collapses (only [enabled] changes), so a spring that is still running
- * is not cut off.
  */
 @Composable
 internal fun BoxScope.FloatingWindowHandle(
@@ -73,7 +60,7 @@ internal fun BoxScope.FloatingWindowHandle(
     Box(
         modifier = Modifier
             .align(Alignment.BottomCenter)
-            .size(width = 72.dp, height = 20.dp)
+            .size(width = 88.dp, height = 20.dp)
             .then(
                 if (!enabled) Modifier else Modifier.pointerInput(density) {
                     val firePx = HANDLE_FIRE_DP * density
@@ -133,9 +120,7 @@ internal fun BoxScope.FloatingWindowHandle(
                 .padding(bottom = PILL_BOTTOM_INSET_DP.dp)
                 .graphicsLayer {
                     alpha = if (visible) fade().coerceIn(0f, 1f) else 0f
-                    // The pill has no travel of its own. It is a child of the card, so it rides the card's bottom edge as the
-                    // card stretches down; the card's squeeze is cancelled here so the pill keeps its size, and the little the stretch
-                    // moves it off its 5 dp inset is put back, so it stays stuck to the bottom edge during the whole pull.
+                    // The pill has no travel of its own.
                     val pull = ui.handlePull
                     val sx = SwipeDownPull.handleScaleX(pull)
                     val sy = SwipeDownPull.handleScaleY(pull)
@@ -143,9 +128,9 @@ internal fun BoxScope.FloatingWindowHandle(
                     scaleY = 1f / sy
                     translationY = -PILL_BOTTOM_INSET_DP * density * (sy - 1f)
                 }
-                .size(width = 34.dp, height = 4.dp)
+                .size(width = 60.dp, height = 4.dp)
                 .clip(RoundedCornerShape(2.dp))
-                .background(Color.White.copy(alpha = 0.85f))
+                .background(Color.White.copy(alpha = 0.45f))
         )
     }
 }

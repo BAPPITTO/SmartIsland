@@ -44,8 +44,8 @@ internal fun PrewarmedCard(
 }
 
 /**
- * True while the card is really on screen (the island is open or still closing). A pre-composed card that waits collapsed reads
- * false, so its endless loops (the media position, the wave) can pause. Defaults to true wherever the card is not pre-composed.
+ * True while the card is really on screen (the island is open or still closing). A pre-composed card that waits
+ * collapsed reads false, so its endless loops (the media position, the wave) can pause.
  */
 internal val LocalCardShown = compositionLocalOf { true }
 

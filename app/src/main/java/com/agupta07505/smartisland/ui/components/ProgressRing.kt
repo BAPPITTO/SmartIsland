@@ -19,8 +19,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * A smooth ring that doubles as a progress gauge: a faint track with the battery level drawn
- * over it, starting at 12 o'clock and running clockwise.
+ * A smooth ring that doubles as a progress gauge: a faint track with the battery level drawn over it, starting at 12
+ * o'clock and running clockwise.
  */
 @Composable
 fun ProgressRing(

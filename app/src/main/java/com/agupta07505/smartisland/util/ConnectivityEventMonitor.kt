@@ -34,17 +34,6 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
-/**
- * Watches Wi-Fi and VPN connections and posts a brief island card for each new connection.
- *
- * - Wi-Fi card shows the network name (SSID). Android only exposes the SSID with the location
- *   permission granted and location services on; otherwise the card says "Wi-Fi connected".
- * - VPN card shows the VPN exit location (city, country). Android has no API for that, so it is
- *   resolved with an HTTPS IP lookup, only when [SmartIslandSettings.allowNetworkChecks] is on.
- * - Disconnect cards ("Wi-Fi disconnected", "VPN disconnected") are posted when the connection that was up goes away and
- *   nothing replaces it within [DISCONNECT_CONFIRM_MS], so roaming between access points or a VPN that reconnects at once stays quiet.
- * - Cards are transient: they disappear on their own after a few seconds.
- */
 class ConnectivityEventMonitor(
     private val context: Context,
     private val scope: CoroutineScope,
@@ -103,7 +92,6 @@ class ConnectivityEventMonitor(
         repository.removeNotification(KEY_VPN_OFF)
     }
 
-    /** Callbacks fire immediately for networks that are already up; ignore that initial burst. */
     private fun isStartupReplay(): Boolean = SystemClock.elapsedRealtime() - startedAt < STARTUP_GRACE_MS
 
     private fun buildWifiCallback(): ConnectivityManager.NetworkCallback {
@@ -122,8 +110,8 @@ class ConnectivityEventMonitor(
     }
 
     private fun handleWifi(network: Network, caps: NetworkCapabilities) {
-        // The connection is tracked whichever cards are switched on (a "disconnected" card needs to know what was connected);
-        // only the work of reading the name is skipped when neither card is on.
+        // Track the connection whichever cards are on (a "disconnected" card needs to know what was connected);
+        // only reading the name is skipped when neither card is on.
         val settings = settingsProvider()
         val connectedOn = settings.isEventEnabled(IslandEvent.WIFI.id)
         val ssid = if (connectedOn || settings.isEventEnabled(IslandEvent.WIFI_DISCONNECTED.id)) readSsid(caps) else null
@@ -158,7 +146,6 @@ class ConnectivityEventMonitor(
         repository.removeNotification(KEY_WIFI_OFF)
     }
 
-    /** Waits briefly: if another Wi-Fi network shows up meanwhile (roaming), nothing was really lost. */
     private fun scheduleWifiOff(lostSsid: String?) {
         wifiOffJob?.cancel()
         wifiOffJob = scope.launch {
@@ -243,7 +230,6 @@ class ConnectivityEventMonitor(
 
     private var lastSsidMissReason: String? = null
 
-    /** Logs why the network name is missing, once per reason, so the exported log explains it. */
     private fun logSsidMiss(reason: String) {
         if (reason == lastSsidMissReason) return
         lastSsidMissReason = reason
@@ -277,7 +263,6 @@ class ConnectivityEventMonitor(
         }
     }
 
-    /** Waits briefly: a VPN that reconnects at once (a network switch) is not shown as lost. */
     private fun scheduleVpnOff() {
         vpnOffJob?.cancel()
         vpnOffJob = scope.launch {
@@ -340,11 +325,6 @@ class ConnectivityEventMonitor(
         )
     }
 
-    /**
-     * Resolves "City, Country" of the VPN exit point. The request is bound to the VPN network so it
-     * leaves through the tunnel even while another network is still the default; a second provider
-     * is tried when the first one is down or rate-limited.
-     */
     private suspend fun lookupVpnLocation(network: Network): String? = withContext(Dispatchers.IO) {
         LOOKUP_URLS.firstNotNullOfOrNull { url -> fetchLocation(network, url) }
     }
@@ -375,7 +355,6 @@ class ConnectivityEventMonitor(
         const val KEY_VPN = "system_vpn"
         const val KEY_WIFI_OFF = "system_wifi_off"
         const val KEY_VPN_OFF = "system_vpn_off"
-        /** How long a lost connection must stay lost before its card shows (roaming and quick reconnects stay quiet). */
         private const val DISCONNECT_CONFIRM_MS = 1500L
         private const val STARTUP_GRACE_MS = 2000L
         private const val TRANSIENT_DISPLAY_MS = IslandTimings.CONNECTIVITY_CARD_MS

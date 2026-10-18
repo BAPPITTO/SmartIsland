@@ -41,10 +41,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.getValue
 
-/**
- * Landscape, expanded: the collapsed pill stays at its own spot beside / above the card. It behaves like the portrait
- * mini pill: shows the other stored card, tap swaps to it, plus pill swipes and long press.
- */
+/** Landscape, expanded: the collapsed pill stays at its own spot beside / above the card. */
 @Composable
 internal fun CornerPill(
     settings: SmartIslandSettings,

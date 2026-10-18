@@ -7,18 +7,8 @@
 
 package com.agupta07505.smartisland.util
 
-/**
- * Reader-scroll tap guard. The expanded notification's reader text and its thumbnail
- * column scroll. A scroll can end in a tap that was never meant to be one:
- *  - the finger lands to stop a text that is still flinging (no movement at all, so the island's own tap rule opened
- *    the notification),
- *  - the finger lands a moment after a fling has stopped, or
- *  - the text moved under the finger during the touch (a tiny scroll the text swallowed).
- * This keeps the scroll moments the reader reports and answers "may a touch that starts now, and ends in a lift, be a tap?".
- * The clock is passed in, so it is plain Kotlin and testable.
- */
+/** Stops taps that are really the end of a scroll in the reader text or its thumbnail column. */
 class ReaderScrollTracker {
-    /** A reader list is being dragged or is flinging right now. */
     var scrolling: Boolean = false
         private set
 
@@ -30,23 +20,19 @@ class ReaderScrollTracker {
     var moveCount: Long = 0L
         private set
 
-    /** The reader's scroll state changed ([inProgress] = dragging or flinging). */
     fun onScrollState(inProgress: Boolean, nowMs: Long) {
         scrolling = inProgress
         lastActiveMs = nowMs
     }
 
-    /** The scroll offset of a reader list changed. */
     fun onMoved(nowMs: Long) {
         moveCount++
         lastActiveMs = nowMs
     }
 
-    /** A touch beginning at [nowMs] lands on a reader that is still moving or only just stopped. */
     fun touchStartsOnScroll(nowMs: Long): Boolean =
         scrolling || (lastActiveMs != 0L && nowMs - lastActiveMs < READER_SCROLL_SETTLE_MS)
 
-    /** Forgets everything (the card changed, the island closed). */
     fun reset() {
         scrolling = false
         lastActiveMs = 0L

@@ -137,7 +137,6 @@ fun NotificationsAndPrivacySection(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Group 0: Device Profile & OEM Compatibility Rules
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -189,7 +188,6 @@ fun NotificationsAndPrivacySection(
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
-                // Device Selector Dropdown
                 ExposedDropdownMenuBox(
                     expanded = isDeviceMenuExpanded,
                     onExpandedChange = { isDeviceMenuExpanded = it },
@@ -255,7 +253,6 @@ fun NotificationsAndPrivacySection(
                     }
                 }
 
-                // Active Rules Summary Chip
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -283,7 +280,6 @@ fun NotificationsAndPrivacySection(
             }
         }
 
-        // Group 0b: the universal notifications switch, first among the notification settings.
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -321,7 +317,6 @@ fun NotificationsAndPrivacySection(
             }
         }
 
-        // Group 1: Lock Screen & Privacy
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -479,7 +474,6 @@ fun NotificationsAndPrivacySection(
             }
         }
 
-        // Group 2: Display & Expansion Behavior
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -634,7 +628,6 @@ fun NotificationsAndPrivacySection(
             }
         }
 
-        // Shared Installed Apps Provider
         val installedApps by produceState(initialValue = emptyList<LaunchableApp>(), context) {
             value = withContext(Dispatchers.IO) {
                 val apps = AppShortcutProvider.installedApps(context)
@@ -655,7 +648,6 @@ fun NotificationsAndPrivacySection(
             }
         }
 
-        // Group 3.5: Notification Cooldown & Anti-Spam
         var cooldownAppQuery by rememberSaveable { mutableStateOf("") }
         val cooldownFilteredApps = remember(installedApps, cooldownAppQuery) {
             if (cooldownAppQuery.isBlank()) installedApps
@@ -712,7 +704,6 @@ fun NotificationsAndPrivacySection(
                             .padding(top = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        // 1. Cooldown Duration
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(
                                 text = stringResource(R.string.cooldown_duration_title, settings.notificationCooldownDurationMinutes),
@@ -754,7 +745,6 @@ fun NotificationsAndPrivacySection(
 
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
 
-                        // 2. Trigger Threshold (Alert count in 30 seconds)
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(
                                 text = stringResource(R.string.cooldown_threshold_title, settings.notificationCooldownThreshold),
@@ -796,7 +786,7 @@ fun NotificationsAndPrivacySection(
 
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
 
-                        // 3. System events (battery, Wi-Fi, VPN, Bluetooth, flashlight): not apps, so they get their own list
+                        // System events (battery, Wi-Fi, VPN, Bluetooth, flashlight): not apps, so they get their own list.
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(
                                 text = stringResource(R.string.cooldown_system_events_title),
@@ -893,7 +883,6 @@ fun NotificationsAndPrivacySection(
 
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
 
-                        // 4. Excluded Apps (Whitelist)
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(
                                 text = stringResource(R.string.cooldown_excluded_apps_title),
@@ -1020,13 +1009,11 @@ fun NotificationsAndPrivacySection(
             }
         }
 
-        // State for managing app alerts & exclusions
         var showAppManagerDialog by rememberSaveable { mutableStateOf(false) }
         var selectedAppForOptions by rememberSaveable(stateSaver = LaunchableAppSaver) {
             mutableStateOf<LaunchableApp?>(null)
         }
 
-        // Identify customized apps (apps where user changed notification, sound, or cooldown)
         val customizedApps = remember(
             installedApps,
             settings.disabledNotificationPackages,
@@ -1046,7 +1033,6 @@ fun NotificationsAndPrivacySection(
             }
         }
 
-        // Group 4: Per-App Notification, Alert & Sound Management
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -1098,7 +1084,6 @@ fun NotificationsAndPrivacySection(
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
-                // Stats row
                 val activeCount = installedApps.count { it.packageName !in settings.disabledNotificationPackages }
                 val excludedCount = settings.disabledNotificationPackages.size
                 val mutedCount = settings.disabledSoundPackages.size
@@ -1179,7 +1164,6 @@ fun NotificationsAndPrivacySection(
                     }
                 }
 
-                // Overview of customized apps (if any)
                 if (customizedApps.isNotEmpty()) {
                     Column(
                         modifier = Modifier.fillMaxWidth(),
@@ -1320,7 +1304,6 @@ fun NotificationsAndPrivacySection(
                     }
                 }
 
-                // Primary Button to open management dialog
                 FilledTonalButton(
                     onClick = { showAppManagerDialog = true },
                     shape = RoundedCornerShape(12.dp),
@@ -1340,7 +1323,6 @@ fun NotificationsAndPrivacySection(
             }
         }
 
-        // Dialog 1: App Alerts Management List Dialog
         if (showAppManagerDialog) {
             var query by rememberSaveable { mutableStateOf("") }
             var filterTab by rememberSaveable { mutableIntStateOf(0) } // 0: All, 1: Customized, 2: Excluded
@@ -1389,7 +1371,6 @@ fun NotificationsAndPrivacySection(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        // Search box
                         OutlinedTextField(
                             value = query,
                             onValueChange = { query = it },
@@ -1413,7 +1394,6 @@ fun NotificationsAndPrivacySection(
                             modifier = Modifier.fillMaxWidth()
                         )
 
-                        // Filter chips row
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -1447,7 +1427,6 @@ fun NotificationsAndPrivacySection(
                             )
                         }
 
-                        // Batch actions row
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -1492,7 +1471,6 @@ fun NotificationsAndPrivacySection(
 
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
 
-                        // LazyColumn of apps (fast & virtualized)
                         if (filteredApps.isEmpty()) {
                             Box(
                                 modifier = Modifier
@@ -1629,7 +1607,6 @@ fun NotificationsAndPrivacySection(
             )
         }
 
-        // Dialog 2: Detailed App Options Modal (Notifications On/Off/Exclude, Sound On/Off, Cooldown Bypass)
         selectedAppForOptions?.let { app ->
             val isNotificationEnabled = app.packageName !in settings.disabledNotificationPackages
             val isSoundEnabled = app.packageName !in settings.disabledSoundPackages
@@ -1690,7 +1667,6 @@ fun NotificationsAndPrivacySection(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Option 1: Smart Island Notifications (Allow / Exclude from Island)
                         ToggleRowItem(
                             title = stringResource(R.string.option_island_notifications),
                             subtitle = if (isNotificationEnabled)
@@ -1712,7 +1688,6 @@ fun NotificationsAndPrivacySection(
 
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
 
-                        // Option 2: Island Alert Sound (Sound on / Muted)
                         ToggleRowItem(
                             title = stringResource(R.string.option_island_sound),
                             subtitle = if (isSoundEnabled)
@@ -1733,7 +1708,6 @@ fun NotificationsAndPrivacySection(
 
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
 
-                        // Option 2b: Expanded card (may this app's card open at all)
                         ToggleRowItem(
                             title = stringResource(R.string.option_expanded_card),
                             subtitle = if (mayExpandCard)
@@ -1754,8 +1728,7 @@ fun NotificationsAndPrivacySection(
 
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
 
-                        // Option 2c: Auto-expand (does a new notification open the card by itself). Three choices:
-                        // Loud only is the default for every app; Always also opens silent ones; Never beats loud.
+                        // Auto-expand: Loud only is the default for every app; Always also opens silent ones; Never beats loud.
                         Column(
                             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -1816,7 +1789,6 @@ fun NotificationsAndPrivacySection(
 
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
 
-                        // Per-app lock-screen rule.
                         ToggleRowItem(
                             title = stringResource(R.string.option_hide_on_lock_screen),
                             subtitle = stringResource(R.string.option_hide_on_lock_screen_desc),
@@ -1827,7 +1799,6 @@ fun NotificationsAndPrivacySection(
 
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
 
-                        // Option 3: Anti-Spam Cooldown Bypass (Exclude from cooldown)
                         ToggleRowItem(
                             title = stringResource(R.string.option_cooldown_bypass),
                             subtitle = stringResource(R.string.option_cooldown_bypass_desc),
@@ -1989,7 +1960,6 @@ private fun rememberAppIcon(packageName: String): ImageBitmap? {
     return iconBitmap
 }
 
-/** Saves an optional [LaunchableApp] across rotation (an empty list means null). */
 private val LaunchableAppSaver: Saver<LaunchableApp?, Any> = listSaver(
     save = { app -> if (app == null) emptyList<Any>() else listOf(app.packageName, app.label) },
     restore = { saved ->
@@ -1997,10 +1967,6 @@ private val LaunchableAppSaver: Saver<LaunchableApp?, Any> = listSaver(
     }
 )
 
-/**
- * One switch per event that has a lock-screen switch (every event but calls). On = the event stays out of
- * the collapsed pill while the phone is locked. Collapsed by default: the list is long.
- */
 @Composable
 private fun LockScreenEventList(
     settings: SmartIslandSettings,

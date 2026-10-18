@@ -52,7 +52,6 @@ private enum class ConfigurableGesture(
     /** Own category ("Long press"): never listed with the pill or expanded swipes. */
     val isLongPress: Boolean = false
 ) {
-    // Pill (Collapsed) Gestures
     PillSwipeLeft(
         titleRes = R.string.pill_swipe_left_title,
         descRes = R.string.pill_swipe_left_desc,
@@ -124,7 +123,6 @@ private enum class ConfigurableGesture(
         isPillGesture = true
     ),
 
-    // Expanded Card Gestures
     ExpandedSwipeUp(
         titleRes = R.string.swipe_gesture_up_title,
         descRes = R.string.swipe_gesture_up_desc,
@@ -250,10 +248,8 @@ fun GesturesSection(
             .padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // ==================== NEW USER TOUR ====================
         NewUserTourCard(onStart = { showTour = true })
 
-        // ==================== GESTURE SENSITIVITY ====================
         if (repository != null) {
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -265,7 +261,6 @@ fun GesturesSection(
                 GestureSensitivityRow(settings = settings, repository = repository)
             }
 
-            // Vibration strength: moved here from Notifications and privacy, next to the gestures it answers.
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 shape = RoundedCornerShape(16.dp),
@@ -288,7 +283,6 @@ fun GesturesSection(
             }
         }
 
-        // ==================== CARD 1: PILL SWIPE ACTIONS (COLLAPSED) ====================
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(16.dp),
@@ -300,7 +294,6 @@ fun GesturesSection(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Header with Master Toggle for Pill Swipes
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -390,7 +383,6 @@ fun GesturesSection(
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
-                // List of 4 Pill Gestures
                 val pillGestures = ConfigurableGesture.entries.filter { it.isPillGesture && !it.isLongPress && it != ConfigurableGesture.PillSwipeDown }
                 pillGestures.forEachIndexed { index, gesture ->
                     val currentAction = getActionForGesture(gesture, settings)
@@ -452,7 +444,6 @@ fun GesturesSection(
                             }
                         }
 
-                        // Current Action Badge
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = if (isActionDisabled) {
@@ -501,13 +492,11 @@ fun GesturesSection(
             }
         }
 
-        // ==================== LONG PRESS (COLLAPSED PILL) ====================
         LongPressCard(
             action = getActionForGesture(ConfigurableGesture.PillLongPress, settings),
             onClick = { activeGestureDialog = ConfigurableGesture.PillLongPress }
         )
 
-        // ==================== CARD 2: EXPANDED CARD SWIPE ACTIONS ====================
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(16.dp),
@@ -519,7 +508,6 @@ fun GesturesSection(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Header with Master Toggle for Expanded Swipes
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -609,7 +597,6 @@ fun GesturesSection(
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
-                // List of 3 Expanded Gestures
                 val expandedGestures = ConfigurableGesture.entries.filter { !it.isPillGesture && !it.isLongPress && it != ConfigurableGesture.ExpandedSwipeDown }
                 expandedGestures.forEachIndexed { index, gesture ->
                     val currentAction = getActionForGesture(gesture, settings)
@@ -672,7 +659,6 @@ fun GesturesSection(
                             }
                         }
 
-                        // Current Action Badge
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = if (isActionDisabled) {
@@ -721,13 +707,11 @@ fun GesturesSection(
             }
         }
 
-        // ==================== ALL GESTURES (what each touch does right now) ====================
         GestureReferenceCard(settings = settings)
     }
 
     if (showTour) NewUserTour(settings = settings, onFinish = { showTour = false })
 
-    // Action Selection Dialog
     activeGestureDialog?.let { gesture ->
         val currentAction = getActionForGesture(gesture, settings)
         AlertDialog(

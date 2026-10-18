@@ -13,9 +13,8 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 
 /**
- * How far (dp) the secondary bubble slides toward the primary cutout to fuse with it. [distDp] is the
- * signed centre-to-centre distance. The bubble crosses the gap between the two edges and then sinks
- * almost fully inside the pill's side, so it ends up hidden in the pill rather than at its centre.
+ * How far (dp) the secondary bubble slides toward the primary cutout to fuse with it. [distDp] is the signed centre-
+ * to-centre distance.
  */
 internal fun mergeTravelDp(distDp: Float, pillWidthDp: Float, bubbleWidthDp: Float): Float {
     val gap = (kotlin.math.abs(distDp) - pillWidthDp / 2f - bubbleWidthDp / 2f).coerceAtLeast(0f)
@@ -25,7 +24,6 @@ internal fun mergeTravelDp(distDp: Float, pillWidthDp: Float, bubbleWidthDp: Flo
     return gap + sink
 }
 
-/** The empty gap (dp) between the bubble's and the pill's facing edges; 0 when they already touch. */
 internal fun mergeGapDp(distDp: Float, pillWidthDp: Float, bubbleWidthDp: Float): Float =
     (kotlin.math.abs(distDp) - pillWidthDp / 2f - bubbleWidthDp / 2f).coerceAtLeast(0f)
 
@@ -66,7 +64,6 @@ internal fun mergeSwell(merge: Float, contact: Float): Float {
     return kotlin.math.sin(Math.PI.toFloat() * t)
 }
 
-/** The bubble stays solid while it travels and sinks in; it only fades over the very last bit. */
 internal fun mergeBubbleAlpha(merge: Float): Float {
     val t = ((merge - 0.9f) / 0.1f).coerceIn(0f, 1f)
     return 1f - t * t * (3f - 2f * t)
@@ -75,14 +72,13 @@ internal fun mergeBubbleAlpha(merge: Float): Float {
 private const val MIN_STRETCH_PEAK = 0.2f
 
 /**
- * Liquid stretch toward the pill: grows as the bubble nears the pill's edge, peaks at contact (the
- * moment the two pull together), then relaxes while the bubble sinks into the pill.
+ * Liquid stretch toward the pill: grows as the bubble nears the pill's edge, peaks at contact (the moment the two
+ * pull together), then relaxes while the bubble sinks into the pill.
  */
 internal fun mergeStretch(merge: Float, contact: Float): Float {
     val m = merge.coerceIn(0f, 1f)
-    // A cutout that already touches the pill (contact 0, e.g. beside a wide pill or an open island) used to
-    // skip the rise and stay stretched at merge 0, so the round cutout looked warped at rest. The stretch
-    // now always starts at 0 and peaks no earlier than MIN_STRETCH_PEAK of the merge.
+    // A cutout that already touches the pill (contact 0, e.g. beside a wide pill or an open island) must not skip the
+    // rise and stay stretched at merge 0, or the round cutout would look warped at rest.
     val peak = contact.coerceIn(MIN_STRETCH_PEAK, 0.999f)
     val start = (peak - 0.35f).coerceAtLeast(0f)
     val rise = ((m - start) / (peak - start)).coerceIn(0f, 1f)

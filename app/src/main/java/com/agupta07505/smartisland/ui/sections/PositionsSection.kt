@@ -104,7 +104,6 @@ fun PositionsSection(
             .animateContentSize(),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // 1. Sleek Mode Switcher (Pill vs Notch)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -114,7 +113,6 @@ fun PositionsSection(
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             val isNotch = settings.enableNotchMode
-            // Pill Tab
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -157,7 +155,6 @@ fun PositionsSection(
                 }
             }
 
-            // Notch Tab
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -201,7 +198,6 @@ fun PositionsSection(
             }
         }
 
-        // 2. Quick Layout Presets Grid
         CollapsibleCard(
             title = "Quick presets",
             stateKey = "pos_presets_${if (settings.enableNotchMode) "notch" else "pill"}",
@@ -242,7 +238,6 @@ fun PositionsSection(
                     )
                 }
 
-                // Row 1: Center Hole & Wide Island
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -288,7 +283,6 @@ fun PositionsSection(
                     )
                 }
 
-                // Row 2: Left Corner & Right Corner
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -334,7 +328,6 @@ fun PositionsSection(
                     )
                 }
 
-                // Companion Circle Position (Pill Mode only)
                 if (!settings.enableNotchMode) {
                     HorizontalDivider(
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
@@ -417,7 +410,6 @@ fun PositionsSection(
             ExemptAppsCard(settings = settings, repository = repository, landscape = false)
         }
 
-        // 4. Precision Tuning Sliders Card
         CollapsibleCard(
             title = "Size and position",
             stateKey = "pos_tuning_${if (settings.enableNotchMode) "notch" else "pill"}",
@@ -565,7 +557,7 @@ fun PositionsSection(
         }
         }
 
-        // 4b. Manual camera cutout area (portrait; for phones where the hardware detection fails)
+        // Manual camera cutout area (portrait), for phones where the hardware detection fails.
         if (!settings.enableNotchMode) {
         CollapsibleCard(
             title = stringResource(R.string.camera_cutout_title),
@@ -648,7 +640,6 @@ fun PositionsSection(
         }
         }
 
-        // 5. Appearance & Behavior Card
         CollapsibleCard(
             title = "Shadow",
             stateKey = "pos_look_${if (settings.enableNotchMode) "notch" else "pill"}",
@@ -668,7 +659,6 @@ fun PositionsSection(
                     .fillMaxWidth()
                     .padding(16.dp)
             ) {
-                // Shadow Toggle & Elevation
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()

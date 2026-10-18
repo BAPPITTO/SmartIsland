@@ -25,7 +25,7 @@ class LabColorTest {
 
     @Test
     fun reproducesTheShadesOwnContainerColours() {
-        // Values measured from the shade's screenshots: (chroma, hue) of the container at lightness 90.
+        // Reference values from the notification shade: (chroma, hue) of the container at lightness 90.
         assertClose("#c2e8ff", LabColor.lchToSrgb(90.0, 16.9, 244.0))
         assertClose("#a0f880", LabColor.lchToSrgb(90.0, 68.6, 134.0))
         assertClose("#dae5e1", LabColor.lchToSrgb(90.0, 4.5, 171.0))

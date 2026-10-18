@@ -191,6 +191,22 @@ object OemDeviceRules {
         "com.google.android.tethering.entitlement"
     )
 
+    private val HOTSPOT_KEYWORD_PACKAGES = setOf(
+        "android",
+        "com.android.settings",
+        "com.android.systemui",
+        "com.android.networkstack.tethering",
+        "com.google.android.networkstack.tethering",
+        "com.google.android.tethering",
+        "com.miui.securitycenter",
+        "com.miui.networkassistant",
+        "com.coloros.wirelesssettings",
+        "com.oplus.wirelesssettings",
+        "com.vivo.settings",
+        "com.huawei.systemmanager",
+        "com.motorola.settings"
+    )
+
     private val HOTSPOT_KEYWORDS = listOf(
         "hotspot", "tethering", "portable hotspot", "mobile hotspot",
         "wifi hotspot", "usb tethering", "bluetooth tethering"
@@ -299,8 +315,8 @@ object OemDeviceRules {
     )
 
     /**
-     * Voice / audio recorder apps (Google Recorder, Samsung Voice Recorder, OEM sound recorders ...).
-     * Screen-recorder packages and screen-recording wording always win, so this never claims them.
+     * Voice / audio recorder apps (Google Recorder, Samsung Voice Recorder, OEM sound recorders ...). Screen-recorder
+     * packages and screen-recording wording always win, so this never claims them.
      */
     fun isAudioRecording(packageName: String, titleText: String): Boolean {
         val pkg = packageName.lowercase()
@@ -363,8 +379,10 @@ object OemDeviceRules {
         packageName: String,
         titleText: String
     ): Boolean {
+        if (packageName in HOTSPOT_PACKAGES) return true
+        if (packageName !in HOTSPOT_KEYWORD_PACKAGES) return false
         val lowerText = titleText.lowercase()
-        return packageName in HOTSPOT_PACKAGES || HOTSPOT_KEYWORDS.any { lowerText.contains(it) }
+        return HOTSPOT_KEYWORDS.any { lowerText.contains(it) }
     }
 
     fun isNonNavigationContent(
@@ -417,7 +435,6 @@ object OemDeviceRules {
                 intents.add(Intent().setComponent(ComponentName("com.zte.heartyservice", "com.zte.heartyservice.autorun.AppAutoRunManager")))
             }
             else -> {
-                // Generic fallback
             }
         }
 

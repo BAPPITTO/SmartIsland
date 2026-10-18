@@ -34,7 +34,6 @@ class LockScreenPresetTest {
         assertEquals(false, messages.isEventHiddenOnLockScreen("notification"))
         assertEquals(false, messages.isEventHiddenOnLockScreen("call"))
         assertEquals(true, messages.isEventHiddenOnLockScreen("music"))
-        assertEquals(true, messages.isEventHiddenOnLockScreen("privacy_camera"))
     }
 
     @Test

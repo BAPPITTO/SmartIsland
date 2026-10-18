@@ -30,7 +30,6 @@ enum class AppAutoExpand {
  */
 object AppEventRules {
 
-    /** Only plain notifications and transfers are app-owned cards; calls, timers etc. always open. */
     private fun isAppCard(mode: IslandMode): Boolean =
         mode == IslandMode.Notification || mode == IslandMode.DownloadUpload
 

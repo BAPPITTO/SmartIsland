@@ -21,10 +21,7 @@ import android.os.SystemClock
 import com.agupta07505.smartisland.model.IslandMode
 import com.agupta07505.smartisland.model.IslandNotification
 
-/**
- * What a media session says right now. A media app re-posts its notification a second or two after a
- * track change, but the media session itself reports the change at once; the island follows the session.
- */
+/** What a media session says right now. */
 data class MediaSnapshot(
     val packageName: String,
     val title: String?,
@@ -37,11 +34,7 @@ data class MediaSnapshot(
     val sessionToken: MediaSession.Token? = null
 )
 
-/**
- * True while a session is playing or only briefly between playing states (buffering, connecting, skipping).
- * Those transient states used to read as "not playing", which dropped the card's rank for a moment and made
- * the primary and secondary cutouts swap and swap back.
- */
+/** True while a session is playing or only briefly between playing states (buffering, connecting, skipping). */
 fun isPlayingLike(state: Int?): Boolean = when (state) {
     PlaybackState.STATE_PLAYING,
     PlaybackState.STATE_BUFFERING,
@@ -54,9 +47,8 @@ fun isPlayingLike(state: Int?): Boolean = when (state) {
     else -> false
 }
 
-/** Pure: how a [MediaSnapshot] changes a stored Music card. Anything the session does not know stays as it was. */
+/** Applies a [MediaSnapshot] to a stored Music card; fields the session does not report are kept. */
 object MediaCardPatch {
-    /** True when this card is one the snapshot can update. */
     fun appliesTo(card: IslandNotification, snapshot: MediaSnapshot): Boolean {
         if (card.mode != IslandMode.Music || card.packageName != snapshot.packageName) return false
         // An app with two sessions: each session only updates its own card.
@@ -72,7 +64,7 @@ object MediaCardPatch {
             title = newTitle ?: old.title,
             // A new track with no artist known yet must not keep the previous artist.
             text = s.artist?.takeIf { it.isNotBlank() } ?: if (trackChanged) "" else old.text,
-            // Same for the picture: the previous track's cover is wrong; the notification brings the new one a moment later.
+            // The previous track's cover is wrong too; the notification brings the new one shortly.
             largeIcon = s.artwork ?: if (trackChanged) null else old.largeIcon,
             mediaDurationMs = s.durationMs ?: if (trackChanged) null else old.mediaDurationMs,
             mediaPositionMs = s.positionMs ?: old.mediaPositionMs,
@@ -82,9 +74,8 @@ object MediaCardPatch {
 }
 
 /**
- * Listens to every active media session and reports a [MediaSnapshot] when its track or play state changes.
- * Needs notification-listener access (the same one the island already has). All callbacks run on the main thread; a
- * track change usually raises the metadata and the playback callbacks back to back, so they are merged into one report.
+ * Listens to every active media session and reports a [MediaSnapshot] when its track or play state changes. Needs
+ * notification-listener access (the same one the island already has).
  */
 class MediaSessionWatcher(
     context: Context,

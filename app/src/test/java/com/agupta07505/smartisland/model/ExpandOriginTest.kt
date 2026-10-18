@@ -91,9 +91,8 @@ class ExpandOriginTest {
     }
 
     /**
-     * `IslandLayout.animatedXOffset` is `start + size / 2`, and the landscape pill's last spot
-     * (`pillExit.record`) now takes the pill's rest centre instead of that animated value. At rest (progress 0, size = the
-     * pill) the two are the same number, for a pill anywhere: inside the card, left of it, or right of it.
+     * `IslandLayout.animatedXOffset` is `start + size / 2`, and the landscape pill's last spot (`pillExit.record`)
+     * takes the pill's rest centre.
      */
     @Test
     fun islandCentreAtRestIsThePillCentre() {

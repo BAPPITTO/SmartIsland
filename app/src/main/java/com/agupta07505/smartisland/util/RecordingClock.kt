@@ -12,14 +12,6 @@ import kotlin.math.abs
 
 /**
  * Elapsed time of a screen / voice recording, tracked from the recorder's own notification.
- *
- * Why not just use `Notification.when`: recorders re-post their notification every second (or on
- * every pause / resume), and `when` then moves with it, so a timer built on it restarts, runs ahead
- * or keeps counting after the recording is saved. Instead the clock reads, in this order:
- *   1. the time written in the notification ("Currently recording 00:26"),
- *   2. the notification's chronometer base,
- *   3. its own previous value.
- * While paused or finished the value is frozen, so it never moves.
  */
 object RecordingClock {
     /** [startMillis] is `now - elapsed` while running; [frozenMs] is non-null while paused / finished. */
@@ -52,6 +44,12 @@ object RecordingClock {
         return null
     }
 
+    fun withoutPostAge(readingMs: Long?, ageMs: Long): Long? =
+        readingMs?.minus(ageMs.coerceAtLeast(0L))?.takeIf { it > 0L }
+
+    fun frozenReading(paused: Boolean, shownMs: Long?, parsedMs: Long?): Long? =
+        if (paused && shownMs != null && shownMs > 0L) shownMs else parsedMs
+
     /** Paused when a "Resume" button is offered (and no "Pause" one), or the text says "paused". */
     fun isPaused(actionTitles: List<String>, text: String): Boolean {
         val titles = actionTitles.map { it.lowercase() }
@@ -64,11 +62,26 @@ object RecordingClock {
     }
 
     /**
-     * The next clock state.
-     * @param previous the state kept for this recording, if any
-     * @param parsedMs the time read from the notification text
-     * @param chronometerBaseMs `when` of a notification that shows a count-up chronometer
-     * @param fallbackFrozenMs elapsed time read from the notification's own view, used only while paused
+     * The state a post continues from: the card's own, or, for a paused post, the app's last one. A running post
+     * never borrows another card's clock.
+     */
+    fun continuation(own: State?, lastForApp: State?, paused: Boolean): State? =
+        own ?: lastForApp?.takeIf { paused }
+
+    /**
+     * Paused state that survives a clock app's cancel-and-repost (the new post may show neither "Resume" nor
+     * "paused"). Counts as running again only once the app offers "Pause".
+     */
+    fun resolvePaused(detected: Boolean, lastForApp: State?, actionTitles: List<String>): Boolean {
+        if (detected) return true
+        if (lastForApp?.frozenMs == null) return false
+        val offersPause = actionTitles.any { t -> PAUSE_WORDS.any { t.lowercase().contains(it) } }
+        return !offersPause
+    }
+
+    /**
+     * The next clock state. [exactFrozenMs] ([TimerClock.elapsedFromChronometer]) wins while paused; [exactStart]
+     * means [chronometerBaseMs] is exact, so the start is not smoothed towards the previous one.
      */
     fun next(
         previous: State?,
@@ -77,12 +90,19 @@ object RecordingClock {
         finished: Boolean,
         parsedMs: Long?,
         chronometerBaseMs: Long?,
-        fallbackFrozenMs: Long? = null
+        fallbackFrozenMs: Long? = null,
+        exactFrozenMs: Long? = null,
+        exactStart: Boolean = false
     ): State {
         val previousElapsed = previous?.elapsedMs(nowMillis)
+        if (paused && !finished && exactFrozenMs != null && exactFrozenMs >= 0L) {
+            return State(startMillis = nowMillis - exactFrozenMs, frozenMs = exactFrozenMs)
+        }
+        if (paused && !finished && previous?.frozenMs != null) {
+            return previous
+        }
         if (paused || finished) {
-            // A paused post often carries no time, or a bogus "00:00". Prefer a real positive reading, then the
-            // clock that was running up to the pause, then the notification view's own chronometer.
+            // A paused post often prints 00:00.
             val frozen = parsedMs?.takeIf { it > 0L }
                 ?: previousElapsed?.takeIf { it > 0L }
                 ?: fallbackFrozenMs?.takeIf { it > 0L }
@@ -96,15 +116,14 @@ object RecordingClock {
             ?: previousElapsed
             ?: 0L
         val candidateStart = nowMillis - elapsed
-        // Whole-second text makes the start jitter by up to a second; keep the old start unless the
-        // recorder's own time has really moved away from it.
-        val start = if (previous != null && previous.frozenMs == null &&
+        // Keep the old start unless it moved beyond whole-second jitter.
+        val start = if (!exactStart && previous != null && previous.frozenMs == null &&
             abs(previous.startMillis - candidateStart) <= JITTER_MS
         ) previous.startMillis else candidateStart
         return State(startMillis = start, frozenMs = null)
     }
 
-    /** True when a recorder's notification is a paused recording (still ongoing in spirit). */
+    /** True when a recorder's notification is a paused recording. */
     fun looksPaused(n: Notification): Boolean {
         val titles = runCatching { n.actions.orEmpty().map { it.title?.toString().orEmpty() } }
             .getOrDefault(emptyList())

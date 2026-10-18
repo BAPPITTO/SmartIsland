@@ -7,7 +7,7 @@
 
 package com.agupta07505.smartisland.model
 
-/** Where a transfer card is in its life. Shown as the badge on the expanded card. */
+/** Where a transfer card is in its life; shown as the badge on the expanded card. */
 enum class TransferState(val badge: String?) {
     ACTIVE(null),
     PAUSED("Paused"),

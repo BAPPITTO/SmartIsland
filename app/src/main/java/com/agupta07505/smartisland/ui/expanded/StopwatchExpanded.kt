@@ -36,6 +36,7 @@ import com.agupta07505.smartisland.ui.IslandText as Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -128,7 +129,7 @@ private fun StopwatchExpandedMiui(
         frozenElapsedSeconds,
         chronometerBase
     ) {
-        mutableStateOf(
+        mutableLongStateOf(
             frozenElapsedSeconds
                 ?: chronometerBase?.let { base ->
                     (
@@ -155,7 +156,7 @@ private fun StopwatchExpandedMiui(
     }
 
     var lapCount by remember(notification?.key) {
-        mutableStateOf(notificationLapCount)
+        mutableIntStateOf(notificationLapCount)
     }
 
     LaunchedEffect(
@@ -207,7 +208,6 @@ private fun StopwatchExpandedMiui(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Left: Stopwatch Glyph & Time
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)
@@ -260,12 +260,10 @@ private fun StopwatchExpandedMiui(
             }
         }
 
-        // Right: Interactive Quick Actions (Lap, Pause/Resume, Reset)
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 1. Lap Button
             val lapAction = notification?.actionIntents?.firstOrNull {
                 it.title.contains("lap", ignoreCase = true) || it.title.contains("split", ignoreCase = true)
             }
@@ -300,7 +298,6 @@ private fun StopwatchExpandedMiui(
                 )
             }
 
-            // 2. Pause / Resume Button
             val pauseAction = if (isPaused) {
                 notification?.actionIntents?.firstOrNull { action ->
                     resumeKeywords.any {
@@ -346,7 +343,6 @@ private fun StopwatchExpandedMiui(
                 )
             }
 
-            // 3. Reset / Stop Button
             val resetAction = notification?.actionIntents?.firstOrNull {
                 val t = it.title.lowercase()
                 t.contains("reset") || t.contains("stop") || t.contains("clear") || t.contains("cancel")
@@ -426,7 +422,6 @@ private fun StopwatchExpandedCurrent(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Left: Stopwatch Glyph & Time
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)
@@ -477,12 +472,11 @@ private fun StopwatchExpandedCurrent(
             }
         }
 
-        // Right: Interactive Quick Actions (Lap, Pause/Resume, Reset)
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 1. Lap: only shown when the stopwatch app offers a Lap button. The app owns the lap list.
+            // Lap: only shown when the stopwatch app offers a Lap button. The app owns the lap list.
             val lapAction = notification.actionWithRole(ActionRole.Lap)
             if (lapAction != null && notification != null && !isPaused) {
                 Box(
@@ -502,7 +496,6 @@ private fun StopwatchExpandedCurrent(
                 }
             }
 
-            // 2. Pause / Resume: the app's own button.
             val toggleAction = if (isPaused) notification.actionWithRole(ActionRole.Resume)
             else notification.actionWithRole(ActionRole.Pause)
             if (toggleAction != null && notification != null) {
@@ -527,7 +520,6 @@ private fun StopwatchExpandedCurrent(
                 }
             }
 
-            // 3. Reset / Stop: the app's own button, then clear the island card.
             val resetAction = notification.actionWithRole(ActionRole.Reset, ActionRole.Stop)
             if (resetAction != null && notification != null) {
                 Box(
@@ -536,9 +528,11 @@ private fun StopwatchExpandedCurrent(
                         .clip(CircleShape)
                         .background(LocalIslandPalette.current.pick(Color(0xFF3F3F46), Color(0xFFC9C8CB)))
                         .bounceClick {
-                            notification.fireAction(context, resetAction)
-                            SmartIslandRepositories.notificationRepository(context).removeNotification(notification.key)
-                            onCollapse()
+                            // Clear the card only if the press was delivered.
+                            if (notification.fireAction(context, resetAction)) {
+                                SmartIslandRepositories.notificationRepository(context).removeNotification(notification.key)
+                                onCollapse()
+                            }
                         },
                     contentAlignment = Alignment.Center
                 ) {
@@ -551,7 +545,7 @@ private fun StopwatchExpandedCurrent(
                 }
             }
 
-            // 4. Any other button the stopwatch app put in its notification, shown as the app labels it.
+            // Any other button the stopwatch app put in its notification, shown as the app labels it.
             if (notification != null) {
                 notification.leftoverActions(lapAction, toggleAction, resetAction).forEach {
                     ShadeActionChip(notification, it, stopwatchColor)

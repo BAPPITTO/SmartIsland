@@ -48,9 +48,9 @@ import androidx.compose.runtime.setValue
 /**
  * Secondary / tertiary cutout state for [IslandOverlayView] (see [IslandLayout]).
  *
- * The animated values are held as State objects behind getters, like [IslandLayout]. They used to be read
- * in rememberIslandSecondary, i.e. inside the root composable, so with two cards on the island (a live event plus a
- * notification) the WHOLE overlay recomposed on every frame of an expand, a collapse or a card arriving. Now a read in a
+ * The animated values are held as State objects behind getters, like [IslandLayout]. Reading them in
+ * rememberIslandSecondary, i.e. inside the root composable, would recompose the WHOLE overlay on every frame of an expand, a
+ * collapse or a card arriving with two cards on the island (a live event plus a notification). So a read in a
  * graphicsLayer / layout / offset lambda only re-runs that lambda, and the `*Shown` flags (derived, they flip once per
  * animation) are what composition looks at.
  */
@@ -65,7 +65,6 @@ internal class IslandSecondary(
     private val secondaryAlphaState: State<Float>,
     private val secondaryScaleState: State<Float>,
     private val secondaryBubbleWidthState: State<Dp>,
-    /** Width of the bubble as a circle and as the mini pill, and which one it is heading for (for [secondaryPillProgress]). */
     private val circleSize: Dp,
     private val miniPillWidth: Dp,
     private val secondaryIsPill: Boolean,
@@ -77,7 +76,6 @@ internal class IslandSecondary(
     val secondaryMergeAnim: androidx.compose.animation.core.Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
     val idleDotShown: Boolean,
     val idleDotAlpha: Float,
-    /** The corner pill / secondary bubble / tertiary pill / merge backdrop are drawn at all (derived: they flip once, not per frame). */
     private val cornerPillShownState: State<Boolean>,
     private val secondaryShownState: State<Boolean>,
     private val tertiaryShownState: State<Boolean>,
@@ -92,7 +90,6 @@ internal class IslandSecondary(
     val tertiaryScale: Float get() = tertiaryScaleState.value
     val secondaryOffset: Dp get() = secondaryOffsetState.value
 
-    /** 0 = the bubble is a circle, 1 = it has become the mini pill. */
     val secondaryPillProgress: Float
         get() {
             val delta = (miniPillWidth - circleSize).value
@@ -136,7 +133,6 @@ internal fun rememberIslandSecondary(
     val compactGap = layout.compactGap
     val compactShapes = layout.compactShapes
     val animSpeed = settings.animationSpeed(isLandscape)
-    val screenShareBubble = layout.screenShareBubble
     val hasCompanion = layout.hasCompanion
     val isCircleLeft = layout.isCircleLeft
     val collapsedMainLeft = layout.collapsedMainLeft
@@ -148,14 +144,10 @@ internal fun rememberIslandSecondary(
     val isHiding = layout.isHiding
     val collapsedTopShift = layout.collapsedTopShift
 
-    // Dual Pill (Multi-Tasking Split Island) Detection:
-    // When 2 or more notifications exist (e.g. Music + Notification/Timer/Call), split into Main Pill + Secondary Bubble
-    // Same-app cards: only while the island is expanded, the secondary round cutout shows the next
-    // card from the same app as the current one, and tapping it switches to that card.
-    // The same-app rule applies to the expanded island: a sibling from the same app turns the
-    // secondary cutout into the picker button; without one it shows the other card (pill / cutout)
-    // so neither vanishes while the island is open.
-    val sameAppRule = expanded && !screenShareBubble
+    // The same-app rule applies to the expanded island: a sibling from the same app turns the secondary cutout into
+    // the picker button; without one it shows the other card (pill / cutout) so neither vanishes while the island is
+    // open.
+    val sameAppRule = expanded
     val sameAppIndex = if (!settings.enableNotchMode && sameAppRule) {
         nextSameAppIndex(notifications, safeIndex)
     } else -1
@@ -177,7 +169,7 @@ internal fun rememberIslandSecondary(
         notifications.indexOfFirst { it.key == tertiaryNotification.key }
     } else -1
     val isSplitMode = hasCompanion
-    val secondaryIsPill = !screenShareBubble && !sameAppCompanion &&
+    val secondaryIsPill = !sameAppCompanion &&
         compactShapes.singleOrNull() == CompactNotificationShape.MiniPill
     val showTertiaryPill = compactShapes.size == 2 && tertiaryNotification != null
 
@@ -260,21 +252,16 @@ internal fun rememberIslandSecondary(
         label = "secondaryOffset"
     )
 
-    // Idle merge (collapsed island only): when the secondary round cutout has not been interacted
-    // with for SECONDARY_IDLE_MS, it merges into the primary cutout. Any touch on the island, a new
-    // or changed card, or expanding the island brings it back. The expanded island, including its
-    // same-app secondary cutout, never uses this timer, and the screen-share cast icon is exempt
-    // because it is a status indicator.
-    val secondaryCanIdleMerge = !expanded && !screenShareBubble && secondaryNotification != null && !isHiding
+    // Idle merge (collapsed island only): when the secondary round cutout has not been interacted with for
+    // SECONDARY_IDLE_MS, it merges into the primary cutout.
+    val secondaryCanIdleMerge = !expanded && secondaryNotification != null && !isHiding
     var secondaryIdleMerged by remember { mutableStateOf(false) }
-    // A privacy indicator merges as soon as its hold is over (the controller keeps it for MERGE_MS).
-    val privacyCanMerge = !expanded && screenShareBubble && layout.privacyMerging && !isHiding
     // Idle circle pressed: the secondary cutout merges into the collapsed pill now, together with the expanded island's close
     // (step 1 of the idle-circle close), and only then the pill leaves (step 2).
     val idleCloseMerge = forceMerge && secondaryCanIdleMerge
-    LaunchedEffect(secondaryCanIdleMerge, userInteractionTimestamp, settings.secondaryMergeMs, privacyCanMerge, idleCloseMerge) {
+    LaunchedEffect(secondaryCanIdleMerge, userInteractionTimestamp, settings.secondaryMergeMs, idleCloseMerge) {
         secondaryIdleMerged = false
-        if (privacyCanMerge || idleCloseMerge) {
+        if (idleCloseMerge) {
             secondaryIdleMerged = true
             return@LaunchedEffect
         }
@@ -283,24 +270,11 @@ internal fun rememberIslandSecondary(
         secondaryIdleMerged = true
     }
     val secondaryMergeAnim = remember { androidx.compose.animation.core.Animatable(0f) }
-    // Diagnostic for the warped-cutout report: once the open island has settled, log what the round cutout is
-    // drawn with (width vs. circle size, merge, scale) so a bad frame can be traced in the diagnostic log.
-    LaunchedEffect(expanded, secondaryIsPill, sameAppCompanion) {
-        if (!expanded || secondaryNotification == null) return@LaunchedEffect
-        kotlinx.coroutines.delay(900)
-        com.agupta07505.smartisland.util.AppLogRecorder.i(
-            "SecondaryDiag",
-            "expanded pill=$secondaryIsPill picker=$sameAppCompanion width=${secondaryBubbleWidthState.value.value} circle=${circleSize.value} " +
-                "mini=${miniPillWidth.value} merge=${secondaryMergeAnim.value} scale=${secondaryScaleState.value} corner=${secondaryBubbleCornerState.value.value}"
-        )
-    }
-    val secondaryBubblePresent = screenShareBubble || secondaryNotification != null
+    val secondaryBubblePresent = secondaryNotification != null
     LaunchedEffect(secondaryIdleMerged, expanded, settings.mergeStyle, secondaryBubblePresent, holdMerge, idleCloseMerge) {
         if (holdMerge && !secondaryBubblePresent && !expanded) {
-            // The pill is leaving and the last card went: finish the merge it was in (no snap back to apart), while the
-            // cutout fades with its normal animation.
-            // The secondary rides along with the pill, so the rest of the merge is squeezed into the pill's own
-            // spring length: the whole close stays short instead of dragging on after the pill is gone.
+            // The pill is leaving and the last card went: finish the merge it was in (no snap back to apart), while
+            // the cutout fades with its normal animation.
             val remainingMs = (settings.mergeStyleKind().baseDurationMs * (1f - secondaryMergeAnim.value)).toInt().coerceAtLeast(60)
             val pillSpringMs = com.agupta07505.smartisland.model.pillSpringSettleMs(
                 animSpeed.stiffness(com.agupta07505.smartisland.model.PILL_SPRING_STIFFNESS)
@@ -310,9 +284,8 @@ internal fun rememberIslandSecondary(
                 animationSpec = tween(minOf(animSpeed.durationMs(remainingMs), pillSpringMs), easing = MERGE_IN_EASING)
             )
         } else if (secondaryIdleMerged) {
-            // The small bubble slides sideways to the big one, pulled in as it nears
-            // (the bubble slides to the pill's side and fuses into it, see mergeTravelDp / mergeSwell).
-            // Forced by the idle circle (step 1 of the close): the merge lasts as long as the expanded island's close, not its usual length.
+            // The small bubble slides sideways to the big one, pulled in as it nears (the bubble slides to the pill's
+            // side and fuses into it, see mergeTravelDp / mergeSwell).
             val mergeMs = if (idleCloseMerge && forcedMergeMs > 0) {
                 animSpeed.systemDurationMs(forcedMergeMs)
             } else {
@@ -323,7 +296,7 @@ internal fun rememberIslandSecondary(
                 animationSpec = tween(mergeMs, easing = MERGE_IN_EASING)
             )
         } else if (expanded || !secondaryBubblePresent) {
-            // No cutout left (expanded, or a privacy cutout that has merged away): reset without animating,
+            // No cutout left (expanded, or none to show): reset without animating,
             // so the next cutout starts apart instead of mid-return.
             secondaryMergeAnim.snapTo(0f)
         } else {
@@ -331,14 +304,13 @@ internal fun rememberIslandSecondary(
         }
     }
 
-    // Idle dot: a permanent control (tap and long press only) at the idle spot while a card is on the island (landscape only; portrait uses the pill's centre).
-    // One tap puts every card away at once (no idle wait); see model/LandscapeIdleDot.kt.
+    // Idle dot: a permanent control (tap and long press only) at the idle spot while a card is on the island
+    // (landscape only; portrait uses the pill's centre).
     val idleDotShown = !settings.enableNotchMode && com.agupta07505.smartisland.model.shouldShowIdleDot(
         dot = landscapeDot,
         hasCards = com.agupta07505.smartisland.model.pillOnIsland(notifications.isNotEmpty(), widgetPill),
         isLandscape = isLandscape
     )
-    // A control only: on or off, no fade.
     val idleDotAlpha = if (idleDotShown) 1f else 0f
     val cornerPillShownState = remember(cornerPillAlphaState) { derivedStateOf { cornerPillAlphaState.value > 0.01f } }
     val secondaryShownState = remember(secondaryAlphaState, secondaryMergeAnim) {

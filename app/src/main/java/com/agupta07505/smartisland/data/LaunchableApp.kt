@@ -19,10 +19,7 @@ data class LaunchableApp(
 )
 
 object AppShortcutProvider {
-    /**
-     * The pinned entries whose apps are still installed, in the order they were pinned. A folder comes back as one
-     * [LaunchableApp] whose packageName is the folder's entry string (see [PinnedApps.isFolder]) and whose label lists its apps.
-     */
+    /** The pinned entries whose apps are still installed, in the order they were pinned. */
     fun selectedApps(context: Context, packages: List<String>): List<LaunchableApp> =
         packages.mapNotNull { entry ->
             if (PinnedApps.isFolder(entry)) {

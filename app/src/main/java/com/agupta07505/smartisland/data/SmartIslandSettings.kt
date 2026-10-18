@@ -51,8 +51,8 @@ data class SmartIslandSettings(
     val welcomeDialogShown: Boolean = false,
     val showOnLockScreen: Boolean = false,
     /**
-     * Live cards (music, navigation, timers, recordings, downloads, live activities) of the app that is in the foreground.
-     * Off by default: the app shows them itself, so the island hides them. On: the island keeps showing them.
+     * Live cards (music, navigation, timers, recordings, downloads, live activities) of the app that is in the
+     * foreground.
      */
     val showLiveEventsInForeground: Boolean = false,
     val lockScreenPrivacy: String = "AppIconOnly",
@@ -71,12 +71,10 @@ data class SmartIslandSettings(
     /** False: nothing opens the island by itself while the phone is locked (cards still show in the pill). */
     val autoExpandOnLockScreen: Boolean = true,
     val enableShadow: Boolean = true,
-    val expandedBlurEnabled: Boolean = false,
+    val expandedBlurEnabled: Boolean = true,
     val expandedBlurRadius: Float = 24f,
-    /** See-through blur of whatever is behind an open card (system window blur, heavier). Off by default; the card blur above works without it. */
     /**
-     * The media (music) card has its own blur and opacity. A phone or backup saved before this
-     * existed starts from the shared values above (see the loaders), so nothing changes until the owner moves them.
+     * The media (music) card has its own blur and opacity; old saves and backups start from the shared values above.
      */
     val mediaBlurEnabled: Boolean = false,
     val mediaBlurRadius: Float = 24f,
@@ -103,6 +101,19 @@ data class SmartIslandSettings(
     val notificationCooldownSystemEvents: Set<String> = emptySet(),
     val developerModeEnabled: Boolean = true,
     val recordLogs: Boolean = false,
+    /** What starts the Face ID unlock animation's tick: "face_only" (the system's face-unlock success) or "any" (any unlock). */
+    val faceUnlockMode: String = "face_only",
+    /** How the Face ID unlock animation looks: "square" (opens below the cutout) or "cutout" (stays on the cutout). */
+    val faceIdStyle: String = "square_tick",
+    /**
+     * Whether the Face ID animation also plays when an app's lock prompt (the phone's app lock) scans the face. Read
+     * from the system log, so it needs Shizuku.
+     */
+    val appFaceIdEnabled: Boolean = true,
+    /** How the app Face ID animation looks: "square_tick" (expanded), "square" (mix) or "cutout". Independent of [faceIdStyle]. */
+    val appFaceIdStyle: String = "square_tick",
+    /** Whether a fingerprint unlock plays the fingerprint scan animation (lock screen and app prompts). */
+    val fingerprintAnimationEnabled: Boolean = true,
     /** App theme: "system" (follow the phone), "light" or "dark". */
     val themeMode: String = "system",
     /** App theme: the liquid glass look (translucent glass panels over a soft colour backdrop). Off gives the flat Material 3 look. */
@@ -111,7 +122,7 @@ data class SmartIslandSettings(
     val materialYou: Boolean = false,
     /** App theme: the accent colour (ARGB) the whole palette is built from when Material You is off. */
     val accentColor: Long = DEFAULT_ACCENT_COLOR,
-    /** Look of the expanded island: "dark" (the original look), "light", or "system" (follows the phone's light / dark setting). */
+    /** Look of the expanded island: "dark", "light", or "system" (follows the phone's light / dark setting). */
     val expandedTheme: String = EXPANDED_THEME_DARK,
     /** Font of the island's text: one of [VALID_FONTS] ("serif" is the phone's serif font) or a custom font id (`custom:<file name>`). */
     val islandFont: String = FONT_LORA,
@@ -137,34 +148,36 @@ data class SmartIslandSettings(
     val swipeHoldUpAction: String = "DismissAll",
     val swipeDownAction: String = "None",
     val swipeDownCollapsedAction: String = "Expand",
-    val swipeLeftAction: String = "None",
-    val swipeRightAction: String = "None",
+    val swipeLeftAction: String = "NextEvent",
+    val swipeRightAction: String = "PreviousEvent",
     val swipeHorizontalCollapsedAction: String = "NextPrevious",
     val enablePillSwipeActions: Boolean = true,
     val pillSwipeUpAction: String = "DismissCurrent",
     val pillSwipeDownAction: String = "Expand",
-    val pillSwipeLeftAction: String = "PreviousNotification",
-    val pillSwipeRightAction: String = "NextNotification",
+    val pillSwipeLeftAction: String = "NextEvent",
+    val pillSwipeRightAction: String = "PreviousEvent",
     // Long press on the collapsed pill. One real action (hide / show the pill) or "None" to turn it off.
     val longPressAction: String = "TogglePill",
     val circlePosition: String = CIRCLE_POSITION_RIGHT,
     /**
-     * Portrait collapsed cutout with content (a card on the pill): true keeps the idle cutout's size; false stretches the pill to
-     * [contentPillWidthPercent] of its idle width when a card arrives and shrinks it back when the card is put away.
+     * Portrait collapsed cutout with content (a card on the pill): true keeps the idle cutout's size; false stretches
+     * the pill to [contentPillWidthPercent] of its idle width when a card arrives and shrinks it back when the card
+     * is put away.
      */
     val contentPillSameAsIdle: Boolean = false,
     val contentPillWidthPercent: Float = DEFAULT_CONTENT_PILL_PERCENT,
     /**
-     * Landscape: the pill with a card on it against the pill that only carries the idle widgets (the landscape width). On by default,
-     * so the pill the user tuned keeps its size.
+     * Landscape: the pill with a card on it against the pill that only carries the idle widgets (the landscape
+     * width). On by default, so the pill the user tuned keeps its size.
      */
     val contentPillSameAsIdleLandscape: Boolean = true,
     /** Apps that switch the island totally off while they are in the foreground, per orientation (see model/IslandExemption). */
     val islandExemptApps: Set<String> = emptySet(),
     val islandExemptAppsLandscape: Set<String> = emptySet(),
+    /** Portrait only: apps that keep the collapsed pill on screen but dead (no content, no popups, no touches) while in the foreground. */
+    val islandExemptAppsStatic: Set<String> = emptySet(),
     val contentPillWidthPercentLandscape: Float = DEFAULT_CONTENT_PILL_PERCENT,
-    // ---- Landscape profile (independent of the portrait fields above) ----
-    // Legacy since LR4 (idle landscape cutout is always the camera circle); kept for old backups.
+    // Legacy: kept so old backups still load.
     val landscapeShape: String = LANDSCAPE_SHAPE_PILL,
     val landscapeWidth: Float = 112f,
     val landscapeHeight: Float = 34f,
@@ -185,7 +198,6 @@ data class SmartIslandSettings(
     // `landscapeXOffset` is the horizontal fine tuning added on top of that position.
     val landscapePillPosition: String = LANDSCAPE_POSITION_MIDDLE,
     val disabledEventsLandscape: Set<String> = emptySet(),
-    // ---- Timing (Settings > Timing). Defaults equal the old fixed values in IslandTimings. ----
     /** Collapsed island with only static cards falls back to the idle cutout after this long. */
     val idleTimeoutMs: Int = IslandTimings.STATIC_IDLE_TIMEOUT_MS.toInt(),
     /** Low battery, battery saver and fully charged cards leave the island after this long. */
@@ -196,9 +208,11 @@ data class SmartIslandSettings(
     val secondaryMergeMs: Int = IslandTimings.SECONDARY_IDLE_MS.toInt(),
     /** A download / upload card the app has not updated for this many minutes is dropped. 0 = never. */
     val transferExpiryMinutes: Int = DEFAULT_TRANSFER_EXPIRY_MINUTES,
-    // ---- Idle widgets: live readouts in the collapsed cutout while no event shows (model/IdleWidget.kt). ----
     val idleWidgetsEnabled: Boolean = false,
-    /** The landscape profile's own on / off switch (the portrait one is [idleWidgetsEnabled]). Old installs start from the portrait value. */
+    /**
+     * The landscape profile's own on / off switch (the portrait one is [idleWidgetsEnabled]). Old installs start from
+     * the portrait value.
+     */
     val idleWidgetsEnabledLandscape: Boolean = false,
     /** Idle widgets go off after a tap on the cutout closed the island, per orientation (see model/IdleWidgetOff). */
     val idleOffAfterTapClose: Boolean = false,
@@ -217,10 +231,20 @@ data class SmartIslandSettings(
     val idleWidgetCycleSeconds: Int = com.agupta07505.smartisland.model.IdleWidgets.DEFAULT_CYCLE_SECONDS,
     /** Seconds without a touch until the semi-expanded widget island closes by itself; 0 = never (see model/WidgetIslandTimer). */
     val widgetIslandCloseSeconds: Int = com.agupta07505.smartisland.model.WidgetIslandTimer.DEFAULT_SECONDS,
-    /** What the charging battery island shows besides percent, time to full and temperature: WATT or VOLT ([com.agupta07505.smartisland.model.WidgetIslandContent.BATTERY_WATT]). */
+    /**
+     * What the charging battery island shows besides percent, time to full and temperature: WATT or VOLT
+     * ([com.agupta07505.smartisland.model.WidgetIslandContent.BATTERY_WATT]).
+     */
     val widgetIslandBatteryMetric: String = com.agupta07505.smartisland.model.WidgetIslandContent.BATTERY_WATT,
     /** The next-alarm widget stays off the pill while the alarm is more than 12 hours away. */
     val idleAlarmHideBeyond12h: Boolean = false,
+    /** The battery widget takes a turn only while charging. Off (the default): it also shows the level while not charging. */
+    val batteryOnlyWhenCharging: Boolean = false,
+    /**
+     * The 2.5 s sideways beat of the idle glyphs only plays when a value on the widget changed. Off (the default): it
+     * plays on every beat.
+     */
+    val idleBeatOnlyOnChange: Boolean = false,
     /** Font of the collapsed pill's idle glyphs: empty = the island font, else a [VALID_FONTS] id or a custom font id. */
     val idleGlyphFont: String = "",
     /** Size of the idle glyphs in percent of the normal size (see model/IdleSlots). */
@@ -228,9 +252,68 @@ data class SmartIslandSettings(
     /** AUTO (device region), C or F. */
     val idleWidgetTempUnit: String = com.agupta07505.smartisland.model.IdleWidgets.UNIT_AUTO,
     val idleWidgetWindUnit: String = com.agupta07505.smartisland.model.IdleWidgets.UNIT_AUTO,
-    /** How the idle glyphs change: [com.agupta07505.smartisland.model.LedTick.STYLE_SMOOTH] (the heavy tick) or [com.agupta07505.smartisland.model.LedTick.STYLE_LED] (footsteps on an LED grid). */
+    /** Where the weather's place comes from ([com.agupta07505.smartisland.model.WeatherConfig.SOURCE_AUTO], MANUAL or LAST_KNOWN). */
+    val weatherLocationSource: String = com.agupta07505.smartisland.model.WeatherConfig.SOURCE_AUTO,
+    /** The city picked for the manual source (display name, blank = none) and its place, rounded to one decimal. */
+    val weatherManualCity: String = "",
+    val weatherManualLat: Float = 0f,
+    val weatherManualLon: Float = 0f,
+    /** Minutes between weather lookups; 0 = only when asked ([com.agupta07505.smartisland.model.WeatherConfig.REFRESH_CHOICES]). */
+    val weatherRefreshMinutes: Int = com.agupta07505.smartisland.model.WeatherConfig.DEFAULT_REFRESH_MINUTES,
+    /** [com.agupta07505.smartisland.model.WeatherConfig.PROVIDER_OPEN_METEO] or PROVIDER_CUSTOM (an Open-Meteo compatible service). */
+    val weatherProvider: String = com.agupta07505.smartisland.model.WeatherConfig.PROVIDER_OPEN_METEO,
+    val weatherCustomUrl: String = "",
+    /** The custom provider's API key. Kept on the device only: it is left out of backups. */
+    val weatherCustomKey: String = "",
+    /** What the idle weather pill shows ([com.agupta07505.smartisland.model.WeatherPill]). */
+    val weatherPillMode: String = com.agupta07505.smartisland.model.WeatherPill.TEMP_ICON,
+    /** The extra island rows, as a comma list of [com.agupta07505.smartisland.model.WeatherReadouts] ids; empty = the plain island. */
+    val weatherIslandReadouts: String = "",
+    /** The weather glyph moves (sun spin, rain fall). The system "remove animations" setting always wins. */
+    val weatherIconAnimated: Boolean = true,
+    /** Hold the weather glyph still while Battery Saver is on. */
+    val weatherIconPauseOnSaver: Boolean = true,
+    /** When the weather widget takes a turn on the pill ([com.agupta07505.smartisland.model.WeatherRules.MODE_ALWAYS] or MODE_NOTABLE). */
+    val weatherShowRule: String = com.agupta07505.smartisland.model.WeatherRules.MODE_ALWAYS,
+    /** The triggers of "only when notable", as a comma list of [com.agupta07505.smartisland.model.WeatherRules] ids; never empty. */
+    val weatherNotableTriggers: String = com.agupta07505.smartisland.model.WeatherRules.DEFAULT_TRIGGERS,
+    /** Notable when at or above this temperature (Celsius). */
+    val weatherHotC: Int = com.agupta07505.smartisland.model.WeatherRules.DEFAULT_HOT_C,
+    /** Notable when at or below this temperature (Celsius). */
+    val weatherColdC: Int = com.agupta07505.smartisland.model.WeatherRules.DEFAULT_COLD_C,
+    /** Keep the weather widget off the pill between [weatherNightStartHour] and [weatherNightEndHour]. */
+    val weatherHideAtNight: Boolean = false,
+    val weatherNightStartHour: Int = com.agupta07505.smartisland.model.WeatherRules.DEFAULT_NIGHT_START,
+    val weatherNightEndHour: Int = com.agupta07505.smartisland.model.WeatherRules.DEFAULT_NIGHT_END,
+    /**
+     * The net speed widget only takes a turn on the pill above this speed in KB/s (0 = Off: always in the rotation).
+     */
+    val netSpeedThresholdKbps: Int = com.agupta07505.smartisland.model.NetSpeedRules.DEFAULT_KBPS,
+    /** The net speed widget shows on any connection, on Wi-Fi only or on mobile data only. */
+    val netSpeedConnection: String = com.agupta07505.smartisland.model.NetSpeedRules.CONN_ANY,
+    /**
+     * Per-widget schedules: which widgets rotate during work hours, at night, or while charging. The hidden lists are
+     * comma lists of widget ids.
+     */
+    val idleScheduleWorkEnabled: Boolean = false,
+    val idleScheduleWorkHidden: String = "",
+    val idleScheduleWorkStartHour: Int = com.agupta07505.smartisland.model.IdleSchedule.DEFAULT_WORK_START,
+    val idleScheduleWorkEndHour: Int = com.agupta07505.smartisland.model.IdleSchedule.DEFAULT_WORK_END,
+    val idleScheduleWorkWeekdaysOnly: Boolean = true,
+    val idleScheduleNightEnabled: Boolean = false,
+    val idleScheduleNightHidden: String = "",
+    val idleScheduleNightStartHour: Int = com.agupta07505.smartisland.model.IdleSchedule.DEFAULT_NIGHT_START,
+    val idleScheduleNightEndHour: Int = com.agupta07505.smartisland.model.IdleSchedule.DEFAULT_NIGHT_END,
+    val idleScheduleChargingEnabled: Boolean = false,
+    val idleScheduleChargingHidden: String = "",
+    /** The widget that always leads the rotation (a widget id); empty = none. */
+    val idleWidgetPinnedFirst: String = "",
+    /**
+     * How the idle glyphs change: [com.agupta07505.smartisland.model.LedTick.STYLE_SMOOTH] (the heavy tick) or
+     * [com.agupta07505.smartisland.model.LedTick.STYLE_LED] (footsteps on an LED grid).
+     */
     val idleTickStyle: String = com.agupta07505.smartisland.model.LedTick.STYLE_SMOOTH,
-    /** Hops per change for the LED style, repeated in turn: "1, 2, 3, 2, 5" (see [com.agupta07505.smartisland.model.LedTick.parsePattern]). */
+    /** Hops per change for the LED style, repeated in turn: "4, 5, 4" (see [com.agupta07505.smartisland.model.LedTick.parsePattern]). */
     val ledTickPattern: String = com.agupta07505.smartisland.model.LedTick.DEFAULT_PATTERN,
     /** Milliseconds between the hops of the LED style. */
     val ledTickPaceMs: Int = com.agupta07505.smartisland.model.LedTick.DEFAULT_PACE_MS,
@@ -240,73 +323,64 @@ data class SmartIslandSettings(
     val ledTickColor: String = com.agupta07505.smartisland.model.LedTick.COLOR_RED,
     /** The value slot steps half a pace after the glyph slot (footsteps) instead of both together. */
     val ledTickStagger: Boolean = true,
-    // ---- Animation speed per orientation (Layout tab): relaxed / normal / snappy. ----
     val animSpeedPortrait: String = AnimationSpeed.ID_RELAXED,
     val animSpeedLandscape: String = AnimationSpeed.ID_RELAXED,
-    /** How the secondary round cutout merges into the primary one: "slide" (original) or "bubble". */
+    /** How the secondary round cutout merges into the primary one: "slide" or "bubble". */
     val mergeStyle: String = MergeStyle.ID_SLIDE,
     /** Same choice for landscape. Old backups and old installs start from the shared [mergeStyle] they had. */
     val mergeStyleLandscape: String = MergeStyle.ID_SLIDE,
-    // ---- Do Not Disturb ----
     /** Keep showing cards while Do Not Disturb hides notifications from the shade. Sound stays muted. */
     val showDuringDnd: Boolean = false,
-    // ---- Haptics: strength of the vibration for expand, collapse, swipe actions and the hold ----
     val hapticStrength: String = HapticStrength.ID_NORMAL,
-    // ---- Floating window: the white pull handle on the expanded card and the Floating window swipe action ----
     /** Off hides the white pill (and its pull animation) and makes the Floating window swipe action do nothing. */
     val floatingWindowEnabled: Boolean = true,
     /** [com.agupta07505.smartisland.model.FloatingWindowMode] id: Android's own freeform, or LMO Freeform. */
     val floatingWindowMode: String = com.agupta07505.smartisland.model.FloatingWindowMode.ID_SYSTEM,
-    // ---- Gestures: how easily swipes fire (distance and how clearly one direction must win) ----
     val gestureSensitivity: String = GestureSensitivity.ID_NORMAL,
-    // ---- Per-app event rules (deny sets: an app in no set behaves as before). Sound uses disabledSoundPackages. ----
+    // Deny sets: an app in no set gets the default. Sound uses disabledSoundPackages.
     /** Apps whose cards never open into the expanded card. */
     val noExpandPackages: Set<String> = emptySet(),
     /** Apps whose new notifications never open the card by themselves (beats the loud-notification exception). */
     val noAutoExpandPackages: Set<String> = emptySet(),
     /**
-     * Apps the user switched auto-expand ON for. An app in neither set is at its default: only its loud
-     * (non-silent) notifications open the card by themselves.
+     * Apps the user switched auto-expand ON for. An app in neither set is at its default: only its loud (non-silent)
+     * notifications open the card by themselves.
      */
     val autoExpandPackages: Set<String> = emptySet(),
     /** System events (event ids) that never open the card by themselves; they still show in the pill. */
     val noAutoExpandEvents: Set<String> = emptySet(),
     /**
-     * True: while the phone is locked no event shows in the collapsed pill (calls excepted); the idle
-     * cutout stays. Only matters when [showOnLockScreen] is on. Off by default, so nothing changes.
+     * True: while the phone is locked no event shows in the collapsed pill (calls excepted); the idle cutout stays.
+     * Only matters when [showOnLockScreen] is on.
      */
     val hideAllOnLockScreen: Boolean = false,
     /** Event ids whose card (or privacy dot) is kept out of the pill while the phone is locked. */
     val hideOnLockScreenEvents: Set<String> = emptySet(),
     /**
-     * Universal switch for app notifications. Off: the notification cards are not shown and the listener
-     * ignores the notifications completely (they stay in the system shade). On by default.
+     * Universal switch for app notifications. Off: the notification cards are not shown and the listener ignores the
+     * notifications completely (they stay in the system shade). On by default.
      */
     val notificationsEnabled: Boolean = true,
     /** Apps whose cards stay out of the pill while the phone is locked (their notifications are untouched). */
     val hideOnLockScreenPackages: Set<String> = emptySet()
 ) {
-    /** Animation speed for the orientation being rendered. */
     fun animationSpeed(isLandscape: Boolean): AnimationSpeed =
         AnimationSpeed.fromId(if (isLandscape) animSpeedLandscape else animSpeedPortrait)
 
-    /** Merge animation for the secondary round cutout. */
     fun mergeStyleKind(): MergeStyle = MergeStyle.fromId(mergeStyle)
 
     /** Merge animation of the given orientation (the overlay reads [mergeStyle] after `forOrientation` has swapped it). */
     fun mergeStyleKind(landscape: Boolean): MergeStyle =
         MergeStyle.fromId(if (landscape) mergeStyleLandscape else mergeStyle)
 
-    /** True when the given event id is not switched off by the user. */
     fun isEventEnabled(eventId: String): Boolean = eventId !in disabledEvents && !notificationsSwitchedOff(eventId)
 
-    /** True for the app-notification event while the universal notifications switch is off. */
     private fun notificationsSwitchedOff(eventId: String): Boolean =
         !notificationsEnabled && eventId == com.agupta07505.smartisland.model.IslandEvent.NOTIFICATION.id
 
     /**
-     * True when the event must stay out of the pill while the phone is locked: the universal lock-screen switch or the
-     * event's own. Calls are never hidden (a ringing call has to stay reachable).
+     * True when the event must stay out of the pill while the phone is locked: the universal lock-screen switch or
+     * the event's own. Calls are never hidden (a ringing call has to stay reachable).
      */
     /**
      * True when a card of [packageName] must stay out of the pill while the phone is locked because of the per-app
@@ -320,24 +394,22 @@ data class SmartIslandSettings(
         return hideAllOnLockScreen || eventId in hideOnLockScreenEvents
     }
 
-    /** True when the given event may open the island by itself (its own auto-expand switch is not off). */
     fun isEventAutoExpand(eventId: String): Boolean = eventId !in noAutoExpandEvents
 
-    /** True when the given event id is switched on in the landscape profile. */
     fun isLandscapeEventEnabled(eventId: String): Boolean =
         eventId !in disabledEventsLandscape && !notificationsSwitchedOff(eventId)
 
     /**
-     * True when no profile that can be shown would display the event. The notification listener
-     * ignores such events completely and leaves them in the system shade.
+     * True when no profile that can be shown would display the event. The notification listener ignores such events
+     * completely and leaves them in the system shade.
      */
     fun isEventDisabledEverywhere(eventId: String): Boolean =
         notificationsSwitchedOff(eventId) ||
             (eventId in disabledEvents && (!showInLandscape || eventId in disabledEventsLandscape))
 
     /**
-     * True when at least one displayable profile has the event switched off. The listener must not
-     * pull such a notification out of the system shade, or it would vanish in that orientation.
+     * True when at least one displayable profile has the event switched off. The listener must not pull such a
+     * notification out of the system shade, or it would vanish in that orientation.
      */
     fun isEventDisabledSomewhere(eventId: String): Boolean =
         notificationsSwitchedOff(eventId) ||
@@ -443,6 +515,11 @@ data class SmartIslandSettings(
 
         settingsObj.put("developerModeEnabled", developerModeEnabled)
         settingsObj.put("recordLogs", recordLogs)
+        settingsObj.put("faceUnlockMode", faceUnlockMode)
+        settingsObj.put("faceIdStyle", faceIdStyle)
+        settingsObj.put("appFaceIdEnabled", appFaceIdEnabled)
+        settingsObj.put("appFaceIdStyle", appFaceIdStyle)
+        settingsObj.put("fingerprintAnimationEnabled", fingerprintAnimationEnabled)
         settingsObj.put("themeMode", themeMode)
         settingsObj.put("liquidGlassTheme", liquidGlassTheme)
         settingsObj.put("materialYou", materialYou)
@@ -505,6 +582,7 @@ data class SmartIslandSettings(
         settingsObj.put("contentPillSameAsIdle", contentPillSameAsIdle)
         settingsObj.put("islandExemptApps", JSONArray().also { a -> islandExemptApps.forEach { a.put(it) } })
         settingsObj.put("islandExemptAppsLandscape", JSONArray().also { a -> islandExemptAppsLandscape.forEach { a.put(it) } })
+        settingsObj.put("islandExemptAppsStatic", JSONArray().also { a -> islandExemptAppsStatic.forEach { a.put(it) } })
         settingsObj.put("contentPillSameAsIdleLandscape", contentPillSameAsIdleLandscape)
         settingsObj.put("contentPillWidthPercentLandscape", contentPillWidthPercentLandscape.toDouble())
         settingsObj.put("contentPillWidthPercent", contentPillWidthPercent.toDouble())
@@ -514,8 +592,43 @@ data class SmartIslandSettings(
         settingsObj.put("idleWidgetCycleSeconds", idleWidgetCycleSeconds)
         settingsObj.put("widgetIslandCloseSeconds", widgetIslandCloseSeconds)
         settingsObj.put("idleAlarmHideBeyond12h", idleAlarmHideBeyond12h)
+        settingsObj.put("batteryOnlyWhenCharging", batteryOnlyWhenCharging)
+        settingsObj.put("idleBeatOnlyOnChange", idleBeatOnlyOnChange)
         settingsObj.put("idleWidgetTempUnit", idleWidgetTempUnit)
         settingsObj.put("idleWidgetWindUnit", idleWidgetWindUnit)
+        settingsObj.put("weatherLocationSource", weatherLocationSource)
+        settingsObj.put("weatherManualCity", weatherManualCity)
+        settingsObj.put("weatherManualLat", weatherManualLat.toDouble())
+        settingsObj.put("weatherManualLon", weatherManualLon.toDouble())
+        settingsObj.put("weatherRefreshMinutes", weatherRefreshMinutes)
+        settingsObj.put("weatherProvider", weatherProvider)
+        settingsObj.put("weatherCustomUrl", weatherCustomUrl)
+        // weatherCustomKey is deliberately not written: a backup file must not carry a secret.
+        settingsObj.put("weatherPillMode", weatherPillMode)
+        settingsObj.put("weatherIslandReadouts", weatherIslandReadouts)
+        settingsObj.put("weatherIconAnimated", weatherIconAnimated)
+        settingsObj.put("weatherIconPauseOnSaver", weatherIconPauseOnSaver)
+        settingsObj.put("weatherShowRule", weatherShowRule)
+        settingsObj.put("weatherNotableTriggers", weatherNotableTriggers)
+        settingsObj.put("weatherHotC", weatherHotC)
+        settingsObj.put("weatherColdC", weatherColdC)
+        settingsObj.put("weatherHideAtNight", weatherHideAtNight)
+        settingsObj.put("weatherNightStartHour", weatherNightStartHour)
+        settingsObj.put("weatherNightEndHour", weatherNightEndHour)
+        settingsObj.put("netSpeedThresholdKbps", netSpeedThresholdKbps)
+        settingsObj.put("netSpeedConnection", netSpeedConnection)
+        settingsObj.put("idleScheduleWorkEnabled", idleScheduleWorkEnabled)
+        settingsObj.put("idleScheduleWorkHidden", idleScheduleWorkHidden)
+        settingsObj.put("idleScheduleWorkStartHour", idleScheduleWorkStartHour)
+        settingsObj.put("idleScheduleWorkEndHour", idleScheduleWorkEndHour)
+        settingsObj.put("idleScheduleWorkWeekdaysOnly", idleScheduleWorkWeekdaysOnly)
+        settingsObj.put("idleScheduleNightEnabled", idleScheduleNightEnabled)
+        settingsObj.put("idleScheduleNightHidden", idleScheduleNightHidden)
+        settingsObj.put("idleScheduleNightStartHour", idleScheduleNightStartHour)
+        settingsObj.put("idleScheduleNightEndHour", idleScheduleNightEndHour)
+        settingsObj.put("idleScheduleChargingEnabled", idleScheduleChargingEnabled)
+        settingsObj.put("idleScheduleChargingHidden", idleScheduleChargingHidden)
+        settingsObj.put("idleWidgetPinnedFirst", idleWidgetPinnedFirst)
         settingsObj.put("idleTickStyle", idleTickStyle)
         settingsObj.put("ledTickPattern", ledTickPattern)
         settingsObj.put("ledTickPaceMs", ledTickPaceMs)
@@ -572,9 +685,12 @@ data class SmartIslandSettings(
         val settingsCount: Int
     )
 
+    val expandedBlurMode: ExpandedBlurMode
+        get() = if (expandedBlurEnabled) ExpandedBlurMode.Card else ExpandedBlurMode.Off
+
     /**
      * The settings the media (music) card draws with: the shared blur and opacity fields hold the media values, so
-     * every existing helper (`cardBackgroundBlur`, `islandSurface`, the blur window) works unchanged on this copy.
+     * every existing helper (`cardBackgroundBlur`, `islandSurface`) works unchanged on this copy.
      */
     fun forMedia(): SmartIslandSettings = copy(
         opacity = mediaOpacity,
@@ -582,11 +698,47 @@ data class SmartIslandSettings(
         expandedBlurRadius = mediaBlurRadius
     )
 
-    /** [forMedia] when [media] is true (the shown card is a music card), else these settings. */
     fun forCard(media: Boolean): SmartIslandSettings = if (media) forMedia() else this
 
+    fun weatherRules() = com.agupta07505.smartisland.model.WeatherRulesPrefs(
+        mode = com.agupta07505.smartisland.model.WeatherRules.normalizeMode(weatherShowRule),
+        triggers = com.agupta07505.smartisland.model.WeatherRules.normalizeTriggers(weatherNotableTriggers),
+        hotC = com.agupta07505.smartisland.model.WeatherRules.normalizeHotC(weatherHotC),
+        coldC = com.agupta07505.smartisland.model.WeatherRules.normalizeColdC(weatherColdC),
+        hideAtNight = weatherHideAtNight,
+        nightStartHour = com.agupta07505.smartisland.model.WeatherRules.normalizeHour(weatherNightStartHour),
+        nightEndHour = com.agupta07505.smartisland.model.WeatherRules.normalizeHour(weatherNightEndHour)
+    )
+
+    fun idleSchedulePrefs() = com.agupta07505.smartisland.model.IdleSchedulePrefs(
+        workEnabled = idleScheduleWorkEnabled,
+        workHidden = idleScheduleWorkHidden,
+        workStartHour = idleScheduleWorkStartHour,
+        workEndHour = idleScheduleWorkEndHour,
+        workWeekdaysOnly = idleScheduleWorkWeekdaysOnly,
+        nightEnabled = idleScheduleNightEnabled,
+        nightHidden = idleScheduleNightHidden,
+        nightStartHour = idleScheduleNightStartHour,
+        nightEndHour = idleScheduleNightEndHour,
+        chargingEnabled = idleScheduleChargingEnabled,
+        chargingHidden = idleScheduleChargingHidden,
+        pinnedFirst = idleWidgetPinnedFirst
+    )
+
+    fun weatherPrefs() = com.agupta07505.smartisland.model.WeatherPrefs(
+        source = weatherLocationSource,
+        manualCity = weatherManualCity,
+        manualLat = weatherManualLat,
+        manualLon = weatherManualLon,
+        refreshMinutes = weatherRefreshMinutes,
+        provider = weatherProvider,
+        customUrl = weatherCustomUrl,
+        customKey = weatherCustomKey,
+        pillMode = com.agupta07505.smartisland.model.WeatherPill.normalize(weatherPillMode),
+        readouts = com.agupta07505.smartisland.model.WeatherReadouts.normalize(weatherIslandReadouts)
+    )
+
     companion object {
-        /** Default accent of the app theme: a soft azure that suits the glass look. */
         const val DEFAULT_ACCENT_COLOR = 0xFF4A8CFFL
 
         const val EXPANDED_THEME_DARK = "dark"
@@ -654,9 +806,10 @@ data class SmartIslandSettings(
         const val MIN_SHADOW_ELEVATION = 0f
         const val MAX_SHADOW_ELEVATION = 32f
 
-        // Timing bounds (milliseconds) and the step the sliders move in.
         const val MIN_IDLE_TIMEOUT_MS = 1_000
-        const val MAX_IDLE_TIMEOUT_MS = 30_000
+        // The slider's last stop (one 500 ms step past 30 s) means "never": the idle timeout is off.
+        const val MAX_IDLE_TIMEOUT_MS = 30_500
+        const val IDLE_TIMEOUT_NEVER_MS = MAX_IDLE_TIMEOUT_MS
         const val MIN_BATTERY_WARNING_MS = 1_000
         const val MAX_BATTERY_WARNING_MS = 15_000
         const val MIN_POPUP_MS = 500
@@ -802,6 +955,11 @@ data class SmartIslandSettings(
                 notificationCooldownSystemEvents = safeStringSet("notificationCooldownSystemEvents", defaults.notificationCooldownSystemEvents),
                 developerModeEnabled = obj.optBoolean("developerModeEnabled", defaults.developerModeEnabled),
                 recordLogs = obj.optBoolean("recordLogs", defaults.recordLogs),
+                faceUnlockMode = obj.optString("faceUnlockMode", defaults.faceUnlockMode).takeIf { it in setOf("face_only", "any") } ?: defaults.faceUnlockMode,
+                faceIdStyle = obj.optString("faceIdStyle", defaults.faceIdStyle).takeIf { it in setOf("square", "cutout", "square_tick") } ?: defaults.faceIdStyle,
+                appFaceIdEnabled = obj.optBoolean("appFaceIdEnabled", defaults.appFaceIdEnabled),
+                appFaceIdStyle = obj.optString("appFaceIdStyle", defaults.appFaceIdStyle).takeIf { it in setOf("square", "cutout", "square_tick") } ?: defaults.appFaceIdStyle,
+                fingerprintAnimationEnabled = obj.optBoolean("fingerprintAnimationEnabled", defaults.fingerprintAnimationEnabled),
                 themeMode = obj.optString("themeMode", defaults.themeMode).takeIf { it in setOf("system", "light", "dark") } ?: defaults.themeMode,
                 liquidGlassTheme = obj.optBoolean("liquidGlassTheme", defaults.liquidGlassTheme),
                 materialYou = obj.optBoolean("materialYou", defaults.materialYou),
@@ -876,6 +1034,7 @@ data class SmartIslandSettings(
                 contentPillSameAsIdle = obj.optBoolean("contentPillSameAsIdle", defaults.contentPillSameAsIdle),
                 islandExemptApps = safeStringSet("islandExemptApps", defaults.islandExemptApps),
                 islandExemptAppsLandscape = safeStringSet("islandExemptAppsLandscape", defaults.islandExemptAppsLandscape),
+                islandExemptAppsStatic = safeStringSet("islandExemptAppsStatic", defaults.islandExemptAppsStatic),
                 contentPillSameAsIdleLandscape = obj.optBoolean("contentPillSameAsIdleLandscape", defaults.contentPillSameAsIdleLandscape),
                 contentPillWidthPercentLandscape = safeFloat(
                     "contentPillWidthPercentLandscape", defaults.contentPillWidthPercentLandscape,
@@ -897,6 +1056,8 @@ data class SmartIslandSettings(
                         com.agupta07505.smartisland.model.IdleWidgets.MAX_CYCLE_SECONDS
                     ),
                 idleAlarmHideBeyond12h = obj.optBoolean("idleAlarmHideBeyond12h", defaults.idleAlarmHideBeyond12h),
+                batteryOnlyWhenCharging = obj.optBoolean("batteryOnlyWhenCharging", defaults.batteryOnlyWhenCharging),
+                idleBeatOnlyOnChange = obj.optBoolean("idleBeatOnlyOnChange", defaults.idleBeatOnlyOnChange),
                 widgetIslandCloseSeconds = com.agupta07505.smartisland.model.WidgetIslandTimer.normalize(
                     obj.optInt("widgetIslandCloseSeconds", defaults.widgetIslandCloseSeconds)
                 ),
@@ -918,6 +1079,70 @@ data class SmartIslandSettings(
                     .takeIf { it in com.agupta07505.smartisland.model.IdleWidgets.VALID_UNITS } ?: defaults.idleWidgetTempUnit,
                 idleWidgetWindUnit = obj.optString("idleWidgetWindUnit", defaults.idleWidgetWindUnit)
                     .takeIf { it in com.agupta07505.smartisland.model.IdleWidgets.VALID_WIND_UNITS } ?: defaults.idleWidgetWindUnit,
+                weatherLocationSource = com.agupta07505.smartisland.model.WeatherConfig.normalizeSource(
+                    obj.optString("weatherLocationSource", defaults.weatherLocationSource)
+                ),
+                weatherManualCity = com.agupta07505.smartisland.model.WeatherConfig.normalizeCity(
+                    obj.optString("weatherManualCity", defaults.weatherManualCity)
+                ),
+                weatherManualLat = obj.optDouble("weatherManualLat", defaults.weatherManualLat.toDouble()).toFloat()
+                    .takeIf { it.isFinite() && it in -90f..90f } ?: defaults.weatherManualLat,
+                weatherManualLon = obj.optDouble("weatherManualLon", defaults.weatherManualLon.toDouble()).toFloat()
+                    .takeIf { it.isFinite() && it in -180f..180f } ?: defaults.weatherManualLon,
+                weatherRefreshMinutes = com.agupta07505.smartisland.model.WeatherConfig.normalizeRefreshMinutes(
+                    obj.optInt("weatherRefreshMinutes", defaults.weatherRefreshMinutes)
+                ),
+                weatherProvider = com.agupta07505.smartisland.model.WeatherConfig.normalizeProvider(
+                    obj.optString("weatherProvider", defaults.weatherProvider)
+                ),
+                weatherCustomUrl = com.agupta07505.smartisland.model.WeatherConfig.normalizeCustomUrl(
+                    obj.optString("weatherCustomUrl", defaults.weatherCustomUrl)
+                ),
+                weatherPillMode = com.agupta07505.smartisland.model.WeatherPill.normalize(
+                    obj.optString("weatherPillMode", defaults.weatherPillMode)
+                ),
+                weatherIslandReadouts = com.agupta07505.smartisland.model.WeatherReadouts.normalize(
+                    obj.optString("weatherIslandReadouts", defaults.weatherIslandReadouts)
+                ),
+                weatherIconAnimated = obj.optBoolean("weatherIconAnimated", defaults.weatherIconAnimated),
+                weatherIconPauseOnSaver = obj.optBoolean("weatherIconPauseOnSaver", defaults.weatherIconPauseOnSaver),
+                weatherShowRule = com.agupta07505.smartisland.model.WeatherRules.normalizeMode(
+                    obj.optString("weatherShowRule", defaults.weatherShowRule)
+                ),
+                weatherNotableTriggers = com.agupta07505.smartisland.model.WeatherRules.normalizeTriggers(
+                    obj.optString("weatherNotableTriggers", defaults.weatherNotableTriggers)
+                ),
+                weatherHotC = com.agupta07505.smartisland.model.WeatherRules.normalizeHotC(
+                    obj.optInt("weatherHotC", defaults.weatherHotC)
+                ),
+                weatherColdC = com.agupta07505.smartisland.model.WeatherRules.normalizeColdC(
+                    obj.optInt("weatherColdC", defaults.weatherColdC)
+                ),
+                weatherHideAtNight = obj.optBoolean("weatherHideAtNight", defaults.weatherHideAtNight),
+                weatherNightStartHour = com.agupta07505.smartisland.model.WeatherRules.normalizeHour(
+                    obj.optInt("weatherNightStartHour", defaults.weatherNightStartHour)
+                ),
+                weatherNightEndHour = com.agupta07505.smartisland.model.WeatherRules.normalizeHour(
+                    obj.optInt("weatherNightEndHour", defaults.weatherNightEndHour)
+                ),
+                netSpeedThresholdKbps = com.agupta07505.smartisland.model.NetSpeedRules.normalize(
+                    obj.optInt("netSpeedThresholdKbps", defaults.netSpeedThresholdKbps)
+                ),
+                netSpeedConnection = com.agupta07505.smartisland.model.NetSpeedRules.normalizeConnection(
+                    obj.optString("netSpeedConnection", defaults.netSpeedConnection)
+                ),
+                idleScheduleWorkEnabled = obj.optBoolean("idleScheduleWorkEnabled", defaults.idleScheduleWorkEnabled),
+                idleScheduleWorkHidden = com.agupta07505.smartisland.model.IdleSchedule.normalizeHidden(obj.optString("idleScheduleWorkHidden", defaults.idleScheduleWorkHidden)),
+                idleScheduleWorkStartHour = com.agupta07505.smartisland.model.IdleSchedule.normalizeHour(obj.optInt("idleScheduleWorkStartHour", defaults.idleScheduleWorkStartHour)),
+                idleScheduleWorkEndHour = com.agupta07505.smartisland.model.IdleSchedule.normalizeHour(obj.optInt("idleScheduleWorkEndHour", defaults.idleScheduleWorkEndHour)),
+                idleScheduleWorkWeekdaysOnly = obj.optBoolean("idleScheduleWorkWeekdaysOnly", defaults.idleScheduleWorkWeekdaysOnly),
+                idleScheduleNightEnabled = obj.optBoolean("idleScheduleNightEnabled", defaults.idleScheduleNightEnabled),
+                idleScheduleNightHidden = com.agupta07505.smartisland.model.IdleSchedule.normalizeHidden(obj.optString("idleScheduleNightHidden", defaults.idleScheduleNightHidden)),
+                idleScheduleNightStartHour = com.agupta07505.smartisland.model.IdleSchedule.normalizeHour(obj.optInt("idleScheduleNightStartHour", defaults.idleScheduleNightStartHour)),
+                idleScheduleNightEndHour = com.agupta07505.smartisland.model.IdleSchedule.normalizeHour(obj.optInt("idleScheduleNightEndHour", defaults.idleScheduleNightEndHour)),
+                idleScheduleChargingEnabled = obj.optBoolean("idleScheduleChargingEnabled", defaults.idleScheduleChargingEnabled),
+                idleScheduleChargingHidden = com.agupta07505.smartisland.model.IdleSchedule.normalizeHidden(obj.optString("idleScheduleChargingHidden", defaults.idleScheduleChargingHidden)),
+                idleWidgetPinnedFirst = com.agupta07505.smartisland.model.IdleSchedule.normalizePinned(obj.optString("idleWidgetPinnedFirst", defaults.idleWidgetPinnedFirst)),
                 idleTickStyle = com.agupta07505.smartisland.model.LedTick.normalizeStyle(obj.optString("idleTickStyle", defaults.idleTickStyle)),
                 ledTickPattern = com.agupta07505.smartisland.model.LedTick.normalizePattern(obj.optString("ledTickPattern", defaults.ledTickPattern)),
                 ledTickPaceMs = com.agupta07505.smartisland.model.LedTick.normalizePace(obj.optInt("ledTickPaceMs", defaults.ledTickPaceMs)),
@@ -959,3 +1184,4 @@ data class SmartIslandSettings(
         }
     }
 }
+enum class ExpandedBlurMode { Off, Card }

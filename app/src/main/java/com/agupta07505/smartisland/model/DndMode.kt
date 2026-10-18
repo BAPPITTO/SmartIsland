@@ -8,23 +8,21 @@
 package com.agupta07505.smartisland.model
 
 /**
- * The Do Not Disturb / mode idle widget: the pill's left slot shows the active mode's glyph, the semi-expanded island its glyph and name.
- * Pure rules (what a mode is called, how its kind is told apart, which of several active modes wins); reading the system is util/DndModeReader.kt.
+ * Do Not Disturb / mode idle widget: the pill's left slot shows the active mode's glyph, the island its glyph and
+ * name. Pure rules; reading the system is util/DndModeReader.kt.
  */
 enum class ModeKind { Dnd, TotalSilence, AlarmsOnly, Bedtime, Driving, Theater, Gaming, Work, Schedule, Custom }
 
 /**
- * What is active right now. [name] is the mode's own name (the system's, in the user's language) or, without one, [DndModes.defaultName].
- * [iconRes] / [iconPackage] point at the mode's own icon (Android's or the phone maker's) when the system exposes one; the widget falls back to its
- * own glyph per [kind] when they are empty or cannot be loaded.
+ * Active mode: [name] is the system's own (else [DndModes.defaultName]); [iconRes] / [iconPackage] point at its icon,
+ * else the widget falls back to a glyph per [kind].
  */
 data class ModeStatus(
     val active: Boolean,
     val kind: ModeKind = ModeKind.Dnd,
     val name: String = "",
-    /** A system mode (a rule) is on, as opposed to the plain interruption filter. */
     val fromRule: Boolean = false,
-    /** Plain interruption filter in effect, one of [DndModes.FILTER_PRIORITY] / [DndModes.FILTER_NONE] / [DndModes.FILTER_ALARMS]; 0 otherwise. */
+    /** Plain interruption filter in effect ([DndModes.FILTER_*]); 0 otherwise. */
     val filter: Int = 0,
     val iconRes: Int = 0,
     val iconPackage: String = ""
@@ -35,17 +33,16 @@ data class ModeStatus(
 }
 
 object DndModes {
-    /** Android's interruption filter values (NotificationManager.INTERRUPTION_FILTER_*), fixed by the platform. */
+    /** Platform values of NotificationManager.INTERRUPTION_FILTER_*. */
     const val FILTER_UNKNOWN = 0
     const val FILTER_ALL = 1
     const val FILTER_PRIORITY = 2
     const val FILTER_NONE = 3
     const val FILTER_ALARMS = 4
 
-    /** A filter other than "all" means Do Not Disturb is on. */
     fun filterActive(filter: Int): Boolean = filter == FILTER_PRIORITY || filter == FILTER_NONE || filter == FILTER_ALARMS
 
-    /** The plain Do Not Disturb as [filter] describes it, for phones that cannot tell which mode is on (or when none is). */
+    /** Plain Do Not Disturb as [filter] describes it, for phones that cannot tell which mode is on. */
     fun fromFilter(filter: Int): ModeStatus = when (filter) {
         FILTER_PRIORITY -> ModeStatus(true, ModeKind.Dnd, defaultName(ModeKind.Dnd), filter = filter)
         FILTER_NONE -> ModeStatus(true, ModeKind.TotalSilence, defaultName(ModeKind.TotalSilence), filter = filter)
@@ -67,8 +64,8 @@ object DndModes {
     }
 
     /**
-     * Tells a mode's kind from its name, for phones whose modes carry no type (before Android 14) and for the phone makers' own names
-     * ("Sleep", "Drive", "Game mode", "Work profile mode" ...). Anything unknown is [ModeKind.Custom].
+     * Mode kind from its name, for phones without mode types (before Android 14) and maker-specific names ("Sleep",
+     * "Drive", "Game mode", ...). Unknown is [ModeKind.Custom].
      */
     fun kindFromName(name: String): ModeKind {
         val n = name.lowercase()
@@ -84,7 +81,7 @@ object DndModes {
         }
     }
 
-    /** With several modes on at once the most specific one is shown: driving before bedtime before the rest, the plain schedule and custom last. */
+    /** Most specific mode wins: driving, then bedtime, then the rest; schedule and custom last. */
     fun rank(kind: ModeKind): Int = when (kind) {
         ModeKind.Driving -> 0
         ModeKind.Bedtime -> 1
@@ -98,13 +95,10 @@ object DndModes {
         ModeKind.AlarmsOnly -> 9
     }
 
-    /** The mode that wins among [active] (null when there are none). */
     fun pick(active: List<ModeStatus>): ModeStatus? = active.minByOrNull { rank(it.kind) }
 
-    /** A mode with a blank name shows the kind's default name. */
     fun withName(kind: ModeKind, name: String?): String = name?.trim().takeUnless { it.isNullOrEmpty() } ?: defaultName(kind)
 
-    /** The island's second line under the mode's name. */
     fun detail(status: ModeStatus): String = when {
         status.fromRule -> "Mode is on"
         status.filter == FILTER_NONE -> "Nothing can interrupt"

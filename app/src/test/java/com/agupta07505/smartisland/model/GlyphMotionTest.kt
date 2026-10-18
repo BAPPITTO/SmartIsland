@@ -158,7 +158,20 @@ class GlyphMotionTest {
         assertEquals(-WeatherMorph.TURN_DEGREES / 2f, mid.incoming.rotationDegrees, 0.001f)
     }
 
-    // ---- Phase 8: attention states ----
+    @Test
+    fun morphLandingStartsAndEndsAtFullSizeWithASmallSwellBetween() {
+        assertEquals(1f, WeatherMorph.landingScale(0f), 0.001f)
+        assertEquals(1f, WeatherMorph.landingScale(1f), 0.001f)
+        assertEquals(1f + WeatherMorph.LANDING_OVERSHOOT, WeatherMorph.landingScale(0.5f), 0.001f)
+        var p = 0f
+        while (p <= 1f) {
+            assertTrue(WeatherMorph.landingScale(p) in 1f..(1f + WeatherMorph.LANDING_OVERSHOOT + 0.001f))
+            p += 0.05f
+        }
+        // Out-of-range progress is clamped.
+        assertEquals(1f, WeatherMorph.landingScale(2f), 0.001f)
+        assertEquals(1f, WeatherMorph.landingScale(-1f), 0.001f)
+    }
 
     @Test
     fun fastSpeedStartsAtOneMegabytePerSecond() {

@@ -19,9 +19,8 @@ import android.provider.Settings
 import com.agupta07505.smartisland.service.SmartIslandOverlayService
 
 /**
- * One-line snapshot of the system state that decides whether Smart Island can see a notification or
- * a call at all: listener and overlay access, battery restrictions that let the system kill the
- * listener, Do Not Disturb, audio mode, and whether WhatsApp is installed. Every read is guarded.
+ * One-line snapshot of the system state that decides whether the island can see a notification or a call: listener
+ * and overlay access, battery restrictions, Do Not Disturb, audio mode, WhatsApp install.
  */
 object EnvironmentDiagnostics {
     private val WHATSAPP_PACKAGES = listOf("com.whatsapp", "com.whatsapp.w4b")
