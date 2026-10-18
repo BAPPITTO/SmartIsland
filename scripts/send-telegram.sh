@@ -4,7 +4,7 @@
 # © Animesh Gupta — github.com/agupta07505
 # Licensed under the GNU GPL v3 License
 #
-# Forwards build artifacts (APKs) to a Telegram channel or forum topic community.
+# Forwards build artifacts (APKs) to a Telegram group with topics.
 #
 
 set -euo pipefail
@@ -23,6 +23,14 @@ if [[ -z "$APK_PATH" || ! -f "$APK_PATH" ]]; then
   exit 1
 fi
 
+escape_html() {
+  local str="$1"
+  str="${str//&/&amp;}"
+  str="${str//</&lt;}"
+  str="${str//>/&gt;}"
+  echo "$str"
+}
+
 FILE_NAME="$(basename "$APK_PATH")"
 FILE_SIZE="$(du -h "$APK_PATH" | cut -f1)"
 REPO="${GITHUB_REPOSITORY:-agupta07505/SmartIsland}"
@@ -32,24 +40,25 @@ COMMIT_SHA="${GITHUB_SHA:-}"
 SHORT_SHA="${COMMIT_SHA:0:7}"
 BRANCH_OR_TAG="${GITHUB_REF_NAME:-}"
 VERSION="${VERSION_TAG:-${BRANCH_OR_TAG}}"
+ACTOR="$(escape_html "${GITHUB_ACTOR:-}")"
+RUN_NUMBER="${GITHUB_RUN_NUMBER:-}"
 
-# Extract and escape last commit message
-RAW_COMMIT_MSG="$(git log -1 --pretty=format:'%s' 2>/dev/null || echo '')"
-if [[ ${#RAW_COMMIT_MSG} -gt 120 ]]; then
-  RAW_COMMIT_MSG="${RAW_COMMIT_MSG:0:117}..."
-fi
+# Gather recent commit messages (up to 3)
+RECENT_COMMITS=""
+while IFS= read -r line; do
+  if [[ -n "$line" ]]; then
+    sha="${line%% *}"
+    msg="${line#* }"
+    if [[ ${#msg} -gt 80 ]]; then
+      msg="${msg:0:77}..."
+    fi
+    msg="$(escape_html "$msg")"
+    RECENT_COMMITS+="  • <a href=\"https://github.com/${REPO}/commit/${sha}\">${sha:0:7}</a> ${msg}
+"
+  fi
+done < <(git log -3 --pretty=format:'%H %s' 2>/dev/null || true)
 
-escape_html() {
-  local str="$1"
-  str="${str//&/&amp;}"
-  str="${str//</&lt;}"
-  str="${str//>/&gt;}"
-  echo "$str"
-}
-
-COMMIT_MSG="$(escape_html "$RAW_COMMIT_MSG")"
-
-# Determine target topic (if any)
+# Determine target topic
 TARGET_TOPIC="$CUSTOM_TOPIC"
 if [[ -z "$TARGET_TOPIC" ]]; then
   if [[ "$BUILD_TYPE" =~ [Dd]ebug ]]; then
@@ -59,30 +68,70 @@ if [[ -z "$TARGET_TOPIC" ]]; then
   fi
 fi
 
-# Build HTML caption
+# ── Build HTML caption ──────────────────────────────────────────
 if [[ "$BUILD_TYPE" =~ [Rr]elease ]]; then
-  CAPTION="🚀 <b>Smart Island ${VERSION}</b> (Release)
+  CAPTION="🚀 <b>Smart Island ${VERSION} — New Release</b>
 
-📦 <b>File:</b> <code>${FILE_NAME}</code> (${FILE_SIZE})
-🏷 <b>Version:</b> <code>${VERSION}</code>
-📝 <b>Commit:</b> <a href=\"https://github.com/${REPO}/commit/${COMMIT_SHA}\">${SHORT_SHA}</a> ${COMMIT_MSG}
-🔗 <a href=\"https://github.com/${REPO}/releases/tag/${VERSION}\">GitHub Release</a> • <a href=\"${RUN_URL}\">Workflow Run</a>"
+━━━━━━━━━━━━━━━━━━━━━━
+
+📦 <b>Artifact</b>
+  <code>${FILE_NAME}</code>  (${FILE_SIZE})
+
+🏷 <b>Version:</b>  <code>${VERSION}</code>
+📱 <b>Android:</b>  8.0+ (API 26)
+🔐 <b>Signed:</b>  ✅ Release keystore
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+📝 <b>Recent Changes</b>
+${RECENT_COMMITS}
+━━━━━━━━━━━━━━━━━━━━━━
+
+🔗 <b>Links</b>
+  📥 <a href=\"https://github.com/${REPO}/releases/tag/${VERSION}\">Download from GitHub Releases</a>
+  📋 <a href=\"https://github.com/${REPO}/blob/main/CHANGELOG.md\">Full Changelog</a>
+  ⚙️ <a href=\"${RUN_URL}\">Workflow Run #${RUN_NUMBER}</a>
+  🌐 <a href=\"https://smartisland.vercel.app\">Website</a>
+
+━━━━━━━━━━━━━━━━━━━━━━
+🏝️ <i>Smart Island — Dynamic Island for Android</i>
+🔒 <i>No internet · No ads · No analytics · 100% on-device</i>"
+
 else
-  CAPTION="🛠 <b>Smart Island Build</b> (${BUILD_TYPE})
+  # Debug / Dev build
+  CAPTION="🛠 <b>Smart Island Dev Build #${RUN_NUMBER}</b>
 
-📦 <b>File:</b> <code>${FILE_NAME}</code> (${FILE_SIZE})
-🌿 <b>Branch:</b> <code>${BRANCH_OR_TAG}</code>
-📝 <b>Commit:</b> <a href=\"https://github.com/${REPO}/commit/${COMMIT_SHA}\">${SHORT_SHA}</a> ${COMMIT_MSG}
-🔗 <a href=\"${RUN_URL}\">GitHub Actions Run</a>"
+━━━━━━━━━━━━━━━━━━━━━━
+
+📦 <b>Artifact</b>
+  <code>${FILE_NAME}</code>  (${FILE_SIZE})
+
+🌿 <b>Branch:</b>  <code>${BRANCH_OR_TAG}</code>
+👤 <b>Author:</b>  ${ACTOR}
+🔐 <b>Signed:</b>  Debug (not for distribution)
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+📝 <b>Recent Commits</b>
+${RECENT_COMMITS}
+━━━━━━━━━━━━━━━━━━━━━━
+
+🔗 <b>Links</b>
+  🔀 <a href=\"https://github.com/${REPO}/tree/${BRANCH_OR_TAG}\">Branch: ${BRANCH_OR_TAG}</a>
+  ⚙️ <a href=\"${RUN_URL}\">Workflow Run #${RUN_NUMBER}</a>
+  📊 <a href=\"https://github.com/${REPO}/actions\">All CI Runs</a>
+
+━━━━━━━━━━━━━━━━━━━━━━
+🏝️ <i>Smart Island — Dev Testing Build</i>
+⚠️ <i>For testing only — not signed for distribution</i>"
 fi
 
-# Normalize and trim secrets
+# ── Normalize and send ──────────────────────────────────────────
 TELEGRAM_BOT_TOKEN="$(echo "${TELEGRAM_BOT_TOKEN}" | tr -d '[:space:]')"
 CHAT_ID="$(echo "${TELEGRAM_CHAT_ID}" | tr -d '[:space:]')"
 TARGET_TOPIC="$(echo "${TARGET_TOPIC:-}" | tr -d '[:space:]')"
 
-# Normalize CHAT_ID: if numeric and missing leading '-' (e.g. copied from web URL https://t.me/c/<id>/<topic>),
-# automatically prefix -100 to target the Telegram supergroup properly.
+# Auto-prefix -100 for supergroup numeric IDs
 if [[ "$CHAT_ID" =~ ^[0-9]{9,}$ ]]; then
   CHAT_ID="-100${CHAT_ID}"
 fi
@@ -91,8 +140,6 @@ REAL_APK_PATH="$(realpath "$APK_PATH" 2>/dev/null || echo "$APK_PATH")"
 
 echo "Uploading $FILE_NAME ($FILE_SIZE) to Telegram chat: $CHAT_ID (Topic: ${TARGET_TOPIC:-General})..."
 
-# Prepare curl arguments
-# Use --form-string for text fields so curl never misinterprets values starting with @ or < as local files.
 CURL_ARGS=(
   -s -S
   --connect-timeout 30
