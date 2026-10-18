@@ -78,7 +78,7 @@ Add the following:
 
 ## 6. What Gets Forwarded
 
-### Build Artifacts (`.github/workflows/android.yml`)
+### Build Artifacts (`.github/workflows/build.yml` & `.github/workflows/release.yml`)
 - **Release APKs** — On tag `v*` or manual dispatch: signed APK with version, changelog link, recent commits, download links, and project info.
 - **Debug APKs** — On `dev` push or manual dispatch: debug APK with branch, author, recent commits, and CI run links.
 

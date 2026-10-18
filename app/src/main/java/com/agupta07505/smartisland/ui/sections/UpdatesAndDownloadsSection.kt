@@ -59,7 +59,7 @@ import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.WifiOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
+import com.agupta07505.smartisland.ui.glass.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -191,9 +191,6 @@ fun UpdatesAndDownloadsSection(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // ==========================================
-        // 1. TOTAL DOWNLOADS AT TOP (HERO STATS CARD)
-        // ==========================================
         TotalDownloadsHeroCard(
             totalDownloads = totalDownloads,
             releaseCount = releases.size,
@@ -207,9 +204,6 @@ fun UpdatesAndDownloadsSection(
             }
         )
 
-        // =======================================================
-        // 2. UPDATE CHECKER (CURRENT VERSION, CHECK UPDATES, CHANGELOGS)
-        // =======================================================
         AppUpdateCheckerCard(
             currentVersion = currentVersion,
             updateStatus = updateStatus,
@@ -225,9 +219,6 @@ fun UpdatesAndDownloadsSection(
             }
         )
 
-        // ==========================================
-        // 3. TOP CONTRIBUTORS
-        // ==========================================
         TopContributorsCard(
             contributors = contributors,
             onContributeClick = {
@@ -244,9 +235,6 @@ fun UpdatesAndDownloadsSection(
             }
         )
 
-        // ==========================================
-        // 4. RECENT COMMITS
-        // ==========================================
         if (recentCommits.isNotEmpty()) {
             RecentCommitsCard(
                 commits = recentCommits,
@@ -261,9 +249,6 @@ fun UpdatesAndDownloadsSection(
     }
 }
 
-// ====================================================================
-// 1. Total Downloads Hero Card (At Top)
-// ====================================================================
 @Composable
 private fun TotalDownloadsHeroCard(
     totalDownloads: Int?,
@@ -351,7 +336,6 @@ private fun TotalDownloadsHeroCard(
                 }
             }
 
-            // Big Numbers Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Bottom,
@@ -398,9 +382,6 @@ private fun TotalDownloadsHeroCard(
     }
 }
 
-// ====================================================================
-// 2. App Update Checker Card (Current Version, Check Updates, Changelogs)
-// ====================================================================
 @Composable
 private fun AppUpdateCheckerCard(
     currentVersion: String,
@@ -434,9 +415,6 @@ private fun AppUpdateCheckerCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // -------------------------------------------------------------
-            // FIRST LINE: CURRENT VERSION
-            // -------------------------------------------------------------
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -473,9 +451,6 @@ private fun AppUpdateCheckerCard(
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
 
-            // -------------------------------------------------------------
-            // SECOND LINE: CHECK FOR UPDATES ACTION & STATUS
-            // -------------------------------------------------------------
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -613,7 +588,6 @@ private fun AppUpdateCheckerCard(
                 }
             }
 
-            // If an update is available, provide download action
             if (updateStatus is UpdateCheckStatus.UpdateAvailable) {
                 Surface(
                     shape = RoundedCornerShape(12.dp),
@@ -664,9 +638,6 @@ private fun AppUpdateCheckerCard(
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
 
-            // -------------------------------------------------------------
-            // THIRD LINE: CHANGELOGS BUTTON & EXPANDABLE LIST
-            // -------------------------------------------------------------
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -751,9 +722,6 @@ private fun AppUpdateCheckerCard(
     }
 }
 
-// ====================================================================
-// Release Changelog Card Item
-// ====================================================================
 @Composable
 private fun ReleaseChangelogItem(release: GitHubReleaseItem) {
     Surface(
@@ -817,9 +785,6 @@ private fun ReleaseChangelogItem(release: GitHubReleaseItem) {
     }
 }
 
-// ====================================================================
-// 3. Top Contributors Card
-// ====================================================================
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TopContributorsCard(
@@ -969,9 +934,6 @@ private fun ContributorChip(
     }
 }
 
-// ====================================================================
-// 4. Recent Commits Card
-// ====================================================================
 @Composable
 private fun RecentCommitsCard(
     commits: List<GitHubCommit>,
