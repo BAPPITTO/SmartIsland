@@ -42,7 +42,7 @@ private val PoppinsFamily = FontFamily(
 
 /**
  * The fonts that ship with the app. Lora, Inter Display and Poppins are open fonts (SIL Open Font License 1.1, see
- * THIRD_PARTY_FONTS.md). Any other font is added by the user from a .ttf or .otf file (see [CustomFonts]).
+ * THIRD_PARTY_FONTS.md). Any other font is added by the user from a .ttf or .otf file.
  */
 internal val IslandFontOptions: List<IslandFontOption> = listOf(
     IslandFontOption(SmartIslandSettings.FONT_SYSTEM, "System", "Your phone's own font", FontFamily.Default),
@@ -53,7 +53,6 @@ internal val IslandFontOptions: List<IslandFontOption> = listOf(
     IslandFontOption(SmartIslandSettings.FONT_MONOSPACE, "Monospace", "Fixed width, like code", FontFamily.Monospace)
 )
 
-/** The family of a built-in font id; the default font for anything else (including custom ids). */
 internal fun islandFontFamily(id: String): FontFamily =
     (IslandFontOptions.firstOrNull { it.id == id } ?: IslandFontOptions.first { it.id == SmartIslandSettings.Default.islandFont }).family
 
@@ -61,11 +60,7 @@ private class CachedCustomFamily(val lastModified: Long, val length: Long, val f
 
 private val customFamilies = ConcurrentHashMap<String, CachedCustomFamily>()
 
-/**
- * The family for any font id. A custom id loads the font file the user added (cached until the file changes);
- * a custom font whose file is missing or unreadable falls back to the phone's own font, so the island never
- * ends up without text.
- */
+/** The family for any font id. */
 internal fun islandFontFamily(context: Context, id: String): FontFamily {
     if (!CustomFonts.isCustomId(id)) return islandFontFamily(id)
     val file = CustomFonts.fileFor(context, id) ?: return FontFamily.Default
@@ -78,8 +73,8 @@ internal fun islandFontFamily(context: Context, id: String): FontFamily {
 }
 
 /**
- * The android Typeface behind a font id, for drawing text into a bitmap (the LED dot style turns any font into dots, see LedRaster).
- * A custom font whose file is missing falls back to the phone's own bold font. Bold weight is used where the font has it.
+ * The android Typeface behind a font id, for drawing text into a bitmap (the LED dot style turns any font into dots,
+ * see LedRaster).
  */
 internal fun islandTypeface(context: Context, id: String): android.graphics.Typeface {
     if (CustomFonts.isCustomId(id)) return CustomFonts.typeface(context, id) ?: android.graphics.Typeface.DEFAULT_BOLD
@@ -93,12 +88,10 @@ internal fun islandTypeface(context: Context, id: String): android.graphics.Type
     }
 }
 
-/** Forgets a deleted custom font. */
 internal fun forgetCustomFontFamily(id: String) {
     customFamilies.remove(id)
 }
 
-/** The resource of a built-in font's file for [weight] (they ship 400, 500 and 700); null for the phone's own families. */
 private fun builtinFontRes(id: String, weight: Int): Int? {
     fun pick(r400: Int, r500: Int, r700: Int) = when {
         weight < 450 -> r400
@@ -113,12 +106,6 @@ private fun builtinFontRes(id: String, weight: Int): Int? {
     }
 }
 
-/**
- * One font entry of the mixed family: the font behind [id], registered for text asked for at [weight].
- * A custom font file or a built-in font draws every weight of its slot with its one file (the slot's representative weight picks
- * the built-in file); the phone's own families (system, serif, monospace) are loaded at the exact weight, so they keep their cuts.
- * A custom font whose file is missing or unreadable falls back to the phone's own font, like [islandFontFamily] does.
- */
 private fun slotFont(context: Context, id: String, slot: FontSlot, weight: Int): Font {
     val label = FontWeight(weight)
     if (CustomFonts.isCustomId(id)) {
@@ -131,9 +118,8 @@ private fun slotFont(context: Context, id: String, slot: FontSlot, weight: Int):
 }
 
 /**
- * The island's font family when fonts are mixed (see model/FontMix.kt): normal and lighter text uses the Light slot's font, medium
- * and semi-bold the Regular slot's, bold and heavier the Medium slot's. A slot left empty uses [islandFont]. All nine weights
- * 100..900 are registered, so each request lands on exactly one slot, never on a neighbour or a synthesised bold.
+ * The island's font family when fonts are mixed: normal and lighter text uses the Light slot's font, medium and semi-
+ * bold the Regular slot's, bold and heavier the Medium slot's.
  */
 internal fun mixedFontFamily(context: Context, islandFont: String, light: String, regular: String, medium: String): FontFamily {
     val fonts = FontSlot.entries.flatMap { slot ->

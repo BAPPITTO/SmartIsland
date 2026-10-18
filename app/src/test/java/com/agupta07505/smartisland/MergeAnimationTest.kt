@@ -91,8 +91,6 @@ class MergeAnimationTest {
         assertEquals(0f, mergeBubbleAlpha(1f), 0.001f)
     }
 
-    // ---- Bubble style ----
-
     @Test
     fun edgeDistanceIsHalfABubbleAtContact() {
         val travel = mergeTravelDp(dist, pill, bubble)
@@ -128,7 +126,7 @@ class MergeAnimationTest {
         }
     }
 
-    // ---- push, then join ----
+    // push, then join
 
     private val gap = 32f
     private val contact = mergeContactFraction(dist, pill, bubble)

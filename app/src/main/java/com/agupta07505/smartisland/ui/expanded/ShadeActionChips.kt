@@ -29,8 +29,8 @@ import com.agupta07505.smartisland.model.IslandNotificationAction
 import com.agupta07505.smartisland.ui.bounceClick
 
 /**
- * The notification's own buttons (ones with a PendingIntent) that a card did not already show with a
- * dedicated control. Nothing is invented: these are exactly the buttons the app put in the shade.
+ * The notification's own buttons (with a PendingIntent) that a card did not already show with a dedicated control:
+ * exactly the buttons the app put in the shade.
  */
 fun IslandNotification?.leftoverActions(vararg shown: IslandNotificationAction?): List<IslandNotificationAction> {
     if (this == null) return emptyList()

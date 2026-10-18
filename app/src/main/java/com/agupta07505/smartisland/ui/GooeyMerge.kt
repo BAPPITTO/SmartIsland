@@ -41,8 +41,8 @@ internal fun gooeySupported(opacity: Float): Boolean =
     Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && opacity >= 0.99f
 
 /**
- * The blur + threshold effect for a blur radius of [blurPx], in the pixels of the layer it is set on (so already multiplied by
- * [gooeyLayerScale] when the layer is recorded smaller). Call only when [gooeySupported].
+ * The blur + threshold effect for a blur radius of [blurPx], in the pixels of the layer it is set on (so already
+ * multiplied by [gooeyLayerScale] when the layer is recorded smaller).
  */
 @androidx.annotation.RequiresApi(Build.VERSION_CODES.S)
 internal fun gooeyRenderEffect(blurPx: Float): RenderEffect {
@@ -53,7 +53,6 @@ internal fun gooeyRenderEffect(blurPx: Float): RenderEffect {
         .asComposeRenderEffect()
 }
 
-/** The alpha threshold, built once: a colour filter is immutable and the effect is rebuilt whenever the radius changes. */
 private val GOO_THRESHOLD_FILTER: ColorMatrixColorFilter by lazy(LazyThreadSafetyMode.PUBLICATION) {
     ColorMatrixColorFilter(
         ColorMatrix(
@@ -128,8 +127,7 @@ private fun DrawScope.drawGooShape(rect: GooRect, color: Color, cornerPx: Float)
 
 /**
  * The pill with its touching end pressed flat: drawn crisp behind the real pill while the bubble pushes into it, so
- * the end that faces the bubble loses its round corners (radius [nearCornerPx] instead of [farCornerPx]). The real
- * pill covers all but the wedges this adds.
+ * the end that faces the bubble loses its round corners (radius [nearCornerPx] instead of [farCornerPx]).
  */
 internal fun DrawScope.drawPillFlatFace(
     pill: GooRect,

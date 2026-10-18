@@ -18,7 +18,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
-/** The small squash-and-bounce when the user switches between cards (not when a swipe's own slide did it, see [skipBounce]); the pill and the cutouts multiply it into their scale. */
+/**
+ * The small squash-and-bounce when the user switches between cards (not when a swipe's own slide did it, see
+ * [skipBounce]); the pill and the cutouts multiply it into their scale.
+ */
 @Composable
 internal fun rememberSwitchScaleAnim(selectedIndex: Int, skipBounce: () -> Boolean = { false }): androidx.compose.animation.core.Animatable<Float, androidx.compose.animation.core.AnimationVector1D> {
     val switchScaleAnim = remember { androidx.compose.animation.core.Animatable(1f) }

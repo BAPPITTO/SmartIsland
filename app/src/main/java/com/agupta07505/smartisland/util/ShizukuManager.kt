@@ -22,13 +22,9 @@ import java.io.InputStreamReader
 
 object ShizukuManager {
 
-    /** Package names tried when the permission lookup finds nothing: the official Shizuku app. */
     private val KNOWN_PACKAGES = listOf("moe.shizuku.privileged.api")
 
-    /**
-     * The package that declares Shizuku's API permission, or null. Any app that declares it counts (the official app, a fork or a
-     * renamed build), so this does not depend on one package name.
-     */
+    /** The package that declares Shizuku's API permission, or null. Any app declaring it counts (official app, fork or renamed build). */
     fun findPackageName(context: Context): String? = runCatching {
         context.packageManager.getPermissionInfo(ShizukuProvider.PERMISSION, 0).packageName
     }.getOrNull()
@@ -54,10 +50,7 @@ object ShizukuManager {
         return byName || isBinderAvailable()
     }
 
-    /**
-     * Safely checks if the Shizuku service binder is currently alive and responsive.
-     * Catches any Throwable (DeadObjectException, ExceptionInInitializerError, RemoteException).
-     */
+    /** Catches any Throwable, including DeadObjectException and RemoteException. */
     fun isBinderAvailable(): Boolean {
         return try {
             Shizuku.pingBinder()
@@ -66,9 +59,6 @@ object ShizukuManager {
         }
     }
 
-    /**
-     * Safely checks if Shizuku API permission has been granted to Smart Island.
-     */
     fun hasPermission(): Boolean {
         if (!isBinderAvailable()) return false
         return try {
@@ -78,9 +68,6 @@ object ShizukuManager {
         }
     }
 
-    /**
-     * Safely requests Shizuku permission. Does not crash if Shizuku service is dead.
-     */
     fun requestPermission(requestCode: Int = 1001) {
         if (!isBinderAvailable()) return
         try {
@@ -118,8 +105,8 @@ object ShizukuManager {
     }
 
     /**
-     * Runs one shell command through Shizuku and returns its stdout. Used for read-only dumps
-     * (e.g. `dumpsys media_projection`). Fails when Shizuku is not running or not permitted.
+     * Runs one shell command through Shizuku and returns its stdout. For read-only dumps such as `dumpsys`; fails
+     * when Shizuku is not running or not permitted.
      */
     suspend fun runShellForOutput(command: String): Result<String> = withContext(Dispatchers.IO) {
         if (!hasPermission()) {
@@ -140,9 +127,25 @@ object ShizukuManager {
     }
 
     /**
-     * Runs one shell command through Shizuku and returns its raw stdout bytes (at most [maxBytes], else
-     * null). Blocking: call it from a background thread. Used to read a picture file the app itself
-     * may not open (see [NotificationMediaReader]).
+     * Starts one shell command through Shizuku and returns the running process, so its output can be read line by
+     * line while it keeps running (a `logcat` follow).
+     */
+    fun openShellStream(command: String): Process? {
+        if (!hasPermission()) return null
+        return runCatching {
+            val newProcessMethod = Shizuku::class.java.getDeclaredMethod(
+                "newProcess",
+                Array<String>::class.java,
+                Array<String>::class.java,
+                String::class.java
+            ).apply { isAccessible = true }
+            newProcessMethod.invoke(null, arrayOf("sh", "-c", command), null, null) as Process
+        }.getOrNull()
+    }
+
+    /**
+     * Runs one shell command through Shizuku and returns its raw stdout bytes (at most [maxBytes], else null).
+     * Blocking. Used to read a picture file the app itself may not open.
      */
     fun runShellForBytes(command: String, maxBytes: Int): ByteArray? {
         if (!hasPermission()) return null
@@ -198,7 +201,6 @@ object ShizukuManager {
     private const val SETUP_PREFS = "shizuku_setup"
     private const val SETUP_SCOPE_KEY = "scope"
 
-    /** The scope of the last setup that succeeded on this phone, or null when none has run. */
     fun savedScope(context: Context): SetupScope? = runCatching {
         val name = context.getSharedPreferences(SETUP_PREFS, Context.MODE_PRIVATE).getString(SETUP_SCOPE_KEY, null)
         SetupScope.entries.firstOrNull { it.name == name }
@@ -211,15 +213,8 @@ object ShizukuManager {
     }
 
     /**
-     * The shell commands of one setup. Necessary: everything the island needs to work, and the steps that take many screens by hand:
-     * - Allow restricted settings (Android 13+, needed before accessibility and notification access can be switched on)
-     * - Accessibility Service and System Alert Window (preserving existing accessibility services)
-     * - Notification Listener Access (preserving existing notification listeners)
-     * - Hidden notification text (RECEIVE_SENSITIVE_NOTIFICATIONS)
-     * - Modify system settings (WRITE_SETTINGS, the brightness slider)
-     * - Notifications and Nearby devices (Bluetooth) runtime permissions
-     * - Battery optimisation whitelist, autostart, background and standby bucket
-     * All adds the optional ones (see [optionalCommands]).
+     * The shell commands of one setup. Necessary: everything the island needs to work, and the steps that take many
+     * screens by hand.
      */
     internal fun setupCommands(
         scope: SetupScope,
@@ -230,7 +225,7 @@ object ShizukuManager {
         mergedNotificationListeners: String
     ): List<String> {
         val necessary = listOf(
-            // First: accessibility and notification access cannot be switched on while this is still restricted.
+            // Accessibility and notification access cannot be switched on while this is still restricted.
             "appops set $pkg ACCESS_RESTRICTED_SETTINGS allow",
             "appops set $pkg SYSTEM_ALERT_WINDOW allow",
             // Modify system settings (the brightness slider on the Utilities page).
@@ -254,8 +249,7 @@ object ShizukuManager {
      * Permissions only some features use, granted by the "all permissions" setup and never by the necessary one:
      * - Usage access (recent apps in the App Shortcuts)
      * - Do Not Disturb access (the silent ringer, the mode idle widget)
-     * - Location, fine and coarse (the weather widget, the Wi-Fi network name, GPS use in the privacy dots)
-     * - Watch app ops (camera, microphone and location use in the privacy dots, without the fallback)
+     * - Location, fine and coarse (the weather widget, the Wi-Fi network name)
      * A ROM that lacks one of them just prints an error; the commands are joined with ";" so the rest still run.
      * The VPN consent is a system dialog that cannot be granted from here.
      */
@@ -263,15 +257,12 @@ object ShizukuManager {
         "appops set $pkg GET_USAGE_STATS allow",
         "cmd notification allow_dnd $pkg",
         "pm grant $pkg android.permission.ACCESS_FINE_LOCATION",
-        "pm grant $pkg android.permission.ACCESS_COARSE_LOCATION",
-        "pm grant $pkg android.permission.WATCH_APPOPS"
+        "pm grant $pkg android.permission.ACCESS_COARSE_LOCATION"
     )
 
     /**
-     * Repairs a stale/crashed AccessibilityService binding through Shizuku.
-     *
-     * Reproduces the effective Accessibility OFF -> ON refresh that was
-     * verified on HyperOS, while preserving every other enabled service.
+     * Repairs a stale or crashed AccessibilityService binding by switching Accessibility off and on, keeping every
+     * other enabled service.
      */
     suspend fun repairAccessibility(context: Context): Result<String> =
         withContext(Dispatchers.IO) {
@@ -288,36 +279,27 @@ object ShizukuManager {
             val commands = listOf(
                 "current=\$(settings get secure enabled_accessibility_services)",
 
-                // Temporarily disable Accessibility globally.
                 "settings put secure accessibility_enabled 0",
 
-                // Remove Smart Island in either representation, while preserving
-                // every other enabled Accessibility service.
+                // Remove Smart Island in either representation, keeping every other enabled service.
                 "new=''; IFS=':'; for s in \$current; do if [ -n \"\$s\" ] && [ \"\$s\" != \"$accessibilityClass\" ] && [ \"\$s\" != \"$shortAccessibilityClass\" ]; then if [ -n \"\$new\" ]; then new=\"\$new:\$s\"; else new=\"\$s\"; fi; fi; done; if [ -n \"\$new\" ] && [ \"\$new\" != \"null\" ]; then settings put secure enabled_accessibility_services \"\$new\"; else settings delete secure enabled_accessibility_services; fi",
 
                 // Give Android/HyperOS time to process the disable.
                 "sleep 2",
 
-                // Add Smart Island back using the short component form.
                 "current=\$(settings get secure enabled_accessibility_services); if [ -n \"\$current\" ] && [ \"\$current\" != \"null\" ]; then current=\"\$current:$shortAccessibilityClass\"; else current=\"$shortAccessibilityClass\"; fi; settings put secure enabled_accessibility_services \"\$current\"",
 
-                // Re-enable Accessibility.
                 "settings put secure accessibility_enabled 1"
             )
 
             runShizukuCommands(commands)
         }
 
-    /** Grants only what the island needs to work (see [setupCommands]). */
     suspend fun autoGrantNecessaryPermissions(context: Context): Result<String> = grant(context, SetupScope.Necessary)
 
-    /** Grants everything: the necessary permissions and the optional ones (see [setupCommands]). */
     suspend fun autoGrantAllPermissions(context: Context): Result<String> = grant(context, SetupScope.All)
 
-    /**
-     * Applies again the scope the user chose last (the necessary one when none was chosen yet). Used after a boot or an update,
-     * so a phone that only got the necessary permissions is never given the optional ones behind the user's back.
-     */
+    /** Applies again the scope the user chose last (the necessary one when none was chosen yet). */
     suspend fun reapplySavedSetup(context: Context): Result<String> = grant(context, savedScope(context) ?: SetupScope.Necessary)
 
     private suspend fun grant(context: Context, scope: SetupScope): Result<String> = withContext(Dispatchers.IO) {
@@ -336,10 +318,8 @@ object ShizukuManager {
     }
 
     /**
-     * Runtime permissions of the necessary setup: nearby devices (Bluetooth connect, for the Bluetooth cards) and notifications. Location
-     * (fine and coarse) is left out on purpose: it is optional (see [optionalCommands]), used only by the weather widget and the Wi-Fi /
-     * privacy extras.
-     * A ROM that lacks one of the permissions just prints an error; the commands are joined with ";" so the rest still run.
+     * Runtime permissions of the necessary setup: nearby devices (Bluetooth connect, for the Bluetooth cards) and
+     * notifications.
      */
     internal fun runtimePermissionCommands(pkg: String): List<String> = listOf(
         "pm grant $pkg android.permission.BLUETOOTH_CONNECT",
@@ -354,10 +334,8 @@ object ShizukuManager {
     )
 
     /**
-     * Shell commands that let this app read notifications Android marked as sensitive. Without them the
-     * system hands the listener "Sensitive notification content hidden" instead of the title and text.
-     * Both forms are tried (the permission and the app op of the same name): a ROM that lacks one of them
-     * just prints an error, and the commands are joined with ";" so the rest still run.
+     * Shell commands that let this app read notifications Android marked as sensitive. Without them the system hands
+     * the listener "Sensitive notification content hidden" instead of the title and text.
      */
     internal fun sensitiveNotificationCommands(pkg: String): List<String> = listOf(
         "pm grant $pkg android.permission.RECEIVE_SENSITIVE_NOTIFICATIONS",
@@ -365,9 +343,9 @@ object ShizukuManager {
     )
 
     /**
-     * True when this app may read notifications Android marked as sensitive: either the permission or the app op of the same name
-     * is granted (the two commands of [sensitiveNotificationCommands] set one each; a ROM may honour only one of them).
-     * False on a phone that has neither, including an Android version without the feature.
+     * True when this app may read notifications Android marked as sensitive: either the permission or the app op of
+     * the same name is granted (the two commands of [sensitiveNotificationCommands] set one each; a ROM may honour
+     * only one of them).
      */
     fun isSensitiveNotificationAccessAllowed(context: Context): Boolean {
         val byPermission = context.checkSelfPermission("android.permission.RECEIVE_SENSITIVE_NOTIFICATIONS") ==
@@ -385,16 +363,13 @@ object ShizukuManager {
         }.getOrDefault(false)
     }
 
-    /** Grants only the sensitive-notification access (see [sensitiveNotificationCommands]). */
     suspend fun grantSensitiveNotificationAccess(context: Context): Result<String> = withContext(Dispatchers.IO) {
         runShizukuCommands(sensitiveNotificationCommands(context.packageName))
     }
 
     /**
      * Shell script that force-stops this app and starts it again. It runs inside Shizuku's shell, not in this
-     * process, so it keeps going after the force-stop kills the app. Force-stopping also switches the
-     * accessibility service off (Android removes it from the enabled list), so whatever was enabled before is
-     * switched back on before the app is started again.
+     * process, so it keeps going after the force-stop kills the app.
      */
     internal fun restartCommands(
         pkg: String,
@@ -416,9 +391,8 @@ object ShizukuManager {
     }
 
     /**
-     * Grants the sensitive-notification access, then force-stops and relaunches the app so the notification
-     * listener picks the new access up without the user restarting anything by hand. Returns after the grant;
-     * once [onGranted] has run, the restart kills this process, so nothing after it is guaranteed to execute.
+     * Grants the sensitive-notification access, then force-stops and relaunches the app so the notification listener
+     * picks the new access up without the user restarting anything by hand.
      */
     suspend fun grantSensitiveNotificationAccessAndRestart(
         context: Context,
@@ -449,9 +423,7 @@ object ShizukuManager {
         runShizukuCommands(script)
     }
 
-    /**
-     * Grants OEM Autostart and disables background kill / app standby restrictions via Shizuku.
-     */
+    /** Grants OEM Autostart and disables background kill and app standby restrictions. */
     suspend fun grantOemAutostartAndKillProtection(context: Context): Result<String> = withContext(Dispatchers.IO) {
         val pkg = context.packageName
         val commands = listOf(

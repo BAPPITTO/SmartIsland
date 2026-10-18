@@ -43,9 +43,8 @@ import com.agupta07505.smartisland.ui.bounceClick
 import com.agupta07505.smartisland.util.runCatchingLogged
 
 /**
- * One extra button of a media card (like, shuffle, cast, add to library ...), taken from the
- * playing app itself: either a custom action of its media session or a button of its
- * notification. [iconRes] is a resource of the app's package, [iconBitmap] a notification icon.
+ * One extra button of a media card (like, shuffle, cast ...), taken from the playing app: a custom action of its
+ * media session or a button of its notification.
  */
 data class MediaCustomControl(
     val label: String,
@@ -57,7 +56,6 @@ data class MediaCustomControl(
     val pendingIntent: PendingIntent? = null
 )
 
-/** Which buttons this app's media card offers, in display order. */
 data class ResolvedMediaControls(
     val hasPrevious: Boolean,
     val hasPlayPause: Boolean,
@@ -74,10 +72,8 @@ object MediaControls {
     private val PLAY_PAUSE_WORDS = listOf("play", "pause", "resume")
 
     /**
-     * Session first: its supported actions say whether previous / next exist (YouTube has no
-     * previous, for instance) and its custom actions are the app's own extra buttons, the same
-     * ones the system media card shows. Apps whose session reports nothing fall back to the
-     * buttons of their notification.
+     * Session first: its supported actions say whether previous / next exist (YouTube has no previous) and its custom
+     * actions are the app's extra buttons.
      */
     fun resolve(state: PlaybackState?, notification: IslandNotification?): ResolvedMediaControls {
         val pkg = notification?.packageName.orEmpty()

@@ -7,22 +7,19 @@
 
 package com.agupta07505.smartisland.model
 
-/** What the island does while an exempt app is in the foreground. */
 enum class ExemptMode {
-    /** Not exempt: the island works as usual. */
     None,
 
-    /** The island is totally off: no pill, no widgets, no cards, no popups, no gestures. */
+    /** No pill, widgets, cards, popups or gestures. */
     Off,
 
-    /** Portrait only: the collapsed pill stays in its place, but it is dead: no content, no popups, no touches. */
+    /** Portrait only: the collapsed pill stays in place but is dead (no content, popups or touches). */
     Static
 }
 
 /**
- * Apps that change the island while they are in the foreground (Settings > Exempt apps), with one list per orientation:
- * an app can be exempt in portrait only, in landscape only, or in both. In portrait an app can also be set to [ExemptMode.Static]
- * (the collapsed pill stays visible but does nothing); landscape only has [ExemptMode.Off]. Pure rule, so it can be unit tested.
+ * Apps that change the island while in the foreground (Settings > Exempt apps), per orientation. Portrait can also
+ * use [ExemptMode.Static]; landscape only [ExemptMode.Off].
  */
 object IslandExemption {
     fun modeFor(

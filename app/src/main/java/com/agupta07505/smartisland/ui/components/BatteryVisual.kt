@@ -46,14 +46,8 @@ import kotlinx.coroutines.launch
 import androidx.compose.runtime.getValue
 
 /**
- * The five looks the battery card can take. Every state has its own icon and colour, and every
- * motion is slow and soft so the card stays calm:
- *
- *  - PluggedIn  the bolt pops in and breathes, the ring glows and one faint ripple drifts outward now and then
- *  - PluggedOut the same bolt in red, drained: it shrinks and dims once, the ring fades softly; no shake
- *  - Full       full-battery icon eases in with one ripple, then a calm slow glow
- *  - Low        alert icon, ring and bar fade softly in and out in red
- *  - Saver      static amber icon, still ring
+ * The five looks the battery card can take. Every state has its own icon and colour, and every motion is slow and
+ * soft so the card stays calm.
  */
 enum class BatteryVisual { PluggedIn, PluggedOut, Full, Low, Saver }
 
@@ -116,13 +110,9 @@ fun vivid(color: Color, minValue: Float = 0.96f): Color {
     return Color(r1 + m, g1 + m, b1 + m, color.alpha)
 }
 
-/** Constant 1: states that do not pulse share this, so nothing animates (and nothing ticks) for them. */
 private val SolidPulse: State<Float> = mutableFloatStateOf(1f)
 
-/**
- * Alpha for ring, icon and bar: Low fades softly, Full and PluggedIn glow slowly, the rest stay solid. Returns the State itself, to be read
- * inside a graphicsLayer / draw block, so the card is not recomposed on every frame of the pulse. Only the animation the state needs runs.
- */
+/** Alpha for ring, icon and bar: Low fades softly, Full and PluggedIn glow slowly, the rest stay solid. */
 @Composable
 fun rememberBatteryPulse(visual: BatteryVisual): State<Float> {
     val transition = rememberInfiniteTransition(label = "batteryPulse")
@@ -149,7 +139,6 @@ fun rememberBatteryPulse(visual: BatteryVisual): State<Float> {
     }
 }
 
-/** Plugged-in ripple: one faint ring drifts outward from the icon, then a pause before the next. */
 @Composable
 private fun OutwardWaves(color: Color, boxSize: Dp, modifier: Modifier = Modifier) {
     val transition = rememberInfiniteTransition(label = "outwardRipple")
@@ -182,8 +171,8 @@ private fun OutwardWaves(color: Color, boxSize: Dp, modifier: Modifier = Modifie
 }
 
 /**
- * Ring + state icon as one unit. [disc] adds the tinted circle behind the icon (expanded card); the collapsed pill goes without.
- * [pulse] is read in graphicsLayer blocks only (see [rememberBatteryPulse]).
+ * Ring + state icon as one unit. [disc] adds the tinted circle behind the icon (expanded card); the collapsed pill
+ * goes without. [pulse] is read in graphicsLayer blocks only.
  */
 @Composable
 fun BatteryBadge(
@@ -242,7 +231,6 @@ fun BatteryBadge(
     }
 }
 
-/** The state icon with its own motion; [pulse] comes from [rememberBatteryPulse]. */
 @Composable
 fun BatteryStateIcon(
     visual: BatteryVisual,
@@ -322,13 +310,11 @@ fun BatteryStateIcon(
                 .graphicsLayer {
                     when (visual) {
                         BatteryVisual.PluggedIn -> {
-                            // Pops in, then breathes.
                             val s = (0.4f + 0.6f * enter.value) * breathe.value
                             scaleX = s
                             scaleY = s
                         }
                         BatteryVisual.PluggedOut -> {
-                            // The same bolt, drained: it shrinks and dims once and stays that way.
                             val d = drain.value
                             val s = 1.08f - 0.26f * d
                             scaleX = s
@@ -351,6 +337,5 @@ fun BatteryStateIcon(
     }
 }
 
-/** Unplugged bolt: how long it holds at full strength, then how long it takes to drain. */
 private const val UNPLUG_HOLD_MS = 150L
 private const val UNPLUG_DRAIN_MS = 900

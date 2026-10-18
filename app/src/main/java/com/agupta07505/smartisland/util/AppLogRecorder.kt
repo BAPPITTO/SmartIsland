@@ -29,10 +29,6 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
-/**
- * Diagnostic logger and process logcat aggregator for Smart Island troubleshooting.
- * Captures in-memory log events and disk buffer, with one-tap export to storage via SAF.
- */
 object AppLogRecorder {
     private const val TAG = "SmartIslandLog"
     private const val MAX_IN_MEMORY_LOGS = 3000
@@ -45,9 +41,8 @@ object AppLogRecorder {
     private val inMemoryLogs = ConcurrentLinkedQueue<String>()
     private val logCount = AtomicInteger(0)
 
-    // Disk copy of the buffer: a notification listener that the system or an OEM task killer stops
-    // takes this process (and the in-memory buffer) with it, which is often exactly the moment a
-    // missed notification needs explaining. One thread keeps the file writes in order.
+    // Disk copy of the buffer: when the system or an OEM task killer stops the listener, the process
+    // and its in-memory buffer die too. One thread keeps the file writes in order.
     private val diskExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "SmartIslandLogWriter").apply { isDaemon = true } }
     @Volatile private var logFile: File? = null
 
@@ -55,24 +50,16 @@ object AppLogRecorder {
     var isRecording: Boolean = false
         private set(value) {
             field = value
-            // While recording, a watchdog logs the main thread's stack whenever it stalls (see MainThreadWatchdog).
             if (value) MainThreadWatchdog.start() else MainThreadWatchdog.stop()
         }
 
-    /**
-     * Follows the "record logs" setting. Safe to call on every settings emission: it only acts when
-     * the value changes, and it also reloads the entries a previous process wrote to disk.
-     */
+    /** Safe to call on every settings emission: it only acts when the value changes. */
     fun applySetting(context: Context, enabled: Boolean) {
         attach(context)
         if (enabled != isRecording) updateRecordingState(context, enabled)
     }
 
-    /**
-     * Call as early as possible in a process (Application and service onCreate). Reloads the entries
-     * a previous process wrote and, when recording was on, resumes at once, so the system restarting
-     * the app or its listener is itself in the log. Safe to call repeatedly.
-     */
+    /** Call early in each process (Application and service onCreate), so a system restart of the app is itself logged. */
     fun restore(context: Context) {
         attach(context)
     }
@@ -98,7 +85,6 @@ object AppLogRecorder {
         }
     }
 
-    /** Points the recorder at the app's files directory and restores entries a dead process left. */
     @Synchronized
     private fun attach(context: Context) {
         if (logFile != null) return
@@ -173,11 +159,7 @@ object AppLogRecorder {
 
     fun getLogCount(): Int = logCount.get()
 
-    /**
-     * Writes an uncaught exception to the log file synchronously (the process is about to die, so
-     * the background writer cannot be trusted) and then returns. Records even when the recorder
-     * is off, so a crash always leaves a trace for the next export.
-     */
+    /** Writes synchronously because the process is dying, and records even when the recorder is off. */
     fun recordCrash(thread: Thread, error: Throwable) {
         val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US).format(Date())
         val entry = "[$timestamp] [Thread: ${thread.name}] [E/CRASH] Uncaught exception, process is dying\n" +
@@ -188,20 +170,17 @@ object AppLogRecorder {
         runCatching { FileWriter(file, true).use { it.write(entry + ENTRY_SEPARATOR + "\n") } }
     }
 
-    /** Unit tests only: switches recording on without a Context (no disk file, no preferences). */
     internal fun startRecordingForTest() {
         resetForTest()
         isRecording = true
     }
 
-    /** Unit tests only: empties the in-memory buffer and stops recording. */
     internal fun resetForTest() {
         isRecording = false
         inMemoryLogs.clear()
         logCount.set(0)
     }
 
-    /** Unit tests only: the newest entry in the in-memory buffer, or null. */
     internal fun lastEntryForTest(): String? = inMemoryLogs.lastOrNull()
 
     fun clear(context: Context) {
@@ -213,10 +192,6 @@ object AppLogRecorder {
         record("I", TAG, "Log buffer cleared by user")
     }
 
-    /**
-     * Reads process-level logcat filtered to this application's PID.
-     * Captures all standard android.util.Log messages and framework events.
-     */
     fun getProcessLogcat(): String {
         return runCatching {
             val pid = Process.myPid()
@@ -236,14 +211,6 @@ object AppLogRecorder {
         }.getOrElse { "Failed to read process logcat: ${it.localizedMessage}" }
     }
 
-    /**
-     * Compiles a comprehensive diagnostic report containing:
-     * - System & Hardware Metadata
-     * - Application State & Permissions
-     * - Complete Settings Configuration JSON
-     * - In-Memory Recorded Event Stream
-     * - Full Process Logcat
-     */
     suspend fun generateDiagnosticReport(context: Context, settings: SmartIslandSettings): String = withContext(Dispatchers.IO) {
         val now = SimpleDateFormat("yyyy-MM-dd HH:mm:ss z", Locale.US).format(Date())
         val displayMetrics = context.resources.displayMetrics
@@ -308,9 +275,6 @@ object AppLogRecorder {
         }
     }
 
-    /**
-     * Exports the diagnostic report to the user-selected Storage Access Framework URI.
-     */
     suspend fun exportLogsToUri(
         context: Context,
         uri: Uri,

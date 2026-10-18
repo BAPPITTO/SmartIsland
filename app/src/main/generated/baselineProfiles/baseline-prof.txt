@@ -14130,7 +14130,6 @@ HSPLcom/agupta07505/smartisland/data/SmartIslandSettings;->getLandscapeXOffset()
 HSPLcom/agupta07505/smartisland/data/SmartIslandSettings;->getLandscapeYOffset()F
 HSPLcom/agupta07505/smartisland/data/SmartIslandSettings;->getLiveActivitiesEnabled()Z
 HSPLcom/agupta07505/smartisland/data/SmartIslandSettings;->getLiveActivityColor()J
-HSPLcom/agupta07505/smartisland/data/SmartIslandSettings;->getLockScreenPrivacy()Ljava/lang/String;
 HSPLcom/agupta07505/smartisland/data/SmartIslandSettings;->getLongPressAction()Ljava/lang/String;
 HSPLcom/agupta07505/smartisland/data/SmartIslandSettings;->getMediaBlurBehind()Z
 HSPLcom/agupta07505/smartisland/data/SmartIslandSettings;->getMediaBlurEnabled()Z
@@ -14308,7 +14307,6 @@ HSPLcom/agupta07505/smartisland/data/SmartIslandSettingsRepository$Keys;->getLan
 HSPLcom/agupta07505/smartisland/data/SmartIslandSettingsRepository$Keys;->getLandscapeYOffset()Landroidx/datastore/preferences/core/Preferences$Key;
 HSPLcom/agupta07505/smartisland/data/SmartIslandSettingsRepository$Keys;->getLiveActivitiesEnabled()Landroidx/datastore/preferences/core/Preferences$Key;
 HSPLcom/agupta07505/smartisland/data/SmartIslandSettingsRepository$Keys;->getLiveActivityColor()Landroidx/datastore/preferences/core/Preferences$Key;
-HSPLcom/agupta07505/smartisland/data/SmartIslandSettingsRepository$Keys;->getLockScreenPrivacy()Landroidx/datastore/preferences/core/Preferences$Key;
 HSPLcom/agupta07505/smartisland/data/SmartIslandSettingsRepository$Keys;->getLongPressAction()Landroidx/datastore/preferences/core/Preferences$Key;
 HSPLcom/agupta07505/smartisland/data/SmartIslandSettingsRepository$Keys;->getMediaBlurBehind()Landroidx/datastore/preferences/core/Preferences$Key;
 HSPLcom/agupta07505/smartisland/data/SmartIslandSettingsRepository$Keys;->getMediaBlurEnabled()Landroidx/datastore/preferences/core/Preferences$Key;
@@ -14459,7 +14457,6 @@ HSPLcom/agupta07505/smartisland/model/IslandEvent;->getGroup()Ljava/lang/String;
 HSPLcom/agupta07505/smartisland/model/IslandEvent;->getId()Ljava/lang/String;
 HSPLcom/agupta07505/smartisland/model/IslandEvent;->getLabel()Ljava/lang/String;
 HSPLcom/agupta07505/smartisland/model/IslandEvent;->getShortLabel()Ljava/lang/String;
-HSPLcom/agupta07505/smartisland/model/IslandEvent;->isPrivacy()Z
 HSPLcom/agupta07505/smartisland/model/IslandEvent;->values()[Lcom/agupta07505/smartisland/model/IslandEvent;
 Lcom/agupta07505/smartisland/model/IslandEvent$Companion;
 HSPLcom/agupta07505/smartisland/model/IslandEvent$Companion;-><init>()V

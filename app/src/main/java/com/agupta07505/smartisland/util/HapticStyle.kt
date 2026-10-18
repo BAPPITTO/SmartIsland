@@ -7,23 +7,17 @@
 
 package com.agupta07505.smartisland.util
 
-/** What the island is reporting through the vibration motor. */
 enum class HapticKind { Expand, Collapse, Swipe, Hold, Merge, Lock }
 
-/** One buzz: how long and how hard (1..255), plus the system effect id to prefer on Android 10+. */
+/** Amplitude is 1..255; [effect] is preferred on Android 10+. */
 data class HapticSpec(val durationMs: Long, val amplitude: Int, val effect: Effect)
 
-/** Mirrors the system's predefined effects so this file stays free of Android classes (unit-testable). */
+/** Mirrors the system's predefined effects so this file stays free of Android classes. */
 enum class Effect { Tick, Click, HeavyClick }
 
 /**
- * Haptic strength (Notifications and privacy). [OFF] vibrates never. The other two scale the amplitude
- * of the fallback buzz; on Android 10+ the system's own tick/click effects are used instead, which feel
- * crisp on any motor.
- *
- * Each kind has its own feel: expand is a soft click, collapse a lighter tick, a swipe action a short
- * tick, and the 300 ms hold (which confirms the hold mode) the heavy click it always was. The merge touch (two
- * cutouts meeting) is the lightest tick of all. The swipe lock is a dull, longer buzz.
+ * [OFF] never vibrates. The other two scale the amplitude of the fallback buzz; on Android 10+ the system's own
+ * tick/click effects are used instead.
  */
 enum class HapticStrength(val id: String, val scale: Float) {
     OFF("off", 0f),
@@ -39,7 +33,7 @@ enum class HapticStrength(val id: String, val scale: Float) {
             HapticKind.Swipe -> Triple(12L, 130, Effect.Tick)
             HapticKind.Hold -> Triple(60L, 200, Effect.HeavyClick)
             HapticKind.Merge -> Triple(10L, 90, Effect.Tick)
-            // Swiping locks for a moment. A dull, slightly longer buzz, unlike the crisp arm tick.
+            // Dull and slightly longer, unlike the crisp tick.
             HapticKind.Lock -> Triple(28L, 100, Effect.Click)
         }
         return HapticSpec(duration, (amplitude * scale).toInt().coerceIn(1, 255), effect)
@@ -53,7 +47,6 @@ enum class HapticStrength(val id: String, val scale: Float) {
 
         val VALID_IDS: Set<String> = entries.map { it.id }.toSet()
 
-        /** Unknown or missing ids (old backups) fall back to [NORMAL]. */
         fun fromId(id: String?): HapticStrength = entries.firstOrNull { it.id == id } ?: NORMAL
     }
 }

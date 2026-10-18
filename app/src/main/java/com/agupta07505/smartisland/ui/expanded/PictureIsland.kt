@@ -15,9 +15,8 @@ import androidx.compose.ui.unit.dp
 internal val PICTURE_ISLAND_MIN_HEIGHT = 200.dp
 
 /**
- * Landscape: an open picture, or the image selector, is its own island beside the card (the sibling picker's slot, on the side
- * away from the camera). True when the picture open belongs to the shown card and really exists, or when the selector is open
- * for a card with 2 or more pictures ([selectorOpen]).
+ * Landscape: an open picture, or the image selector, is its own island beside the card, on the side away from the
+ * camera.
  */
 internal fun pictureShownBesideCard(
     isLandscape: Boolean,
@@ -31,12 +30,11 @@ internal fun pictureShownBesideCard(
         (selectorOpen && cardMediaCount >= 2)
     )
 
-/** Height of the landscape picture island: tall enough for a full picture, never above the tallest island. */
 internal fun pictureIslandHeight(cardHeight: Dp): Dp = maxOf(cardHeight, PICTURE_ISLAND_MIN_HEIGHT).coerceAtMost(260.dp)
 
 /**
- * Height of the landscape island beside the card for the step it shows: the half-size picture and the selector are halfway
- * between the card minimum and the full picture ([PICTURE_MID_HEIGHT]), the full picture is the tallest island.
+ * Height of the landscape island beside the card for its step: the half-size picture and the selector are halfway
+ * between the card minimum and the full picture ([PICTURE_MID_HEIGHT]); the full picture is the tallest.
  */
 internal fun pictureIslandStepHeight(fullSize: Boolean): Dp = if (fullSize) EXPANDED_MEDIA_HEIGHT else PICTURE_MID_HEIGHT
 
@@ -49,8 +47,8 @@ internal fun stepsOpenBesideCard(steps: com.agupta07505.smartisland.model.CardSt
 }
 
 /**
- * Landscape: the one progress of the two islands (0 = the card alone, 1 = card and island side by side) while a step follows the
- * finger. A step that opens the island runs it up with the drag, one that closes it runs it down; [dragProgress] is 0..1.
+ * Landscape: the one progress of the two islands (0 = card alone, 1 = side by side) while a step follows the finger:
+ * a step that opens the island runs it up with the drag, one that closes it runs it down.
  */
 internal fun besideDragSplitProgress(opening: Boolean, dragProgress: Float): Float =
     (if (opening) dragProgress else 1f - dragProgress).coerceIn(0f, 1f)
@@ -59,8 +57,8 @@ internal fun besideDragSplitProgress(opening: Boolean, dragProgress: Float): Flo
 internal enum class PictureArrowSide { Inside, Left, Right }
 
 /**
- * Landscape: the picture island sits on the side away from the camera (the sibling picker's side), so the
- * arrows that open it are on that side too. [pickerOnLeft] is true when the camera is on the right.
+ * Landscape: the picture island is on the side away from the camera (the sibling picker's side), so its arrows are
+ * there too. [pickerOnLeft] is true when the camera is on the right.
  */
 internal fun pictureArrowSide(isLandscape: Boolean, pickerOnLeft: Boolean): PictureArrowSide = when {
     !isLandscape -> PictureArrowSide.Inside

@@ -232,7 +232,7 @@ class OrientationProfileTest {
         assertEquals(167f, idle.yOffset, 0.01f) // 360 / 2 - 26 / 2
     }
 
-    // ---- Reverse landscape (display rotation 270): the authored profile is mirrored ----
+    // Reverse landscape (display rotation 270): the authored profile is mirrored
 
     @Test
     fun reverseLandscapeMirrorsAForcedLeftIdlePill() {

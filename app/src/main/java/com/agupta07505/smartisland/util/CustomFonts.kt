@@ -14,9 +14,8 @@ import android.provider.OpenableColumns
 import java.io.File
 
 /**
- * Fonts the user adds from a .ttf or .otf file. A chosen font is copied into the app's private storage
- * (`files/fonts`) so it keeps working when the original file moves. The island font setting stores the id
- * `custom:<file name>`; the helpers here are pure so they can be tested without a device.
+ * Fonts the user adds from a .ttf or .otf file, copied into private storage (`files/fonts`) so they keep working when
+ * the original moves. The island font setting stores the id `custom:<file name>`.
  */
 object CustomFonts {
     const val ID_PREFIX = "custom:"
@@ -26,7 +25,6 @@ object CustomFonts {
     private const val FALLBACK_NAME = "Custom font"
     private val SAFE_FILE_NAME = Regex("^[A-Za-z0-9][A-Za-z0-9._ \\-]{0,78}\\.(ttf|otf)$")
 
-    /** The result of adding a font. */
     sealed interface ImportResult {
         data class Added(val id: String) : ImportResult
         data object TooLarge : ImportResult
@@ -45,7 +43,6 @@ object CustomFonts {
         return name.takeIf { SAFE_FILE_NAME.matches(it) && !it.contains("..") }
     }
 
-    /** The name shown in the picker: the file name without its extension. */
     fun labelOf(fileName: String): String = fileName.substringBeforeLast('.')
 
     /** "ttf" or "otf" from the first bytes of a font file, or null when it is neither. */
@@ -63,7 +60,6 @@ object CustomFonts {
         }
     }
 
-    /** A safe stored file name from the picked file's display name and its real format. */
     fun safeFileName(displayName: String?, extension: String): String {
         val base = (displayName ?: "")
             .substringBeforeLast('.', displayName ?: "")
@@ -88,7 +84,6 @@ object CustomFonts {
 
     private fun dir(context: Context): File = File(context.filesDir, DIR)
 
-    /** The file names of every font the user has added, sorted by name. */
     fun list(context: Context): List<String> =
         dir(context).listFiles()
             ?.filter { it.isFile && SAFE_FILE_NAME.matches(it.name) }
@@ -96,13 +91,11 @@ object CustomFonts {
             ?.sortedBy { it.lowercase() }
             ?: emptyList()
 
-    /** The file behind a font id when it exists, otherwise null. */
     fun fileFor(context: Context, id: String): File? {
         val name = fileNameOf(id) ?: return null
         return File(dir(context), name).takeIf { it.isFile }
     }
 
-    /** Loads the typeface of a stored font; null when the file is missing or cannot be read as a font. */
     fun typeface(context: Context, id: String): Typeface? {
         val file = fileFor(context, id) ?: return null
         return runCatching { Typeface.createFromFile(file) }.getOrNull()?.takeIf { it !== Typeface.DEFAULT }
@@ -143,6 +136,5 @@ object CustomFonts {
         }
     }
 
-    /** Deletes a stored font. Returns true when a file was removed. */
     fun delete(context: Context, id: String): Boolean = fileFor(context, id)?.delete() == true
 }

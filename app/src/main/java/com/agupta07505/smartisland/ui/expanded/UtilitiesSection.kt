@@ -113,7 +113,6 @@ import kotlinx.coroutines.delay
 internal val UTILITY_CELL_HEIGHT = 56.dp
 internal val UTILITY_CELL_GAP = 8.dp
 
-/** Height of the brightness (top) and volume (bottom) sliders on the Utilities page. */
 internal val UTILITY_SLIDER_HEIGHT = 20.dp
 
 /** Space between a slider and the grid. Two sliders and their gaps (46 dp) make a two-row grid exactly as tall as a two-row Apps page. */
@@ -122,7 +121,6 @@ internal val UTILITY_SLIDER_GAP = 3.dp
 /** Width kept free down the right edge for the settings button (and the page dots) so no cell sits under them. */
 internal val UTILITY_SETTINGS_GUTTER = 32.dp
 
-/** Height of a page that reaches down [usedRows] rows of the grid; 0 when nothing is placed. */
 internal fun utilitiesPageHeight(usedRows: Int): Dp =
     if (usedRows <= 0) 0.dp
     else UTILITY_CELL_HEIGHT * usedRows + UTILITY_CELL_GAP * (usedRows - 1) + (UTILITY_SLIDER_HEIGHT + UTILITY_SLIDER_GAP) * 2
@@ -172,8 +170,8 @@ internal fun utilityIcon(type: UtilityType): ImageVector = when (type) {
 }
 
 /**
- * The Utilities page: a [UtilityGrid.COLUMNS] x [UtilityGrid.ROWS] grid of utilities and app widgets laid out as the user set
- * them in the app. Fills the launcher window it is in; the window is as tall as the rows in use (see [utilitiesPageHeight]).
+ * The Utilities page: a [UtilityGrid.COLUMNS] x [UtilityGrid.ROWS] grid of utilities and app widgets as the user
+ * arranged them. Fills its launcher window, as tall as the rows in use.
  */
 @Composable
 internal fun UtilitiesContainer(settings: SmartIslandSettings, modifier: Modifier = Modifier) {
@@ -185,8 +183,8 @@ internal fun UtilitiesContainer(settings: SmartIslandSettings, modifier: Modifie
     val pagerState = rememberPagerState(pageCount = { tabCount })
     var calculatorChoices by remember { mutableStateOf<List<com.agupta07505.smartisland.data.LaunchableApp>?>(null) }
     var pickingTimer by remember { mutableStateOf(false) }
-    // Rearranging: a long press on a utility lifts it, it follows the finger, and letting go drops it on the nearest cell (or
-    // trades places with the utility it lands on). [dragStart] is where the finger was when the long press landed.
+    // Rearranging: a long press lifts a utility, it follows the finger, and letting go drops it on the nearest cell (or trades
+    // places). [dragStart] is where the finger was when the long press landed.
     var draggedKey by remember { mutableStateOf<String?>(null) }
     var dragStart by remember { mutableStateOf(Offset.Zero) }
     var dragDelta by remember { mutableStateOf(Offset.Zero) }
@@ -204,7 +202,6 @@ internal fun UtilitiesContainer(settings: SmartIslandSettings, modifier: Modifie
 
     fun onTap(item: UtilityPlacement) {
         if (item.type == UtilityType.Timer) {
-            // A timer needs a length: pick one here, then the island starts it itself.
             pickingTimer = true
             return
         }
@@ -263,9 +260,8 @@ internal fun UtilitiesContainer(settings: SmartIslandSettings, modifier: Modifie
                 onCancel = { pickingTimer = false }
             )
             else -> Column(Modifier.fillMaxSize().padding(top = 2.dp, end = UTILITY_SETTINGS_GUTTER, bottom = 6.dp)) {
-            // The plus (add a utility) takes the first empty cell. On the first tab it never makes the page taller than the window already
-            // is: a cell in the rows in use, or the next row when the window has the room for it. The second tab only exists once the
-            // first is full, so it always has the full height.
+            // The plus takes the first empty cell. On the first tab it never makes the page taller than the window
+            // already is: a cell in the rows in use, or the next row if the window has room.
             val usedRows = UtilityLayout.usedRows(layout)
             fun plusCellFor(tab: Int): Pair<Int, Int>? {
                 val base = tab * UtilityGrid.ROWS
@@ -277,7 +273,6 @@ internal fun UtilitiesContainer(settings: SmartIslandSettings, modifier: Modifie
             }
             val gridRows = maxOf(usedRows, (plusCellFor(0)?.first ?: -1) + 1)
             val gridHeight = UTILITY_CELL_HEIGHT * gridRows + UTILITY_CELL_GAP * (gridRows - 1)
-            // The button inside the left end of the brightness slider switches adaptive brightness on and off.
             val autoBrightness by produceState(false) {
                 while (true) { value = UtilityActions.autoBrightnessEnabled(context); delay(500) }
             }
@@ -290,13 +285,11 @@ internal fun UtilitiesContainer(settings: SmartIslandSettings, modifier: Modifie
                 iconActive = autoBrightness
             )
             Spacer(Modifier.height(UTILITY_SLIDER_GAP))
-            // The grid stays in the middle of the space between the two sliders. The sliders sit outside the sideways scroll, so they
-            // never move with it and never compete with it for a drag.
+            // The sliders sit outside the sideways scroll, so they never move with it or compete with it for a drag.
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxWidth().height(gridHeight),
-                // A lifted utility follows the finger instead of scrolling the page.
                 userScrollEnabled = draggedKey == null,
                 // Only one page is ever on screen at a time; keeping the other composed would run its tiles' polling for nothing.
                 beyondViewportPageCount = 0
@@ -307,15 +300,14 @@ internal fun UtilitiesContainer(settings: SmartIslandSettings, modifier: Modifie
                 val density = LocalDensity.current
                 val pitchX = with(density) { (cellWidth + UTILITY_CELL_GAP).toPx() }
                 val pitchY = with(density) { (UTILITY_CELL_HEIGHT + UTILITY_CELL_GAP).toPx() }
-                // What letting go of [item], [delta] px from where it rests, would leave behind; null when nothing would change.
-                // The page is only as tall as the rows in use, so a drop that would need another row does not count.
+                // What letting go of [item], [delta] px from where it rests, would leave behind; null when nothing changes.
+                // A drop that needs another row does not count (the page is only as tall as the rows in use).
                 fun landing(item: UtilityPlacement, delta: Offset): List<UtilityPlacement>? {
                     val (row, col) = UtilityLayout.snapCell(item, item.col * pitchX + delta.x, UtilityGrid.localRow(item.row) * pitchY + delta.y, pitchX, pitchY)
                     val result = UtilityLayout.drop(layout, item.key, row, col)
                     return result.takeIf { it != layout && UtilityLayout.usedRows(it) <= UtilityLayout.usedRows(layout) }
                 }
                 val liftedItem = layout.firstOrNull { it.key == draggedKey && it.tab == tab }
-                // Where the lifted utility would land, shown as a soft square under it.
                 if (liftedItem != null) {
                     landing(liftedItem, dragDelta)?.firstOrNull { it.key == liftedItem.key }?.let { spot ->
                         Box(
@@ -411,7 +403,6 @@ internal fun UtilitiesContainer(settings: SmartIslandSettings, modifier: Modifie
             }
 
             Spacer(Modifier.height(UTILITY_SLIDER_GAP))
-            // The button inside the left end of the volume slider switches the ringer between sound and silent (or vibrate).
             val ringer by produceState(android.media.AudioManager.RINGER_MODE_NORMAL) {
                 while (true) { value = UtilityActions.ringerMode(context); delay(500) }
             }
@@ -429,15 +420,12 @@ internal fun UtilitiesContainer(settings: SmartIslandSettings, modifier: Modifie
             )
             }
         }
-        // Which tab is showing; only drawn when there is a second one. Sits in the strip under the volume slider.
         if (tabCount > 1 && layout.isNotEmpty() && choices == null && !pickingTimer) {
             UtilityTabDots(tabCount, pagerState.currentPage, Modifier.align(Alignment.BottomCenter).padding(bottom = 1.dp))
         }
     }
 }
 
-
-/** Small dots under the grid, one per tab, the showing tab brighter (the same look as the launcher's own page dots). */
 @Composable
 private fun UtilityTabDots(count: Int, current: Int, modifier: Modifier = Modifier) {
     val palette = LocalIslandPalette.current
@@ -453,19 +441,12 @@ private fun UtilityTabDots(count: Int, current: Int, modifier: Modifier = Modifi
     }
 }
 
-/**
- * A horizontal level control (brightness, volume): a rounded bar filled up to the level, its icon at the left. Only a mostly
- * sideways drag moves it, and a tap sets the level where it lands. It takes every touch it owns (the page's swipes and the
- * island's own gestures never see them); a drag that starts mostly vertical is left alone, so Up / Down still switch pages from it.
- * [read] is polled while the page shows, so the bar follows changes made elsewhere (hardware keys, the system panel).
- */
 @Composable
 private fun UtilitySlider(
     icon: ImageVector,
     description: String,
     read: () -> Float,
     write: (Float) -> Unit,
-    // When set, the icon at the slider's left end is a button.
     onIconClick: (() -> Unit)? = null,
     // A dimmed icon tells that the button's setting is off.
     iconActive: Boolean = true
@@ -498,11 +479,9 @@ private fun UtilitySlider(
                     while (true) {
                         val event = awaitPointerEvent()
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                        // Someone else took this touch before it was ours.
                         if (change.isConsumed && !owned) break
                         if (!change.pressed) {
                             if (!owned) {
-                                // A tap sets the level where it landed.
                                 val level = fractionAt(down.position.x)
                                 shown = level
                                 currentWrite(level)
@@ -556,8 +535,8 @@ private fun UtilitySlider(
 }
 
 /**
- * The corner button: opens the app on the App Shortcuts configuration. It is drawn outside the page that scrolls, so it stays in
- * the window's top-right corner whatever page is swiping in.
+ * The corner button: opens the app on the App Shortcuts configuration. Drawn outside the scrolling page so it stays
+ * in the window's top-right corner.
  */
 @Composable
 internal fun BoxScope.UtilitiesSettingsButton() {
@@ -581,7 +560,6 @@ internal fun BoxScope.UtilitiesSettingsButton() {
     }
 }
 
-/** A utility: just its icon, centred in its one cell (the name is only read aloud). A switch utility lights up while it is on. */
 @Composable
 private fun UtilityTile(type: UtilityType, onClick: () -> Unit, gestureModifier: Modifier = Modifier) {
     val palette = LocalIslandPalette.current
@@ -592,8 +570,8 @@ private fun UtilityTile(type: UtilityType, onClick: () -> Unit, gestureModifier:
             .fillMaxSize()
             .clip(RoundedCornerShape(14.dp))
             .background(if (active) palette.accentCyan.copy(alpha = 0.28f) else palette.text.copy(alpha = 0.10f))
-            // A long press does nothing by itself (it only lifts the tile for dragging), so letting go after one does not run the
-            // utility. The drag is applied after the click so it sees the touch first (see ShortcutApp).
+            // A long press does nothing by itself (it only lifts the tile for dragging), so letting go after one does
+            // not run the utility. The drag is applied after the click so it sees the touch first.
             .combinedClickable(onClick = onClick, onLongClick = {})
             .then(gestureModifier),
         contentAlignment = Alignment.Center
@@ -613,7 +591,6 @@ private val SWITCH_LIKE_UTILITIES = setOf(
     UtilityType.DarkMode, UtilityType.BatterySaver
 )
 
-/** Whether a switch-like utility is on right now. Read twice a second while the page is showing. */
 @Composable
 private fun utilityActive(type: UtilityType, context: Context): Boolean {
     if (type !in SWITCH_LIKE_UTILITIES) return false
@@ -641,7 +618,6 @@ private fun utilityActive(type: UtilityType, context: Context): Boolean {
     return on
 }
 
-/** An app widget drawn by the shared widget host, sized to its cells. A widget whose app was removed shows a short note. */
 @Composable
 private fun WidgetTile(widgetId: Int, width: Dp, height: Dp) {
     val palette = LocalIslandPalette.current
@@ -682,19 +658,16 @@ private fun WidgetTile(widgetId: Int, width: Dp, height: Dp) {
                 .clip(RoundedCornerShape(14.dp))
         )
         if (scrollsVertically) {
-            // A widget that scrolls up and down keeps every vertical swipe for itself, so the page could not be left by
-            // swiping on it. The two edge strips take the touch away from the widget and consume nothing, so the launcher's
-            // own swipe (up or down: Utilities <-> Apps) reads it instead. A tap on a strip does nothing.
+            // A widget that scrolls up and down keeps every vertical swipe for itself, so the page could not be left
+            // by swiping on it.
             Box(Modifier.align(Alignment.CenterStart).fillMaxHeight().width(WIDGET_SWIPE_EDGE).pageSwipeEdge())
             Box(Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(WIDGET_SWIPE_EDGE).pageSwipeEdge())
         }
     }
 }
 
-/** Width of the strips on a scrolling widget's left and right edges that swipe the page instead of the widget. */
 private val WIDGET_SWIPE_EDGE = 18.dp
 
-/** Takes the touch away from whatever is underneath without consuming it, so the parent's swipe reading still sees it. */
 private fun Modifier.pageSwipeEdge(): Modifier = pointerInput(Unit) {
     awaitEachGesture {
         awaitFirstDown(requireUnconsumed = false)
@@ -704,10 +677,6 @@ private fun Modifier.pageSwipeEdge(): Modifier = pointerInput(Unit) {
     }
 }
 
-/**
- * True when the view, or anything inside it, can scroll up or down right now (a list with more rows than fit, a scroll view), or
- * is a stack that flips vertically. Widgets that fit their space, or that only react to taps, are not scrollable here.
- */
 private fun hasVerticalScroll(view: View): Boolean {
     if (view is android.widget.StackView) return true
     if (view.canScrollVertically(1) || view.canScrollVertically(-1)) return true
@@ -717,7 +686,6 @@ private fun hasVerticalScroll(view: View): Boolean {
     return false
 }
 
-/** The one-time choice of calculator app, shown in place of the grid. The pick is remembered. */
 @Composable
 private fun CalculatorPicker(
     choices: List<com.agupta07505.smartisland.data.LaunchableApp>,
@@ -769,10 +737,6 @@ private fun CalculatorPicker(
     }
 }
 
-/**
- * The timer length, chosen in place of the grid: one row of lengths that share the width (no sideways scrolling, which would
- * fight the page's swipe), and a close button. It fits even when the page is a single row tall.
- */
 @Composable
 private fun TimerPicker(onPick: (Int) -> Unit, onCancel: () -> Unit) {
     val palette = LocalIslandPalette.current

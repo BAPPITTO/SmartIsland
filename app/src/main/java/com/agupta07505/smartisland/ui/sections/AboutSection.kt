@@ -111,7 +111,6 @@ fun AboutSection(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // 1. GitHub Repository Badges
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -134,7 +133,6 @@ fun AboutSection(
                     )
                 }
 
-                // GitHub Repo Badges
                 FlowRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -184,7 +182,6 @@ fun AboutSection(
             }
         }
 
-        // 4. 100% On-Device & Zero-Telemetry Privacy Shield
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -228,7 +225,6 @@ fun AboutSection(
             }
         }
 
-        // 5. Application Information Card
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -294,7 +290,6 @@ fun AboutSection(
         }
 
         
-        // Bundled Fonts License Credit Card
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -317,7 +312,6 @@ fun AboutSection(
             }
         }
 
-        // 6. Developer & Contact Card
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),

@@ -31,7 +31,10 @@ internal object LedRaster {
 
     private val cache = LinkedHashMap<String, LedGrid?>()
 
-    /** [text] in the font [fontId] as dots, [LedTick.ROWS] rows tall; null when the font cannot be drawn (the caller uses the built-in font). */
+    /**
+     * [text] in the font [fontId] as dots, [LedTick.ROWS] rows tall; null when the font cannot be drawn (the caller
+     * uses the built-in font).
+     */
     fun text(context: Context, text: String, fontId: String): LedGrid? {
         if (text.isEmpty()) return null
         val key = fontId + "\u0000" + text

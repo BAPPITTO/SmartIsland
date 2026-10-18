@@ -25,12 +25,11 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Sample cards for the Demo tab: one per island event, posted straight into the notification
- * repository so every cutout, expanded card and switch can be tried without waiting for the real
- * thing. Demo keys all start with [KEY_PREFIX]; nothing here touches the system shade.
+ * Sample cards for the Demo tab, posted straight into the notification repository; nothing touches the system shade.
+ * Demo keys all start with [KEY_PREFIX].
  *
- * Demo cards follow the same rules as real ones: an event that is switched off on the Home tab is
- * not shown, and short events (plug-in, Wi-Fi, ...) leave by themselves after their usual time.
+ * Demo cards follow the same rules as real ones: an event switched off on the Home tab is not shown, and short
+ * events (plug-in, Wi-Fi, ...) leave by themselves after their usual time.
  */
 object DemoEvents {
     const val KEY_PREFIX = "demo_"
@@ -39,8 +38,8 @@ object DemoEvents {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val dismissJobs = ConcurrentHashMap<String, Job>()
 
-    /** Events that have a sample card. Screen sharing is a dot, not a card, so it has none. */
-    val available: List<IslandEvent> = IslandEvent.entries.filter { !it.isPrivacy }
+    /** Events that have a sample card. Face ID is an animation, not a card, so it still lists here and returns none. */
+    val available: List<IslandEvent> = IslandEvent.entries.toList()
 
     fun isDemoKey(key: String): Boolean = key.startsWith(KEY_PREFIX)
 
@@ -52,6 +51,8 @@ object DemoEvents {
         autoExpand: Boolean = true,
         batteryWarningMs: Long = IslandTimings.BATTERY_WARNING_CARD_MS
     ) {
+        // The Face ID scan is not a card: the Demo tab starts it directly (see DemoSection).
+        if (event == IslandEvent.FACE_UNLOCK) return
         val card = build(context, event) ?: return
         dismissJobs.remove(card.key)?.cancel()
         repo.postNotification(card, autoExpand = autoExpand)
@@ -71,7 +72,6 @@ object DemoEvents {
         repo.removeNotification(key)
     }
 
-    /** Removes every demo card. */
     fun clearAll(repo: INotificationRepository) {
         dismissJobs.values.forEach { it.cancel() }
         dismissJobs.clear()
@@ -80,7 +80,6 @@ object DemoEvents {
 
     fun keyFor(event: IslandEvent): String = KEY_PREFIX + event.id
 
-    /** Brief events go away on their own; lasting ones stay until cleared. */
     internal fun lifetimeMs(
         event: IslandEvent,
         batteryWarningMs: Long = IslandTimings.BATTERY_WARNING_CARD_MS
@@ -88,15 +87,13 @@ object DemoEvents {
         IslandEvent.PLUGGED_IN -> IslandTimings.PLUGGED_IN_CARD_MS
         IslandEvent.PLUGGED_OUT -> IslandTimings.UNPLUGGED_CARD_MS
         IslandEvent.LOW_BATTERY, IslandEvent.BATTERY_SAVER, IslandEvent.FULLY_CHARGED -> batteryWarningMs
-        IslandEvent.WIFI, IslandEvent.VPN -> IslandTimings.CONNECTIVITY_CARD_MS
-        IslandEvent.WIFI_DISCONNECTED, IslandEvent.VPN_DISCONNECTED -> IslandTimings.DISCONNECT_CARD_MS
+        IslandEvent.WIFI, IslandEvent.VPN, IslandEvent.USB_CONNECTED, IslandEvent.HEADPHONES_CONNECTED ->
+            IslandTimings.CONNECTIVITY_CARD_MS
+        IslandEvent.WIFI_DISCONNECTED, IslandEvent.VPN_DISCONNECTED,
+        IslandEvent.USB_DISCONNECTED, IslandEvent.HEADPHONES_DISCONNECTED -> IslandTimings.DISCONNECT_CARD_MS
         else -> 0L
     }
 
-    /**
-     * Buttons on sample cards carry a PendingIntent that goes nowhere (an explicit broadcast nobody
-     * receives), so the island shows and "presses" them exactly like real buttons.
-     */
     private fun noop(context: Context): PendingIntent = PendingIntent.getBroadcast(
         context,
         0,
@@ -147,6 +144,26 @@ object DemoEvents {
             IslandEvent.VPN_DISCONNECTED -> IslandNotification(
                 key = key, packageName = "com.android.systemui", appName = "VPN",
                 title = "VPN disconnected", text = "Traffic is not protected", category = "vpn_disconnected",
+                mode = IslandMode.Bluetooth, timeMillis = now
+            )
+            IslandEvent.USB_CONNECTED -> IslandNotification(
+                key = key, packageName = "com.android.systemui", appName = "USB",
+                title = "USB device", text = "Connected", category = "usb_connected",
+                mode = IslandMode.Bluetooth, timeMillis = now
+            )
+            IslandEvent.USB_DISCONNECTED -> IslandNotification(
+                key = key, packageName = "com.android.systemui", appName = "USB",
+                title = "USB device", text = "Disconnected", category = "usb_disconnected",
+                mode = IslandMode.Bluetooth, timeMillis = now
+            )
+            IslandEvent.HEADPHONES_CONNECTED -> IslandNotification(
+                key = key, packageName = "com.android.systemui", appName = "Headphone",
+                title = "Wired Headphone", text = "Connected", category = "headphones_connected",
+                mode = IslandMode.Bluetooth, timeMillis = now
+            )
+            IslandEvent.HEADPHONES_DISCONNECTED -> IslandNotification(
+                key = key, packageName = "com.android.systemui", appName = "Headphone",
+                title = "Wired Headphone", text = "Disconnected", category = "headphones_disconnected",
                 mode = IslandMode.Bluetooth, timeMillis = now
             )
             IslandEvent.BLUETOOTH -> IslandNotification(
@@ -248,10 +265,7 @@ object DemoEvents {
                 mode = IslandMode.Stopwatch, timeMillis = now - 45_000L
             )
 
-            IslandEvent.PRIVACY_CAMERA,
-            IslandEvent.PRIVACY_MICROPHONE,
-            IslandEvent.PRIVACY_LOCATION,
-            IslandEvent.PRIVACY_MEDIA_PROJECTION -> null
+            IslandEvent.FACE_UNLOCK -> null
         }
     }
 }

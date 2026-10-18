@@ -7,24 +7,9 @@
 
 package com.agupta07505.smartisland.model
 
-/** How far into a notification card the expanded island is. */
 enum class CardDepth { First, Preview, Reader, Selector, PictureMid, Picture }
 
-/**
- * The steps of an expanded notification card, as plain values (the view model holds them, the card, its arrow and the
- * swipe gestures all read and write them, so they cannot disagree).
- *
- * First (text only) -> Preview (last text left, last picture right; only with 2 or more pictures) -> Reader (all text,
- * thumbnails) -> PictureMid (one picture at half size) -> Picture (the same picture at full size). A card with exactly one
- * picture has no preview: First -> Reader -> PictureMid -> Picture. A long text without pictures is First -> Reader.
- * A card with 2 or more pictures has the image [selector] instead of PictureMid: Reader -> Selector (all pictures at half
- * size, only a tap on one opens it) -> Picture; swipe up goes Picture -> Selector -> Preview. In portrait the selector is
- * inside the card, in landscape it is an island beside it. The caller passes a media count of 0 for a card that has a
- * sticker: stickers have no picture steps, no preview and no arrows.
- * [preview] and [reader] stay set while a picture is open ([pictureIndex] != null): the card keeps its reader state.
- * [pictureHalf] says the open picture is at the half-size step (see [PictureSize]); [selector] says the selector is open or is
- * the step a full picture came from.
- */
+/** Steps of an expanded notification card, shared by the view model, the card, its arrow and the swipe gestures. */
 data class CardSteps(
     val preview: Boolean = false,
     val reader: Boolean = false,
@@ -44,7 +29,7 @@ data class CardSteps(
     companion object {
         val First = CardSteps()
 
-        /** The card's arrow: one step in, and from the reader straight back to the first state. */
+        /** Arrow: one step in; from the reader straight back to the first state. */
         fun arrow(steps: CardSteps, mediaCount: Int): CardSteps = when {
             steps.reader -> First
             mediaCount >= 2 && steps.preview -> CardSteps(reader = true)
@@ -53,9 +38,8 @@ data class CardSteps(
         }
 
         /**
-         * Swipe down: one step deeper, or null when there is none (the last step, a selector that only a tap leaves, or a card
-         * with nothing to open). [textExpandable] says whether a card without pictures has a cut-off text to open.
-         * With 2 or more pictures the reader opens the selector, not a picture.
+         * Swipe down: one step deeper, or null when there is none. [textExpandable]: a text-only card has a cut-off
+         * text to open. Two or more pictures open the selector, not a picture.
          */
         fun deeper(steps: CardSteps, mediaCount: Int, textExpandable: Boolean): CardSteps? = when (steps.depth) {
             CardDepth.First -> when {
@@ -74,7 +58,7 @@ data class CardSteps(
             CardDepth.Picture -> null
         }
 
-        /** Swipe up: one step back (picture -> half picture or selector -> reader or preview -> first), or null at the first state. */
+        /** Swipe up: one step back, or null at the first state. */
         fun back(steps: CardSteps, mediaCount: Int): CardSteps? = when (steps.depth) {
             CardDepth.First -> null
             CardDepth.Preview -> First
@@ -84,24 +68,18 @@ data class CardSteps(
             CardDepth.Picture -> if (steps.selector) steps.copy(pictureIndex = null, pictureHalf = false) else steps.copy(pictureHalf = true)
         }
 
-        /** A tap on one picture in the selector opens it at full size. */
         fun pickFromSelector(steps: CardSteps, index: Int): CardSteps = steps.copy(pictureIndex = index, pictureHalf = false, selector = true)
     }
 }
 
-/**
- * What the view model remembers about the open step of ONE card ([key]). A different card (or none) is always at the first
- * state, so a stale value never shows on the wrong card. The open picture lives in the view model's `expandedMedia`.
- */
+/** Open step of ONE card ([key]); any other card is at the first state, so stale state never shows. */
 data class CardStepState(
     val key: String? = null,
     val preview: Boolean = false,
     val reader: Boolean = false,
-    /** The open picture (see [steps]) is at the half-size step. Only counts while a picture of this card is open. */
+    /** Half-size step; only counts while a picture of this card is open. */
     val pictureHalf: Boolean = false,
-    /** The image selector is open (or is the step the open picture came from). */
     val selector: Boolean = false,
-    /** Reported by the card: a text without pictures is cut off, so it has a reader to open. */
     val textExpandable: Boolean = false
 ) {
     fun steps(forKey: String?, pictureKey: String?, pictureIndex: Int): CardSteps {
@@ -112,18 +90,13 @@ data class CardStepState(
     }
 }
 
-/**
- * Heights (dp) of the picture steps of a notification card. The half-size picture sits halfway between the card's smallest
- * height and the full-size picture, which is the tallest an expanded island ever gets.
- */
+/** Heights (dp) of the picture steps; the half step sits midway between the card minimum and the full picture. */
 object PictureSize {
-    /** The smallest height an expanded notification card has. */
     const val CARD_MIN_DP = 95f
 
-    /** The full-size picture's height, the tallest an expanded island grows. */
+    /** Tallest an expanded island ever gets. */
     const val FULL_DP = 260f
 
-    /** The half-size picture's height: halfway between [CARD_MIN_DP] and [FULL_DP]. */
     const val MID_DP = (CARD_MIN_DP + FULL_DP) / 2f
 
     fun heightDp(half: Boolean): Float = if (half) MID_DP else FULL_DP

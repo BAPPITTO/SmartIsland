@@ -46,7 +46,6 @@ import com.agupta07505.smartisland.ui.bounceClick
 import com.agupta07505.smartisland.util.CallActionRole
 import com.agupta07505.smartisland.util.VoipCallDetector
 
-/** One real notification button shown as a round control. Nothing here is made up by the island. */
 private data class CallControl(
     val action: IslandNotificationAction,
     val role: CallActionRole,
@@ -54,7 +53,6 @@ private data class CallControl(
     val active: Boolean
 )
 
-/** The call's real buttons in a fixed order: mute, speaker, hang up / decline, answer. */
 private fun callControls(notification: IslandNotification?): List<CallControl> {
     if (notification == null) return emptyList()
     val real = notification.actionIntents.filter { it.pendingIntent != null }
@@ -151,8 +149,7 @@ private fun CallControlButton(
         description = control.action.title,
         onClick = {
             if (isRinging) {
-                // The ringing card is island-only (its shade copy was removed), so the card
-                // is dropped here; the app will not post a removal for it.
+                // The ringing card is island-only, so it is dropped here; the app will not post a removal for it.
                 notification.sendFirstAction(context, control.action.title)
             } else {
                 // An ongoing call's notification stays in the shade; the card follows it.

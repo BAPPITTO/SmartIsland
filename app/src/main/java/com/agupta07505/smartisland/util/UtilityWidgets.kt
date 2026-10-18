@@ -15,10 +15,7 @@ import android.appwidget.AppWidgetProviderInfo
 import android.content.ComponentName
 import android.content.Context
 
-/**
- * App widgets on the Utilities page. One [AppWidgetHost] serves the overlay (which draws the widgets) and the app (which picks,
- * binds and configures them), so a widget id made in the app is drawn by the island.
- */
+/** App widgets on the Utilities page. */
 object UtilityWidgets {
     private const val HOST_ID = 0x5349
     private val lock = Any()
@@ -31,7 +28,6 @@ object UtilityWidgets {
 
     fun manager(context: Context): AppWidgetManager = AppWidgetManager.getInstance(context.applicationContext)
 
-    /** Widgets only update while the host listens. Calls pair up: each acquire needs one release. */
     fun acquire(context: Context) = synchronized(lock) {
         if (listeners++ == 0) runCatching { host(context).startListening() }
         Unit
@@ -54,7 +50,6 @@ object UtilityWidgets {
         runCatching { host(context).deleteAppWidgetId(widgetId) }
     }
 
-    /** True when the widget is bound already; false means the user still has to allow it (see [bindIntent]). */
     fun bindIfAllowed(context: Context, widgetId: Int, provider: ComponentName): Boolean =
         runCatching { manager(context).bindAppWidgetIdIfAllowed(widgetId, provider) }.getOrDefault(false)
 
@@ -66,18 +61,14 @@ object UtilityWidgets {
     fun info(context: Context, widgetId: Int): AppWidgetProviderInfo? =
         runCatching { manager(context).getAppWidgetInfo(widgetId) }.getOrNull()
 
-    /** The widget's view, or null when its app was uninstalled. */
     fun createView(context: Context, widgetId: Int): AppWidgetHostView? {
         val info = info(context, widgetId) ?: return null
         return runCatching { host(context).createView(context, widgetId, info) }.getOrNull()
     }
 
-    /** Tells the widget how much room it has (in dp) so it can pick a layout. */
     fun resize(view: AppWidgetHostView, widthDp: Int, heightDp: Int) {
         runCatching { view.updateAppWidgetSize(null, widthDp, heightDp, widthDp, heightDp) }
     }
-
-    // ---- configure step, run from the app's activity ----
 
     private const val REQUEST_CONFIGURE = 0x5350
     private var pendingConfigure: ((Boolean) -> Unit)? = null

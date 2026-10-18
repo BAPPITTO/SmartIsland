@@ -46,12 +46,7 @@ import com.agupta07505.smartisland.ui.IslandFontOptions
 import com.agupta07505.smartisland.ui.islandFontFamily
 import com.agupta07505.smartisland.util.CustomFonts
 
-/**
- * Mix fonts (model/FontMix.kt): a switch plus three font slots, Light, Regular and Medium. Each slot opens the same font list as
- * the island font (built-in fonts and the user's own .ttf / .otf files), with "Same as the island font" as its first row.
- * The island picks a slot by the weight each piece of text asks for, so secondary lines, main lines and titles / numbers can
- * each have their own font, like the Light, Regular and Medium cuts of a system font family.
- */
+/** Mix fonts (model/FontMix.kt): a switch plus three font slots, Light, Regular and Medium. */
 @Composable
 internal fun IslandFontMixSection(
     settings: SmartIslandSettings,
@@ -182,7 +177,6 @@ private fun slotNote(slot: FontSlot): String = when (slot) {
     FontSlot.Medium -> stringResource(R.string.font_mix_medium_note)
 }
 
-/** The name shown for a slot's font: the picker's label, the file name of a custom font, or "Island font" when it has none. */
 @Composable
 private fun fontName(id: String): String {
     if (id.isEmpty()) return stringResource(R.string.font_mix_same)

@@ -47,13 +47,11 @@ object TimerStopwatchParser {
         "remaining", "sec remaining", "min remaining"
     )
 
-    /** Whole words only: "lap" must not match "overlap" or "collapse", "split" must not match "splitting". */
     private val STOPWATCH_WORDS = Regex("""(?<![\p{L}])(stopwatch|laps?|split|elapsed)(?![\p{L}])""")
     private val LAP_ACTION = Regex("""(?<![\p{L}])(lap|split|vuelta|tour|runde)(?![\p{L}])""")
 
     private val TIME_PATTERN = Pattern.compile("\\b(?:(\\d{1,2}):)?(\\d{1,2}):(\\d{2})(?:\\.(\\d{1,2}))?\\b")
 
-    /** Clock apps shipped by a phone maker. They keep their own, unchanged detection. */
     private val OEM_CLOCK_PACKAGES = setOf(
         "com.sec.android.app.clockpackage", "com.miui.deskclock", "com.oneplus.deskclock",
         "com.coloros.alarmclock", "com.oplus.alarmclock", "com.android.bbkclock", "com.vivo.clock",
@@ -62,7 +60,6 @@ object TimerStopwatchParser {
         "com.lenovo.deskclock", "com.sonyericsson.organizer", "com.htc.android.worldclock"
     )
 
-    /** Package prefixes of phone makers, so an OEM clock missing from the list above is still left alone. */
     private val OEM_PACKAGE_PREFIXES = listOf(
         "com.miui.", "com.xiaomi.", "com.mi.", "com.sec.", "com.samsung.", "com.oneplus.", "com.oplus.",
         "com.oppo.", "com.coloros.", "com.heytap.", "com.realme.", "com.vivo.", "com.bbk.", "com.huawei.",
@@ -71,30 +68,20 @@ object TimerStopwatchParser {
         "com.transsion.", "com.tecno.", "com.infinix.", "com.itel."
     )
 
-    /** True for a clock app shipped by a phone maker (Xiaomi, Samsung, OnePlus, ...). */
     fun isOemClock(packageName: String): Boolean {
         val pkg = packageName.lowercase()
         return pkg in OEM_CLOCK_PACKAGES || OEM_PACKAGE_PREFIXES.any { pkg.startsWith(it) }
     }
 
-    /** Shade-accurate handling applies to every clock except phone makers' own (Xiaomi, Samsung, ...). */
     fun usesShadeFixes(packageName: String): Boolean = !isOemClock(packageName)
 
-    /** Which clock feature a notification belongs to. */
     enum class ClockKind { Timer, Stopwatch }
 
-    /**
-     * What the island last saw for a clock-app notification. A paused clock stopwatch drops its Lap button and shows
-     * only Resume + Stop, which looks just like a paused timer, so the kind it had while running is remembered.
-     * Per notification id first (a clock app keeps one id for its timer and another for its stopwatch); per package
-     * only as a short-lived fallback.
-     */
     private data class SeenKind(val kind: ClockKind, val atMs: Long)
     private const val PACKAGE_MEMORY_MS = 15 * 60 * 1000L
     private val seenByKey = ConcurrentHashMap<String, ClockKind>()
     private val seenByPackage = ConcurrentHashMap<String, SeenKind>()
 
-    /** Stable identity of a clock notification across the cancel-and-repost a clock app does. */
     fun clockKey(sbn: StatusBarNotification): String =
         "${sbn.packageName.lowercase()}#${runCatching { sbn.id }.getOrDefault(0)}"
 
@@ -109,16 +96,11 @@ object TimerStopwatchParser {
         return seen.kind.takeIf { System.currentTimeMillis() - seen.atMs <= PACKAGE_MEMORY_MS }
     }
 
-    /** Forgets everything remembered (service restart, tests). */
     fun forgetClockKinds() {
         seenByKey.clear()
         seenByPackage.clear()
     }
 
-    /**
-     * The clock app's own notification channel says what it is ("StopwatchNotification",
-     * "TimerModelNotification"). A channel that names both (a shared "firing" channel) says nothing.
-     */
     private fun channelKind(notification: Notification): ClockKind? {
         val id = runCatching { notification.channelId }.getOrNull()?.lowercase() ?: return null
         val stopwatch = id.contains("stopwatch")
@@ -176,30 +158,23 @@ object TimerStopwatchParser {
 
     private val ZERO_TIME_PATTERN = Pattern.compile("\\b0+[:.]00(?::00)?\\b")
 
-    /**
-     * Checks if a notification is an Alarm clock notification (upcoming alarm or firing alarm).
-     */
     fun isAlarm(sbn: StatusBarNotification): Boolean {
         val notification = sbn.notification ?: return false
         val packageName = sbn.packageName.lowercase()
         return isAlarm(notification, packageName)
     }
 
-    /**
-     * Checks if a Notification is an Alarm clock notification.
-     */
     fun isAlarm(notification: Notification, packageName: String = ""): Boolean {
         val fullText = extractFullText(notification)
         val actionLabels = extractActionLabels(notification)
 
-        // 1. Any snooze action or snooze keyword is uniquely an alarm feature
+        // Any snooze action or snooze keyword is uniquely an alarm feature
         if (actionLabels.any { act -> SNOOZE_KEYWORDS.any { act.contains(it) } } ||
             SNOOZE_KEYWORDS.any { fullText.contains(it) }
         ) {
             return true
         }
 
-        // 2. Upcoming alarm phrasing
         if (fullText.contains("upcoming alarm") || fullText.contains("alarm firing") || fullText.contains("alarm ringing")) {
             return true
         }
@@ -210,7 +185,6 @@ object TimerStopwatchParser {
             it.contains("pause") || it.contains("resume") || it.contains("reset") || it.contains("lap")
         }
 
-        // 3. Category alarm or title contains alarm
         val category = runCatching { notification.category }.getOrNull().orEmpty().lowercase()
         val isCategoryAlarm = category == "alarm" || category == "category_alarm"
         val hasAlarmKeyword = ALARM_KEYWORDS.any { fullText.contains(it) }
@@ -222,25 +196,18 @@ object TimerStopwatchParser {
         return false
     }
 
-    /**
-     * Checks if a notification is a live Timer notification.
-     */
     fun isTimer(sbn: StatusBarNotification): Boolean {
         val notification = sbn.notification ?: return false
         val packageName = sbn.packageName.lowercase()
         return isTimer(notification, packageName, clockKey(sbn))
     }
 
-    /**
-     * Checks if a Notification is a live Timer notification.
-     */
     fun isTimer(notification: Notification, packageName: String = "", clockKey: String? = null): Boolean {
-        // 0. Exclude alarms (alarms should never be treated as timers)
         if (isAlarm(notification, packageName)) {
             return false
         }
 
-        // 1. Exclude if clearly a stopwatch (a paused clock stopwatch included, see isStopwatch)
+        // A paused clock stopwatch counts as a stopwatch, see isStopwatch
         if (isStopwatch(notification, packageName, clockKey)) {
             return false
         }
@@ -248,7 +215,6 @@ object TimerStopwatchParser {
         val fullText = extractFullText(notification)
         val actionLabels = extractActionLabels(notification)
 
-        // 2. Exclude non-timer system events (Hotspot, Screen Recording, Calls, Navigation)
         if (OemDeviceRules.isNonNavigationContent(packageName, fullText) &&
             !CLOCK_PACKAGES.contains(packageName) &&
             !actionLabels.any { it.contains("+1") || it.contains("timer") || it.contains("add 1") }
@@ -309,20 +275,13 @@ object TimerStopwatchParser {
         return false
     }
 
-    /**
-     * Checks if a notification is a live Stopwatch notification.
-     */
     fun isStopwatch(sbn: StatusBarNotification): Boolean {
         val notification = sbn.notification ?: return false
         val packageName = sbn.packageName.lowercase()
         return isStopwatch(notification, packageName, clockKey(sbn))
     }
 
-    /**
-     * Checks if a Notification is a live Stopwatch notification.
-     */
     fun isStopwatch(notification: Notification, packageName: String = "", clockKey: String? = null): Boolean {
-        // 0. Exclude alarms (alarms should never be treated as stopwatches)
         if (isAlarm(notification, packageName)) {
             return false
         }
@@ -358,9 +317,8 @@ object TimerStopwatchParser {
         val hasTimerKeyword = TIMER_KEYWORDS.any { fullText.contains(it) } ||
             actionLabels.any { it.contains("+1") || it.contains("timer") || it.contains("add 1") }
 
-        // Wording alone is not enough: any app's text can contain "stopwatch", "lap" (overlap, collapse)
-        // or "split" (a chat reply, a progress message). Outside clock apps a stopwatch must really
-        // be a running count-up chronometer.
+        // Wording alone is not enough: any app's text can contain "stopwatch", "lap" (overlap, collapse) or "split"
+        // (a chat reply, a progress message).
         val isLiveCountUp = isChronometer && !isChronometerCountDown
         val trusted = isClockApp || isLiveCountUp
 
@@ -378,8 +336,7 @@ object TimerStopwatchParser {
             }
         }
 
-        // A paused clock stopwatch has no Lap button, only Resume + Stop, and no running chronometer: it used to fall
-        // through to isTimer and come out as a paused timer (timer icon, 00:00). Nothing in it points to a timer, so
+        // A paused clock stopwatch has no Lap button and no running chronometer, so nothing in it points to a timer;
         // what the same notification was while running decides.
         if (isStock && !isChronometerCountDown && !hasTimerKeyword && isStopwatchPaused(notification)) {
             if (recallKind(packageName, clockKey) == ClockKind.Stopwatch) return true
@@ -398,9 +355,6 @@ object TimerStopwatchParser {
         return false
     }
 
-    /**
-     * Checks if a Timer notification has completed / expired ("Time's up").
-     */
     fun isTimerFinished(notification: Notification): Boolean {
         // Paused timer is never finished
         if (isTimerPaused(notification)) return false
@@ -421,9 +375,6 @@ object TimerStopwatchParser {
         return false
     }
 
-    /**
-     * Checks if a Timer is currently paused.
-     */
     fun isTimerPaused(notification: Notification): Boolean {
         val actionLabels = extractActionLabels(notification)
         val fullText = extractFullText(notification)
@@ -437,9 +388,6 @@ object TimerStopwatchParser {
         return false
     }
 
-    /**
-     * Checks if a Stopwatch is currently paused.
-     */
     fun isStopwatchPaused(notification: Notification): Boolean {
         val actionLabels = extractActionLabels(notification)
         val fullText = extractFullText(notification)
@@ -455,17 +403,12 @@ object TimerStopwatchParser {
         return false
     }
 
-    /**
-     * Reads the precise timer deadline from HyperOS timer metadata.
-     * Reads the most reliable future deadline from a timer notification.
-     * Prefers the notification's deadline before HyperOS-specific fallbacks.
-     */
+    /** Most reliable future deadline of a timer notification; its own deadline comes before the HyperOS fallbacks. */
     fun parseTimerDeadlineMillis(notification: Notification): Long? {
         if (isTimerPaused(notification)) return null
 
         val now = System.currentTimeMillis()
 
-        // 1. Prefer the actual deadline exposed by the notification.
         val notificationDeadline = runCatching {
             notification.`when`
         }.getOrDefault(0L)
@@ -474,7 +417,6 @@ object TimerStopwatchParser {
             return notificationDeadline
         }
 
-        // 2. Try reconstructing the deadline from HyperOS timer metadata.
         val rawParam = runCatching {
             notification.extras?.getString("miui.focus.param")
         }.getOrNull() ?: return null
@@ -494,7 +436,7 @@ object TimerStopwatchParser {
             }
         }
 
-        // 3. Last resort: the HyperOS timerWhen field.
+        // Last resort: the HyperOS timerWhen field.
         val timerWhen = json.optLong("timerWhen", 0L)
 
         return timerWhen.takeIf { it > now }
@@ -507,14 +449,11 @@ object TimerStopwatchParser {
         return notifWhen.takeIf { it > nowMs }
     }
 
-    /**
-     * Extracts the remaining time in seconds from a timer notification.
-     */
     fun parseTimerRemainingSeconds(notification: Notification): Long? {
         val isPaused = isTimerPaused(notification)
         val extras = notification.extras
 
-        // 1. If running and has chronometer countdown base, this is the most accurate
+        // A chronometer countdown base is the most accurate source.
         if (extras != null && !isPaused) {
             val isCountDown = runCatching {
                 extras.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN, false) ||
@@ -530,7 +469,6 @@ object TimerStopwatchParser {
             }
         }
 
-        // 2. If running and notification.when is in future
         if (!isPaused) {
             val notifWhen = runCatching { notification.`when` }.getOrDefault(0L)
             if (notifWhen > System.currentTimeMillis()) {
@@ -539,7 +477,6 @@ object TimerStopwatchParser {
             }
         }
 
-        // 3. Inspect individual text fields for timer countdown
         val title = runCatching { extras?.getCharSequence(Notification.EXTRA_TITLE)?.toString() }.getOrNull().orEmpty()
         val text = runCatching { extras?.getCharSequence(Notification.EXTRA_TEXT)?.toString() }.getOrNull().orEmpty()
         val subText = runCatching { extras?.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString() }.getOrNull().orEmpty()
@@ -548,11 +485,6 @@ object TimerStopwatchParser {
         return parseRemainingFromFields(listOf(title, text, subText, bigText))
     }
 
-    /**
-     * A clock-style time ("29:52") in any field wins over a unit-style one ("30m"). Clock apps put the
-     * timer's total in the title ("30M TIMER") and the live remaining time in the text, so reading the
-     * title first made a paused timer show its full length.
-     */
     private fun parseRemainingFromFields(fields: List<String>): Long? {
         for (field in fields) {
             if (field.isBlank()) continue
@@ -576,16 +508,11 @@ object TimerStopwatchParser {
         return hours * 3600L + minutes * 60L + seconds
     }
 
-    /**
-     * Extracts the remaining time in seconds from an IslandNotification.
-     */
     fun parseTimerRemainingSeconds(notification: com.agupta07505.smartisland.model.IslandNotification): Long? {
         return parseRemainingFromFields(listOf(notification.title, notification.text))
     }
 
-    /**
-     * Parses a string containing time (e.g. "04:55", "00:04:55", "5m 30s") into total seconds.
-     */
+    /** Accepts "04:55", "00:04:55" and "5m 30s". */
     fun parseTimeStringToSeconds(input: String): Long? {
         val matcher = TIME_PATTERN.matcher(input)
         if (matcher.find()) {
@@ -609,9 +536,6 @@ object TimerStopwatchParser {
         return null
     }
 
-    /**
-     * Extracts the elapsed time in seconds from a stopwatch notification.
-     */
     fun parseStopwatchElapsedSeconds(notification: Notification): Long? {
         val isPaused = isStopwatchPaused(notification)
         val extras = notification.extras
@@ -653,9 +577,6 @@ object TimerStopwatchParser {
         return null
     }
 
-    /**
-     * Formats seconds into MM:SS or HH:MM:SS string.
-     */
     fun formatTime(totalSeconds: Long): String {
         val safeSeconds = totalSeconds.coerceAtLeast(0L)
         val hours = safeSeconds / 3600L

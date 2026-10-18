@@ -42,8 +42,7 @@ internal fun ExpandCollapseHapticEffect(expanded: Boolean, cb: IslandCallbacks, 
 /** Finds out once whether Compose already scales its animations by the system animator scale. */
 @Composable
 internal fun AnimScaleProbeEffect() {
-    // Does Compose already carry the system animator scale into its animations? (Its window recomposer normally does, through
-    // the coroutine context.) If not, AnimationSpeed applies the scale itself; if it does, nothing may be scaled twice.
+    // Does Compose already carry the system animator scale into its animations?
     LaunchedEffect(Unit) {
         val carried = kotlin.coroutines.coroutineContext[androidx.compose.ui.MotionDurationScale]
         com.agupta07505.smartisland.util.SystemAnimScale.composeAppliesScale = carried != null

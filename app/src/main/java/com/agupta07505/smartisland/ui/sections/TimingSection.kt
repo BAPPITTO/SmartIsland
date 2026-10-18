@@ -43,7 +43,6 @@ internal fun formatSeconds(ms: Float): String {
     return if (frac == 0) "$whole s" else "$whole.$frac s"
 }
 
-/** "15 min" style text for a value in minutes; 0 means the expiry is off. */
 internal fun formatMinutes(minutes: Float): String {
     val m = minutes.roundToInt()
     return if (m <= 0) "Never" else "$m min"
@@ -54,8 +53,8 @@ internal fun snapToStep(value: Float, step: Float, min: Float, max: Float): Floa
     ((value / step).roundToInt() * step).coerceIn(min, max)
 
 /**
- * Settings > Timing: the timers the person can adjust. Sliders keep a local draft while
- * dragging and write to the settings once, when the finger lifts (or a +/- button is pressed).
+ * Settings > Timing: the timers the person can adjust. Sliders keep a local draft while dragging and write to the
+ * settings once, when the finger lifts (or a +/- button is pressed).
  */
 @Composable
 fun TimingSection(

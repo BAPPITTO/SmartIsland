@@ -48,8 +48,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
 /**
- * Landscape profile editor: shape, size, position and opacity are independent of portrait.
- * Writes only the `landscape*` settings; portrait fields are never touched here.
+ * Landscape profile editor: shape, size, position and opacity are independent of portrait. Writes only the
+ * `landscape*` settings; portrait fields are never touched here.
  */
 @Composable
 fun LandscapeSection(
@@ -84,7 +84,7 @@ fun LandscapeSection(
             .animateContentSize(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // 1. Master switch for the whole landscape profile (the only "show in landscape" switch in the app)
+        // The only "show in landscape" switch in the app.
         Box(modifier = Modifier.searchAnchor("layout.show_landscape")) {
             LandscapeCard {
                 Row(
@@ -113,7 +113,7 @@ fun LandscapeSection(
             }
         }
 
-        // 1b. Distance from the screen's side edge: one number shared by the idle circle and the bar
+        // Distance from the screen's side edge: one number shared by the idle circle and the bar.
         Box(modifier = Modifier.searchAnchor("layout.edge_inset")) {
             LandscapeCard {
                 GroupLabel(stringResource(R.string.landscape_edge_inset_title))
@@ -128,7 +128,6 @@ fun LandscapeSection(
             }
         }
 
-        // 2. Idle cutout: what the island looks like with nothing on it
         CollapsibleCard(
             title = "Idle cutout",
             stateKey = "land_idle",
@@ -207,7 +206,6 @@ fun LandscapeSection(
             }
         }
 
-        // 3. Cutout with content: the collapsed pill while a card is on the island
         CollapsibleCard(
             title = "Cutout with content",
             stateKey = "land_content",
@@ -408,5 +406,4 @@ private fun ChoiceRow(
     }
 }
 
-/** Fine-tune range of the vertical offset, in dp either side of the camera. */
 private const val VERTICAL_TUNE_RANGE_DP = 60f

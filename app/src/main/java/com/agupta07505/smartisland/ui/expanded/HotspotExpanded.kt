@@ -84,13 +84,11 @@ fun HotspotExpanded(
             .padding(start = 18.dp, top = 20.dp, end = 18.dp, bottom = bottomPadding),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Top Header Row matching NotificationExpanded alignment
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Default Hotspot Icon (42.dp matching NotificationExpanded)
             Box(
                 modifier = Modifier
                     .size(42.dp)
@@ -106,7 +104,6 @@ fun HotspotExpanded(
                 )
             }
 
-            // Title & Subtitle Column matching NotificationExpanded font sizes
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "Mobile Hotspot",
@@ -127,7 +124,6 @@ fun HotspotExpanded(
                 )
             }
 
-            // Right side: Badge Tag ("Active") & Timestamp
             Column(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -165,7 +161,6 @@ fun HotspotExpanded(
             }
         }
 
-        // Connected Devices Detail Card
         Box(
             modifier = Modifier
                 .fillMaxWidth()

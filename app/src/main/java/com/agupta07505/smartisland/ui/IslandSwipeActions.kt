@@ -17,8 +17,8 @@ import com.agupta07505.smartisland.util.HapticStrength
 import com.agupta07505.smartisland.util.IslandHaptics
 
 /**
- * Expand and collapse buzz when the island's state actually changes (see the effect in [IslandOverlayView]),
- * so the Expand/Collapse swipe actions must not add a second buzz of their own.
+ * Expand and collapse buzz when the island's state actually changes, so the Expand/Collapse swipe actions must not
+ * add a second buzz of their own.
  */
 internal fun swipeNeedsOwnHaptic(action: SwipeAction): Boolean =
     action != SwipeAction.None && action != SwipeAction.Expand && action != SwipeAction.Collapse
@@ -30,7 +30,7 @@ private fun trySkipMedia(
 ): Boolean {
     if (context == null) return false
 
-    // 1. Direct notification action PendingIntent (e.g. Spotify, YouTube Music, podcasts)
+    // Direct notification action PendingIntent (e.g. Spotify, YouTube Music, podcasts)
     val actionSent = if (forward) {
         notification.trySendFirstAction(context, "next", "skip", "forward")
     } else {
@@ -38,7 +38,7 @@ private fun trySkipMedia(
     }
     if (actionSent) return true
 
-    // 2. Notification MediaSession token
+    // Notification MediaSession token
     val token = notification?.mediaToken
     if (token != null) {
         val success = runCatching {
@@ -49,7 +49,7 @@ private fun trySkipMedia(
         if (success) return true
     }
 
-    // 3. Delegate to NotificationListenerService via SmartIslandCommand
+    // Delegate to NotificationListenerService via SmartIslandCommand
     runCatching {
         val repo = SmartIslandRepositories.notificationRepository(context)
         if (forward) {
@@ -59,7 +59,7 @@ private fun trySkipMedia(
         }
     }
 
-    // 4. Fallback: AudioManager media key events
+    // Fallback: AudioManager media key events
     runCatching {
         val audioManager = context.getSystemService(android.content.Context.AUDIO_SERVICE) as? android.media.AudioManager
         val keyCode = if (forward) android.view.KeyEvent.KEYCODE_MEDIA_NEXT else android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS
@@ -78,11 +78,11 @@ private fun tryPlayPauseMedia(
 ) {
     if (context == null) return
 
-    // 1. Direct notification action PendingIntent
+    // Direct notification action PendingIntent
     val actionSent = notification.trySendFirstAction(context, "play", "pause", "resume", "toggle")
     if (actionSent) return
 
-    // 2. Notification MediaSession token
+    // Notification MediaSession token
     val token = notification?.mediaToken
     if (token != null) {
         val success = runCatching {
@@ -97,13 +97,13 @@ private fun tryPlayPauseMedia(
         if (success) return
     }
 
-    // 3. Delegate to NotificationListenerService via SmartIslandCommand
+    // Delegate to NotificationListenerService via SmartIslandCommand
     runCatching {
         val repo = SmartIslandRepositories.notificationRepository(context)
         repo.sendCommand(SmartIslandCommand.PlayPause(notification?.packageName))
     }
 
-    // 4. Fallback: AudioManager media key events
+    // Fallback: AudioManager media key events
     runCatching {
         val audioManager = context.getSystemService(android.content.Context.AUDIO_SERVICE) as? android.media.AudioManager
         val keyCode = android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
@@ -130,13 +130,13 @@ internal fun executeSwipeAction(
     currentIndex: Int,
     onSwitchEvent: (forward: Boolean) -> Unit = {},
     /**
-     * Entry-skipping switch (all cards of one app count as one entry). Returns false when there is
-     * only one entry. When null, the legacy one-card-at-a-time page change is used.
+     * Entry-skipping switch (all cards of one app count as one entry). Returns false when there is only one entry.
+     * When null, the legacy one-card-at-a-time page change is used.
      */
     onSwitchNotification: ((forward: Boolean) -> Boolean)? = null,
     /** Expanded-island sibling switch; returns false when the current card has no sibling. */
     onSwitchSibling: (forward: Boolean) -> Boolean = { false },
-    /** Long-press toggle: hide / show the collapsed pill. Wired to the ViewModel in L6. */
+    /** Long-press toggle: hide / show the collapsed pill. */
     onTogglePillHidden: () -> Unit = {}
 ) {
     if (context != null && swipeNeedsOwnHaptic(action)) {
@@ -194,7 +194,6 @@ internal fun executeSwipeAction(
         }
         SwipeAction.TogglePill -> onTogglePillHidden()
         SwipeAction.None -> {
-            // Disabled / No action
         }
     }
 }

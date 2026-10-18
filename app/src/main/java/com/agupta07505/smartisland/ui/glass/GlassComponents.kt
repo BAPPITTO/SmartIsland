@@ -21,11 +21,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 
-// ---------------------------------------------------------------------------------------------------------------------
-// Drop-in replacements for Material 3's Card and Switch. The screens import these instead of the Material ones, so every card in
-// the app picks up the glass edge (and the glass switch colours) without each call changing. With the glass theme off they hand
-// everything straight to Material 3 and look exactly as they did.
-// ---------------------------------------------------------------------------------------------------------------------
+// Drop-in replacements for Material 3's Card and Switch: the screens import these, so every card picks up the glass
+// edge and the glass switch colours.
 
 @Composable
 fun Card(
@@ -37,7 +34,6 @@ fun Card(
     content: @Composable ColumnScope.() -> Unit
 ) {
     if (LocalLiquidGlass.current) {
-        // The glass edge replaces the flat outline.
         androidx.compose.material3.Card(
             modifier = modifier.glassEdge(shape, glass = true, dark = LocalGlassDark.current),
             shape = shape,

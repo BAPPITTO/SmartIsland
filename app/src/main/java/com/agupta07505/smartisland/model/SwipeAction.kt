@@ -8,9 +8,8 @@
 package com.agupta07505.smartisland.model
 
 /**
- * The two swipe-down gestures are not configurable (the settings screen does not list them). A swipe down on the
- * collapsed pill always expands the island, and a swipe down on the expanded island does nothing (a card with expandable text or a picture still opens it).
- * The stored `pillSwipeDownAction` / `swipeDownAction` values are ignored.
+ * Both swipe-down gestures are fixed: down on the collapsed pill expands the island, down on the expanded island does
+ * nothing (a card with expandable text or a picture still opens).
  */
 val FIXED_PILL_SWIPE_DOWN_ACTION: SwipeAction get() = SwipeAction.Expand
 val FIXED_EXPANDED_SWIPE_DOWN_ACTION: SwipeAction get() = SwipeAction.None

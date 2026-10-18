@@ -8,10 +8,8 @@
 package com.agupta07505.smartisland.model
 
 /**
- * The island's own stopwatch (the Stopwatch utility). No Android types, so every rule is unit-testable.
- *
- * [startMs] is the wall-clock instant the running count began, already moved forward by earlier pauses, so a running
- * stopwatch is simply `now - startMs`. A paused one keeps its elapsed time in [frozenMs].
+ * The island's own stopwatch (no Android types, so unit-testable). [startMs] is the wall-clock start, already moved
+ * forward by earlier pauses, so running = `now - startMs`; paused keeps [frozenMs].
  */
 data class StopwatchState(
     val active: Boolean = false,
@@ -34,19 +32,17 @@ data class StopwatchState(
     fun resume(now: Long): StopwatchState =
         if (active && !running) copy(running = true, startMs = now - frozenMs, frozenMs = 0L) else this
 
-    /** A lap only counts while the stopwatch runs. */
     fun lap(): StopwatchState = if (active && running) copy(laps = laps + 1) else this
 
     fun reset(): StopwatchState = StopwatchState()
 
-    /** What a tap on the Stopwatch tile does: start it, pause it while it runs, resume it while it is paused. */
+    /** Tap on the Stopwatch tile: start it, pause it while running, resume it while paused. */
     fun toggle(now: Long): StopwatchState = when {
         !active -> start(now)
         running -> pause(now)
         else -> resume(now)
     }
 
-    /** The saved form: `active,running,startMs,frozenMs,laps`. */
     fun encode(): String = listOf(active, running, startMs, frozenMs, laps).joinToString(",")
 
     companion object {

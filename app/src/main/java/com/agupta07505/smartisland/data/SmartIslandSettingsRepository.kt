@@ -112,6 +112,11 @@ class SmartIslandSettingsRepository(private val context: Context) {
         val NotificationCooldownSystemEvents = stringSetPreferencesKey("notification_cooldown_system_events")
         val DeveloperModeEnabled = booleanPreferencesKey("developer_mode_enabled")
         val RecordLogs = booleanPreferencesKey("record_logs")
+        val FaceUnlockMode = stringPreferencesKey("face_unlock_mode")
+        val FaceIdStyle = stringPreferencesKey("face_id_style")
+        val AppFaceIdEnabled = booleanPreferencesKey("app_face_id_enabled")
+        val AppFaceIdStyle = stringPreferencesKey("app_face_id_style")
+        val FingerprintAnimationEnabled = booleanPreferencesKey("fingerprint_animation_enabled")
         val ThemeMode = stringPreferencesKey("theme_mode")
         val LiquidGlassTheme = booleanPreferencesKey("liquid_glass_theme")
         val MaterialYou = booleanPreferencesKey("material_you")
@@ -179,8 +184,43 @@ class SmartIslandSettingsRepository(private val context: Context) {
         val IdleWidgetCycleSeconds = intPreferencesKey("idle_widget_cycle_seconds")
         val WidgetIslandCloseSeconds = intPreferencesKey("widget_island_close_seconds")
         val IdleAlarmHideBeyond12h = booleanPreferencesKey("idle_alarm_hide_beyond_12h")
+        val BatteryOnlyWhenCharging = booleanPreferencesKey("battery_only_when_charging")
+        val IdleBeatOnlyOnChange = booleanPreferencesKey("idle_beat_only_on_change")
         val IdleWidgetTempUnit = stringPreferencesKey("idle_widget_temp_unit")
         val IdleWidgetWindUnit = stringPreferencesKey("idle_widget_wind_unit")
+        val WeatherLocationSource = stringPreferencesKey("weather_location_source")
+        val WeatherManualCity = stringPreferencesKey("weather_manual_city")
+        val WeatherManualLat = floatPreferencesKey("weather_manual_lat")
+        val WeatherManualLon = floatPreferencesKey("weather_manual_lon")
+        val WeatherRefreshMinutes = intPreferencesKey("weather_refresh_minutes")
+        val WeatherProvider = stringPreferencesKey("weather_provider")
+        val WeatherCustomUrl = stringPreferencesKey("weather_custom_url")
+        val WeatherCustomKey = stringPreferencesKey("weather_custom_key")
+        val WeatherPillMode = stringPreferencesKey("weather_pill_mode")
+        val WeatherIslandReadouts = stringPreferencesKey("weather_island_readouts")
+        val WeatherIconAnimated = booleanPreferencesKey("weather_icon_animated")
+        val WeatherIconPauseOnSaver = booleanPreferencesKey("weather_icon_pause_on_saver")
+        val WeatherShowRule = stringPreferencesKey("weather_show_rule")
+        val WeatherNotableTriggers = stringPreferencesKey("weather_notable_triggers")
+        val WeatherHotC = intPreferencesKey("weather_hot_c")
+        val WeatherColdC = intPreferencesKey("weather_cold_c")
+        val WeatherHideAtNight = booleanPreferencesKey("weather_hide_at_night")
+        val WeatherNightStartHour = intPreferencesKey("weather_night_start_hour")
+        val WeatherNightEndHour = intPreferencesKey("weather_night_end_hour")
+        val NetSpeedThresholdKbps = intPreferencesKey("net_speed_threshold_kbps")
+        val NetSpeedConnection = stringPreferencesKey("net_speed_connection")
+        val IdleScheduleWorkEnabled = booleanPreferencesKey("idle_schedule_work_enabled")
+        val IdleScheduleWorkHidden = stringPreferencesKey("idle_schedule_work_hidden")
+        val IdleScheduleWorkStartHour = intPreferencesKey("idle_schedule_work_start_hour")
+        val IdleScheduleWorkEndHour = intPreferencesKey("idle_schedule_work_end_hour")
+        val IdleScheduleWorkWeekdaysOnly = booleanPreferencesKey("idle_schedule_work_weekdays_only")
+        val IdleScheduleNightEnabled = booleanPreferencesKey("idle_schedule_night_enabled")
+        val IdleScheduleNightHidden = stringPreferencesKey("idle_schedule_night_hidden")
+        val IdleScheduleNightStartHour = intPreferencesKey("idle_schedule_night_start_hour")
+        val IdleScheduleNightEndHour = intPreferencesKey("idle_schedule_night_end_hour")
+        val IdleScheduleChargingEnabled = booleanPreferencesKey("idle_schedule_charging_enabled")
+        val IdleScheduleChargingHidden = stringPreferencesKey("idle_schedule_charging_hidden")
+        val IdleWidgetPinnedFirst = stringPreferencesKey("idle_widget_pinned_first")
         val IdleTickStyle = stringPreferencesKey("idle_tick_style")
         val LedTickPattern = stringPreferencesKey("led_tick_pattern")
         val LedTickPaceMs = intPreferencesKey("led_tick_pace_ms")
@@ -212,15 +252,10 @@ class SmartIslandSettingsRepository(private val context: Context) {
         val HideOnLockScreenEvents = stringSetPreferencesKey("hide_on_lock_screen_events")
         val NotificationsEnabled = booleanPreferencesKey("notifications_enabled")
         val HideOnLockScreenPackages = stringSetPreferencesKey("hide_on_lock_screen_packages")
-        /** Set once the landscape shape was moved to the top-middle pill (landscape overhaul L2). */
+        /** Set once the landscape shape was moved to the top-middle pill. */
         val LandscapePillMigrated = booleanPreferencesKey("landscape_pill_migrated_l2")
     }
 
-    /**
-     * One-time: landscape used to default to the camera circle, and a saved "circle" would keep
-     * the old look. Moves it to the top-middle pill once; the user can pick the circle again
-     * afterwards and it then stays.
-     */
     private suspend fun migrateLandscapeShapeOnce() {
         val prefs = runCatching { context.smartIslandDataStore.data.first() }.getOrNull() ?: return
         if (prefs[Keys.LandscapePillMigrated] == true) return
@@ -385,6 +420,11 @@ class SmartIslandSettingsRepository(private val context: Context) {
                 notificationCooldownSystemEvents = prefs[Keys.NotificationCooldownSystemEvents] ?: defaults.notificationCooldownSystemEvents,
                 developerModeEnabled = prefs[Keys.DeveloperModeEnabled] ?: defaults.developerModeEnabled,
                 recordLogs = prefs[Keys.RecordLogs] ?: defaults.recordLogs,
+                faceUnlockMode = prefs[Keys.FaceUnlockMode]?.takeIf { it in setOf("face_only", "any") } ?: defaults.faceUnlockMode,
+                faceIdStyle = prefs[Keys.FaceIdStyle]?.takeIf { it in setOf("square", "cutout", "square_tick") } ?: defaults.faceIdStyle,
+                appFaceIdEnabled = prefs[Keys.AppFaceIdEnabled] ?: defaults.appFaceIdEnabled,
+                appFaceIdStyle = prefs[Keys.AppFaceIdStyle]?.takeIf { it in setOf("square", "cutout", "square_tick") } ?: defaults.appFaceIdStyle,
+                fingerprintAnimationEnabled = prefs[Keys.FingerprintAnimationEnabled] ?: defaults.fingerprintAnimationEnabled,
                 themeMode = prefs[Keys.ThemeMode] ?: defaults.themeMode,
                 liquidGlassTheme = prefs[Keys.LiquidGlassTheme] ?: defaults.liquidGlassTheme,
                 materialYou = prefs[Keys.MaterialYou] ?: defaults.materialYou,
@@ -477,6 +517,8 @@ class SmartIslandSettingsRepository(private val context: Context) {
                         com.agupta07505.smartisland.model.IdleWidgets.MAX_CYCLE_SECONDS
                     ),
                 idleAlarmHideBeyond12h = prefs[Keys.IdleAlarmHideBeyond12h] ?: defaults.idleAlarmHideBeyond12h,
+                batteryOnlyWhenCharging = prefs[Keys.BatteryOnlyWhenCharging] ?: defaults.batteryOnlyWhenCharging,
+                idleBeatOnlyOnChange = prefs[Keys.IdleBeatOnlyOnChange] ?: defaults.idleBeatOnlyOnChange,
                 widgetIslandCloseSeconds = com.agupta07505.smartisland.model.WidgetIslandTimer.normalize(
                     prefs[Keys.WidgetIslandCloseSeconds] ?: defaults.widgetIslandCloseSeconds
                 ),
@@ -494,6 +536,73 @@ class SmartIslandSettingsRepository(private val context: Context) {
                     .takeIf { it in com.agupta07505.smartisland.model.IdleWidgets.VALID_UNITS } ?: defaults.idleWidgetTempUnit,
                 idleWidgetWindUnit = (prefs[Keys.IdleWidgetWindUnit] ?: defaults.idleWidgetWindUnit)
                     .takeIf { it in com.agupta07505.smartisland.model.IdleWidgets.VALID_WIND_UNITS } ?: defaults.idleWidgetWindUnit,
+                weatherLocationSource = com.agupta07505.smartisland.model.WeatherConfig.normalizeSource(
+                    prefs[Keys.WeatherLocationSource] ?: defaults.weatherLocationSource
+                ),
+                weatherManualCity = com.agupta07505.smartisland.model.WeatherConfig.normalizeCity(
+                    prefs[Keys.WeatherManualCity] ?: defaults.weatherManualCity
+                ),
+                weatherManualLat = (prefs[Keys.WeatherManualLat] ?: defaults.weatherManualLat)
+                    .takeIf { it.isFinite() && it in -90f..90f } ?: defaults.weatherManualLat,
+                weatherManualLon = (prefs[Keys.WeatherManualLon] ?: defaults.weatherManualLon)
+                    .takeIf { it.isFinite() && it in -180f..180f } ?: defaults.weatherManualLon,
+                weatherRefreshMinutes = com.agupta07505.smartisland.model.WeatherConfig.normalizeRefreshMinutes(
+                    prefs[Keys.WeatherRefreshMinutes] ?: defaults.weatherRefreshMinutes
+                ),
+                weatherProvider = com.agupta07505.smartisland.model.WeatherConfig.normalizeProvider(
+                    prefs[Keys.WeatherProvider] ?: defaults.weatherProvider
+                ),
+                weatherCustomUrl = com.agupta07505.smartisland.model.WeatherConfig.normalizeCustomUrl(
+                    prefs[Keys.WeatherCustomUrl] ?: defaults.weatherCustomUrl
+                ),
+                weatherCustomKey = com.agupta07505.smartisland.model.WeatherConfig.normalizeKey(
+                    prefs[Keys.WeatherCustomKey] ?: defaults.weatherCustomKey
+                ),
+                weatherPillMode = com.agupta07505.smartisland.model.WeatherPill.normalize(
+                    prefs[Keys.WeatherPillMode] ?: defaults.weatherPillMode
+                ),
+                weatherIslandReadouts = com.agupta07505.smartisland.model.WeatherReadouts.normalize(
+                    prefs[Keys.WeatherIslandReadouts] ?: defaults.weatherIslandReadouts
+                ),
+                weatherIconAnimated = prefs[Keys.WeatherIconAnimated] ?: defaults.weatherIconAnimated,
+                weatherIconPauseOnSaver = prefs[Keys.WeatherIconPauseOnSaver] ?: defaults.weatherIconPauseOnSaver,
+                weatherShowRule = com.agupta07505.smartisland.model.WeatherRules.normalizeMode(
+                    prefs[Keys.WeatherShowRule] ?: defaults.weatherShowRule
+                ),
+                weatherNotableTriggers = com.agupta07505.smartisland.model.WeatherRules.normalizeTriggers(
+                    prefs[Keys.WeatherNotableTriggers] ?: defaults.weatherNotableTriggers
+                ),
+                weatherHotC = com.agupta07505.smartisland.model.WeatherRules.normalizeHotC(
+                    prefs[Keys.WeatherHotC] ?: defaults.weatherHotC
+                ),
+                weatherColdC = com.agupta07505.smartisland.model.WeatherRules.normalizeColdC(
+                    prefs[Keys.WeatherColdC] ?: defaults.weatherColdC
+                ),
+                weatherHideAtNight = prefs[Keys.WeatherHideAtNight] ?: defaults.weatherHideAtNight,
+                weatherNightStartHour = com.agupta07505.smartisland.model.WeatherRules.normalizeHour(
+                    prefs[Keys.WeatherNightStartHour] ?: defaults.weatherNightStartHour
+                ),
+                weatherNightEndHour = com.agupta07505.smartisland.model.WeatherRules.normalizeHour(
+                    prefs[Keys.WeatherNightEndHour] ?: defaults.weatherNightEndHour
+                ),
+                netSpeedThresholdKbps = com.agupta07505.smartisland.model.NetSpeedRules.normalize(
+                    prefs[Keys.NetSpeedThresholdKbps] ?: defaults.netSpeedThresholdKbps
+                ),
+                netSpeedConnection = com.agupta07505.smartisland.model.NetSpeedRules.normalizeConnection(
+                    prefs[Keys.NetSpeedConnection] ?: defaults.netSpeedConnection
+                ),
+                idleScheduleWorkEnabled = prefs[Keys.IdleScheduleWorkEnabled] ?: defaults.idleScheduleWorkEnabled,
+                idleScheduleWorkHidden = com.agupta07505.smartisland.model.IdleSchedule.normalizeHidden(prefs[Keys.IdleScheduleWorkHidden] ?: defaults.idleScheduleWorkHidden),
+                idleScheduleWorkStartHour = com.agupta07505.smartisland.model.IdleSchedule.normalizeHour(prefs[Keys.IdleScheduleWorkStartHour] ?: defaults.idleScheduleWorkStartHour),
+                idleScheduleWorkEndHour = com.agupta07505.smartisland.model.IdleSchedule.normalizeHour(prefs[Keys.IdleScheduleWorkEndHour] ?: defaults.idleScheduleWorkEndHour),
+                idleScheduleWorkWeekdaysOnly = prefs[Keys.IdleScheduleWorkWeekdaysOnly] ?: defaults.idleScheduleWorkWeekdaysOnly,
+                idleScheduleNightEnabled = prefs[Keys.IdleScheduleNightEnabled] ?: defaults.idleScheduleNightEnabled,
+                idleScheduleNightHidden = com.agupta07505.smartisland.model.IdleSchedule.normalizeHidden(prefs[Keys.IdleScheduleNightHidden] ?: defaults.idleScheduleNightHidden),
+                idleScheduleNightStartHour = com.agupta07505.smartisland.model.IdleSchedule.normalizeHour(prefs[Keys.IdleScheduleNightStartHour] ?: defaults.idleScheduleNightStartHour),
+                idleScheduleNightEndHour = com.agupta07505.smartisland.model.IdleSchedule.normalizeHour(prefs[Keys.IdleScheduleNightEndHour] ?: defaults.idleScheduleNightEndHour),
+                idleScheduleChargingEnabled = prefs[Keys.IdleScheduleChargingEnabled] ?: defaults.idleScheduleChargingEnabled,
+                idleScheduleChargingHidden = com.agupta07505.smartisland.model.IdleSchedule.normalizeHidden(prefs[Keys.IdleScheduleChargingHidden] ?: defaults.idleScheduleChargingHidden),
+                idleWidgetPinnedFirst = com.agupta07505.smartisland.model.IdleSchedule.normalizePinned(prefs[Keys.IdleWidgetPinnedFirst] ?: defaults.idleWidgetPinnedFirst),
                 idleTickStyle = com.agupta07505.smartisland.model.LedTick.normalizeStyle(prefs[Keys.IdleTickStyle] ?: defaults.idleTickStyle),
                 ledTickPattern = com.agupta07505.smartisland.model.LedTick.normalizePattern(prefs[Keys.LedTickPattern] ?: defaults.ledTickPattern),
                 ledTickPaceMs = com.agupta07505.smartisland.model.LedTick.normalizePace(prefs[Keys.LedTickPaceMs] ?: defaults.ledTickPaceMs),
@@ -556,11 +665,7 @@ class SmartIslandSettingsRepository(private val context: Context) {
     suspend fun setEnabled(value: Boolean) = editSafely { it[Keys.Enabled] = value }
     suspend fun setEnableShadow(value: Boolean) = editSafely { it[Keys.EnableShadow] = value }
     suspend fun setExpandedBlurEnabled(value: Boolean) = editSafely { it[Keys.ExpandedBlurEnabled] = value }
-    /**
-     * Picks Off or Card blur.
-     * The media card inherits the shared blur until the owner sets its own, so those two are pinned to what the
-     * media card shows now first; changing this choice then never changes the media card.
-     */
+    /** Picks Off or Card blur. */
     suspend fun setExpandedBlurMode(mode: ExpandedBlurMode) = editSafely {
         if (it[Keys.MediaBlurEnabled] == null) {
             it[Keys.MediaBlurEnabled] = it[Keys.ExpandedBlurEnabled] ?: SmartIslandSettings.Default.mediaBlurEnabled
@@ -731,9 +836,8 @@ class SmartIslandSettingsRepository(private val context: Context) {
     }
 
     /**
-     * Reads the REAL persisted value (awaits the first on-disk emission) instead of
-     * relying on the SmartIslandSettings.Default placeholder that State flows emit on the
-     * first frame. Used to decide whether the welcome dialog should show.
+     * Reads the persisted value (awaits the first on-disk emission) rather than the Default placeholder that State
+     * flows emit on the first frame.
      */
     suspend fun isWelcomeDialogShown(): Boolean = settings.first().welcomeDialogShown
 
@@ -841,9 +945,8 @@ class SmartIslandSettingsRepository(private val context: Context) {
             .toSet()
     }
     /**
-     * Sets one app's auto-expand choice in a single write, so the two sets never disagree.
-     * DEFAULT: in neither set (loud notifications open the card, silent ones do not). ALWAYS: in the allow set.
-     * NEVER: in the deny set (beats the loud exception).
+     * Sets one app's auto-expand choice in a single write, so the two sets never disagree. DEFAULT: in neither set
+     * (loud notifications open the card, silent ones do not).
      */
     suspend fun setAppAutoExpand(packageName: String, choice: com.agupta07505.smartisland.util.AppAutoExpand) = editSafely {
         if (packageName.isBlank() || packageName.length > MAX_PACKAGE_NAME_LENGTH) return@editSafely
@@ -872,7 +975,6 @@ class SmartIslandSettingsRepository(private val context: Context) {
         it[Keys.NoAutoExpandEvents] = if (enabled) current - eventId else current + eventId
     }
 
-    /** One switch that keeps every event (calls excepted) out of the pill while the phone is locked. */
     suspend fun setHideAllOnLockScreen(value: Boolean) = editSafely { it[Keys.HideAllOnLockScreen] = value }
 
     /** One event's own lock-screen switch (true = the event is hidden in the pill while locked). */
@@ -884,7 +986,6 @@ class SmartIslandSettingsRepository(private val context: Context) {
         it[Keys.HideOnLockScreenEvents] = if (hidden) current + eventId else current - eventId
     }
 
-    /** Sets the lock-screen switches together from one preset, in one write. */
     suspend fun applyLockScreenPreset(preset: com.agupta07505.smartisland.model.LockScreenPreset) = editSafely {
         when (preset) {
             com.agupta07505.smartisland.model.LockScreenPreset.ShowAll -> {
@@ -916,10 +1017,8 @@ class SmartIslandSettingsRepository(private val context: Context) {
         it[Keys.HideOnLockScreenPackages] = if (hidden) current + packageName else current - packageName
     }
 
-    /** The universal switch for app notifications (off = no notification cards, the listener ignores them). */
     suspend fun setNotificationsEnabled(value: Boolean) = editSafely { it[Keys.NotificationsEnabled] = value }
 
-    /** Puts the four timers back to their built-in values in one write. */
     suspend fun resetTimings() = editSafely {
         val d = SmartIslandSettings.Default
         it[Keys.IdleTimeoutMs] = d.idleTimeoutMs
@@ -985,6 +1084,8 @@ class SmartIslandSettingsRepository(private val context: Context) {
         )
     }
     suspend fun setIdleAlarmHideBeyond12h(value: Boolean) = editSafely { it[Keys.IdleAlarmHideBeyond12h] = value }
+    suspend fun setBatteryOnlyWhenCharging(value: Boolean) = editSafely { it[Keys.BatteryOnlyWhenCharging] = value }
+    suspend fun setIdleBeatOnlyOnChange(value: Boolean) = editSafely { it[Keys.IdleBeatOnlyOnChange] = value }
     suspend fun setWidgetIslandCloseSeconds(value: Int) = editSafely {
         it[Keys.WidgetIslandCloseSeconds] = com.agupta07505.smartisland.model.WidgetIslandTimer.normalize(value)
     }
@@ -1031,6 +1132,83 @@ class SmartIslandSettingsRepository(private val context: Context) {
         it[Keys.IdleWidgetWindUnit] = value.takeIf { v -> v in com.agupta07505.smartisland.model.IdleWidgets.VALID_WIND_UNITS }
             ?: com.agupta07505.smartisland.model.IdleWidgets.UNIT_AUTO
     }
+    suspend fun setWeatherLocationSource(value: String) = editSafely {
+        it[Keys.WeatherLocationSource] = com.agupta07505.smartisland.model.WeatherConfig.normalizeSource(value)
+    }
+    suspend fun setWeatherManualCity(name: String, lat: Float, lon: Float) = editSafely {
+        if (com.agupta07505.smartisland.model.WeatherConfig.validCoordinates(lat, lon)) {
+            it[Keys.WeatherManualCity] = com.agupta07505.smartisland.model.WeatherConfig.normalizeCity(name)
+            it[Keys.WeatherManualLat] = lat
+            it[Keys.WeatherManualLon] = lon
+        }
+    }
+    suspend fun setWeatherRefreshMinutes(value: Int) = editSafely {
+        it[Keys.WeatherRefreshMinutes] = com.agupta07505.smartisland.model.WeatherConfig.normalizeRefreshMinutes(value)
+    }
+    suspend fun setWeatherProvider(value: String) = editSafely {
+        it[Keys.WeatherProvider] = com.agupta07505.smartisland.model.WeatherConfig.normalizeProvider(value)
+    }
+    suspend fun setWeatherCustomUrl(value: String) = editSafely {
+        it[Keys.WeatherCustomUrl] = com.agupta07505.smartisland.model.WeatherConfig.normalizeCustomUrl(value)
+    }
+    suspend fun setWeatherCustomKey(value: String) = editSafely {
+        it[Keys.WeatherCustomKey] = com.agupta07505.smartisland.model.WeatherConfig.normalizeKey(value)
+    }
+    suspend fun setWeatherPillMode(value: String) = editSafely {
+        it[Keys.WeatherPillMode] = com.agupta07505.smartisland.model.WeatherPill.normalize(value)
+    }
+    suspend fun setWeatherIslandReadouts(value: String) = editSafely {
+        it[Keys.WeatherIslandReadouts] = com.agupta07505.smartisland.model.WeatherReadouts.normalize(value)
+    }
+    suspend fun setWeatherIconAnimated(value: Boolean) = editSafely {
+        it[Keys.WeatherIconAnimated] = value
+    }
+    suspend fun setWeatherIconPauseOnSaver(value: Boolean) = editSafely {
+        it[Keys.WeatherIconPauseOnSaver] = value
+    }
+    suspend fun setWeatherShowRule(value: String) = editSafely {
+        it[Keys.WeatherShowRule] = com.agupta07505.smartisland.model.WeatherRules.normalizeMode(value)
+    }
+    suspend fun setWeatherNotableTriggers(value: String) = editSafely {
+        it[Keys.WeatherNotableTriggers] = com.agupta07505.smartisland.model.WeatherRules.normalizeTriggers(value)
+    }
+    suspend fun setWeatherHotC(value: Int) = editSafely {
+        it[Keys.WeatherHotC] = com.agupta07505.smartisland.model.WeatherRules.normalizeHotC(value)
+    }
+    suspend fun setWeatherColdC(value: Int) = editSafely {
+        it[Keys.WeatherColdC] = com.agupta07505.smartisland.model.WeatherRules.normalizeColdC(value)
+    }
+    suspend fun setWeatherHideAtNight(value: Boolean) = editSafely {
+        it[Keys.WeatherHideAtNight] = value
+    }
+    suspend fun setWeatherNightStartHour(value: Int) = editSafely {
+        it[Keys.WeatherNightStartHour] = com.agupta07505.smartisland.model.WeatherRules.normalizeHour(value)
+    }
+    suspend fun setWeatherNightEndHour(value: Int) = editSafely {
+        it[Keys.WeatherNightEndHour] = com.agupta07505.smartisland.model.WeatherRules.normalizeHour(value)
+    }
+    suspend fun setNetSpeedConnection(value: String) = editSafely {
+        it[Keys.NetSpeedConnection] = com.agupta07505.smartisland.model.NetSpeedRules.normalizeConnection(value)
+    }
+    suspend fun setIdleScheduleWorkEnabled(value: Boolean) = editSafely { it[Keys.IdleScheduleWorkEnabled] = value }
+    suspend fun setIdleScheduleWorkHidden(value: String) = editSafely { it[Keys.IdleScheduleWorkHidden] = com.agupta07505.smartisland.model.IdleSchedule.normalizeHidden(value) }
+    suspend fun setIdleScheduleWorkStartHour(value: Int) = editSafely { it[Keys.IdleScheduleWorkStartHour] = com.agupta07505.smartisland.model.IdleSchedule.normalizeHour(value) }
+    suspend fun setIdleScheduleWorkEndHour(value: Int) = editSafely { it[Keys.IdleScheduleWorkEndHour] = com.agupta07505.smartisland.model.IdleSchedule.normalizeHour(value) }
+    suspend fun setIdleScheduleWorkWeekdaysOnly(value: Boolean) = editSafely { it[Keys.IdleScheduleWorkWeekdaysOnly] = value }
+    suspend fun setIdleScheduleNightEnabled(value: Boolean) = editSafely { it[Keys.IdleScheduleNightEnabled] = value }
+    suspend fun setIdleScheduleNightHidden(value: String) = editSafely { it[Keys.IdleScheduleNightHidden] = com.agupta07505.smartisland.model.IdleSchedule.normalizeHidden(value) }
+    suspend fun setIdleScheduleNightStartHour(value: Int) = editSafely { it[Keys.IdleScheduleNightStartHour] = com.agupta07505.smartisland.model.IdleSchedule.normalizeHour(value) }
+    suspend fun setIdleScheduleNightEndHour(value: Int) = editSafely { it[Keys.IdleScheduleNightEndHour] = com.agupta07505.smartisland.model.IdleSchedule.normalizeHour(value) }
+    suspend fun setIdleScheduleChargingEnabled(value: Boolean) = editSafely { it[Keys.IdleScheduleChargingEnabled] = value }
+    suspend fun setIdleScheduleChargingHidden(value: String) = editSafely { it[Keys.IdleScheduleChargingHidden] = com.agupta07505.smartisland.model.IdleSchedule.normalizeHidden(value) }
+    /** Sets the widget order and the pinned widget together, so the selector never shows one without the other. */
+    suspend fun setIdleWidgetOrder(ids: String, pinnedFirst: String) = editSafely {
+        it[Keys.IdleWidgetIds] = com.agupta07505.smartisland.model.IdleWidgets.normalize(ids)
+        it[Keys.IdleWidgetPinnedFirst] = com.agupta07505.smartisland.model.IdleSchedule.normalizePinned(pinnedFirst)
+    }
+    suspend fun setNetSpeedThresholdKbps(value: Int) = editSafely {
+        it[Keys.NetSpeedThresholdKbps] = com.agupta07505.smartisland.model.NetSpeedRules.normalize(value)
+    }
     suspend fun setAllowNetworkChecks(value: Boolean) = editSafely {
         it[Keys.AllowNetworkChecks] = value
     }
@@ -1071,6 +1249,21 @@ class SmartIslandSettingsRepository(private val context: Context) {
     }
     suspend fun setIslandFont(value: String) = editSafely {
         it[Keys.IslandFont] = if (SmartIslandSettings.isValidFont(value)) value else SmartIslandSettings.Default.islandFont
+    }
+    suspend fun setFaceUnlockMode(value: String) = editSafely {
+        it[Keys.FaceUnlockMode] = if (value == "any") "any" else "face_only"
+    }
+    suspend fun setFaceIdStyle(value: String) = editSafely {
+        it[Keys.FaceIdStyle] = if (value == "cutout" || value == "square_tick") value else "square"
+    }
+    suspend fun setAppFaceIdEnabled(value: Boolean) = editSafely {
+        it[Keys.AppFaceIdEnabled] = value
+    }
+    suspend fun setFingerprintAnimationEnabled(value: Boolean) = editSafely {
+        it[Keys.FingerprintAnimationEnabled] = value
+    }
+    suspend fun setAppFaceIdStyle(value: String) = editSafely {
+        it[Keys.AppFaceIdStyle] = if (value == "cutout" || value == "square_tick") value else "square"
     }
     suspend fun setRecordLogs(value: Boolean) = editSafely {
         it[Keys.RecordLogs] = value
@@ -1310,6 +1503,11 @@ class SmartIslandSettingsRepository(private val context: Context) {
         prefs[Keys.NotificationCooldownSystemEvents] = settings.notificationCooldownSystemEvents
         prefs[Keys.DeveloperModeEnabled] = settings.developerModeEnabled
         prefs[Keys.RecordLogs] = settings.recordLogs
+        prefs[Keys.FaceUnlockMode] = settings.faceUnlockMode
+        prefs[Keys.FaceIdStyle] = settings.faceIdStyle
+        prefs[Keys.AppFaceIdEnabled] = settings.appFaceIdEnabled
+        prefs[Keys.AppFaceIdStyle] = settings.appFaceIdStyle
+        prefs[Keys.FingerprintAnimationEnabled] = settings.fingerprintAnimationEnabled
         prefs[Keys.ThemeMode] = settings.themeMode
         prefs[Keys.LiquidGlassTheme] = settings.liquidGlassTheme
         prefs[Keys.MaterialYou] = settings.materialYou
@@ -1396,6 +1594,8 @@ class SmartIslandSettingsRepository(private val context: Context) {
         )
         prefs[Keys.WidgetIslandCloseSeconds] = com.agupta07505.smartisland.model.WidgetIslandTimer.normalize(settings.widgetIslandCloseSeconds)
         prefs[Keys.IdleAlarmHideBeyond12h] = settings.idleAlarmHideBeyond12h
+        prefs[Keys.BatteryOnlyWhenCharging] = settings.batteryOnlyWhenCharging
+        prefs[Keys.IdleBeatOnlyOnChange] = settings.idleBeatOnlyOnChange
         prefs[Keys.WidgetIslandBatteryMetric] = settings.widgetIslandBatteryMetric
             .takeIf { it in com.agupta07505.smartisland.model.WidgetIslandContent.VALID_BATTERY_METRICS } ?: com.agupta07505.smartisland.model.WidgetIslandContent.BATTERY_WATT
         prefs[Keys.IdleGlyphFont] = settings.idleGlyphFont.takeIf { it.isEmpty() || SmartIslandSettings.isValidFont(it) } ?: ""
@@ -1410,6 +1610,39 @@ class SmartIslandSettingsRepository(private val context: Context) {
         prefs[Keys.IdleWidgetWindUnit] = settings.idleWidgetWindUnit
             .takeIf { it in com.agupta07505.smartisland.model.IdleWidgets.VALID_WIND_UNITS }
             ?: com.agupta07505.smartisland.model.IdleWidgets.UNIT_AUTO
+        prefs[Keys.WeatherLocationSource] = com.agupta07505.smartisland.model.WeatherConfig.normalizeSource(settings.weatherLocationSource)
+        prefs[Keys.WeatherManualCity] = com.agupta07505.smartisland.model.WeatherConfig.normalizeCity(settings.weatherManualCity)
+        prefs[Keys.WeatherManualLat] = settings.weatherManualLat
+        prefs[Keys.WeatherManualLon] = settings.weatherManualLon
+        prefs[Keys.WeatherRefreshMinutes] = com.agupta07505.smartisland.model.WeatherConfig.normalizeRefreshMinutes(settings.weatherRefreshMinutes)
+        prefs[Keys.WeatherProvider] = com.agupta07505.smartisland.model.WeatherConfig.normalizeProvider(settings.weatherProvider)
+        prefs[Keys.WeatherCustomUrl] = com.agupta07505.smartisland.model.WeatherConfig.normalizeCustomUrl(settings.weatherCustomUrl)
+        // A restore does not carry the API key (backups never hold it); keep the one already on the device.
+        prefs[Keys.WeatherPillMode] = com.agupta07505.smartisland.model.WeatherPill.normalize(settings.weatherPillMode)
+        prefs[Keys.WeatherIslandReadouts] = com.agupta07505.smartisland.model.WeatherReadouts.normalize(settings.weatherIslandReadouts)
+        prefs[Keys.WeatherIconAnimated] = settings.weatherIconAnimated
+        prefs[Keys.WeatherIconPauseOnSaver] = settings.weatherIconPauseOnSaver
+        prefs[Keys.WeatherShowRule] = com.agupta07505.smartisland.model.WeatherRules.normalizeMode(settings.weatherShowRule)
+        prefs[Keys.WeatherNotableTriggers] = com.agupta07505.smartisland.model.WeatherRules.normalizeTriggers(settings.weatherNotableTriggers)
+        prefs[Keys.WeatherHotC] = com.agupta07505.smartisland.model.WeatherRules.normalizeHotC(settings.weatherHotC)
+        prefs[Keys.WeatherColdC] = com.agupta07505.smartisland.model.WeatherRules.normalizeColdC(settings.weatherColdC)
+        prefs[Keys.WeatherHideAtNight] = settings.weatherHideAtNight
+        prefs[Keys.WeatherNightStartHour] = com.agupta07505.smartisland.model.WeatherRules.normalizeHour(settings.weatherNightStartHour)
+        prefs[Keys.WeatherNightEndHour] = com.agupta07505.smartisland.model.WeatherRules.normalizeHour(settings.weatherNightEndHour)
+        prefs[Keys.NetSpeedThresholdKbps] = com.agupta07505.smartisland.model.NetSpeedRules.normalize(settings.netSpeedThresholdKbps)
+        prefs[Keys.NetSpeedConnection] = com.agupta07505.smartisland.model.NetSpeedRules.normalizeConnection(settings.netSpeedConnection)
+        prefs[Keys.IdleScheduleWorkEnabled] = settings.idleScheduleWorkEnabled
+        prefs[Keys.IdleScheduleWorkHidden] = com.agupta07505.smartisland.model.IdleSchedule.normalizeHidden(settings.idleScheduleWorkHidden)
+        prefs[Keys.IdleScheduleWorkStartHour] = com.agupta07505.smartisland.model.IdleSchedule.normalizeHour(settings.idleScheduleWorkStartHour)
+        prefs[Keys.IdleScheduleWorkEndHour] = com.agupta07505.smartisland.model.IdleSchedule.normalizeHour(settings.idleScheduleWorkEndHour)
+        prefs[Keys.IdleScheduleWorkWeekdaysOnly] = settings.idleScheduleWorkWeekdaysOnly
+        prefs[Keys.IdleScheduleNightEnabled] = settings.idleScheduleNightEnabled
+        prefs[Keys.IdleScheduleNightHidden] = com.agupta07505.smartisland.model.IdleSchedule.normalizeHidden(settings.idleScheduleNightHidden)
+        prefs[Keys.IdleScheduleNightStartHour] = com.agupta07505.smartisland.model.IdleSchedule.normalizeHour(settings.idleScheduleNightStartHour)
+        prefs[Keys.IdleScheduleNightEndHour] = com.agupta07505.smartisland.model.IdleSchedule.normalizeHour(settings.idleScheduleNightEndHour)
+        prefs[Keys.IdleScheduleChargingEnabled] = settings.idleScheduleChargingEnabled
+        prefs[Keys.IdleScheduleChargingHidden] = com.agupta07505.smartisland.model.IdleSchedule.normalizeHidden(settings.idleScheduleChargingHidden)
+        prefs[Keys.IdleWidgetPinnedFirst] = com.agupta07505.smartisland.model.IdleSchedule.normalizePinned(settings.idleWidgetPinnedFirst)
         prefs[Keys.IdleTickStyle] = com.agupta07505.smartisland.model.LedTick.normalizeStyle(settings.idleTickStyle)
         prefs[Keys.LedTickPattern] = com.agupta07505.smartisland.model.LedTick.normalizePattern(settings.ledTickPattern)
         prefs[Keys.LedTickPaceMs] = com.agupta07505.smartisland.model.LedTick.normalizePace(settings.ledTickPaceMs)
@@ -1460,7 +1693,11 @@ class SmartIslandSettingsRepository(private val context: Context) {
             .toSet()
     }
 
-    suspend fun resetAllSettings() = restoreSettings(SmartIslandSettings.Default.copy(welcomeDialogShown = true))
+    suspend fun resetAllSettings() {
+        restoreSettings(SmartIslandSettings.Default.copy(welcomeDialogShown = true))
+        // A restore leaves the weather API key alone (backups never hold it), so a factory reset clears it explicitly.
+        setWeatherCustomKey("")
+    }
 
     private suspend fun editSafely(transform: suspend (MutablePreferences) -> Unit) {
         try {
@@ -1479,7 +1716,6 @@ class SmartIslandSettingsRepository(private val context: Context) {
         max: Float
     ): Float = value?.takeIf { it.isFinite() }?.coerceIn(min, max) ?: fallback
 
-    /** Saves the pinned apps in order and drops the legacy unordered set, so the two can never disagree. */
     private fun writePinnedApps(prefs: MutablePreferences, value: List<String>) {
         prefs[Keys.ShortcutOrder] = PinnedApps.encode(value)
         prefs.remove(Keys.ShortcutPackages)

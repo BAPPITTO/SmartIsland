@@ -42,7 +42,7 @@ class ShizukuSetupScopeTest {
     @Test
     fun necessaryLeavesOutTheOptionalPermissions() {
         val all = commands(ShizukuManager.SetupScope.Necessary).joinToString("\n")
-        listOf("LOCATION", "allow_dnd", "GET_USAGE_STATS", "WATCH_APPOPS").forEach {
+        listOf("LOCATION", "allow_dnd", "GET_USAGE_STATS").forEach {
             assertFalse("unexpected $it", all.contains(it))
         }
     }
@@ -56,9 +56,9 @@ class ShizukuSetupScopeTest {
     }
 
     @Test
-    fun optionalCoversUsageDndLocationAndAppOps() {
+    fun optionalCoversUsageDndAndLocation() {
         val optional = ShizukuManager.optionalCommands(pkg).joinToString("\n")
-        listOf("GET_USAGE_STATS", "allow_dnd", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION", "WATCH_APPOPS").forEach {
+        listOf("GET_USAGE_STATS", "allow_dnd", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION").forEach {
             assertTrue("missing $it", optional.contains(it))
         }
     }

@@ -22,9 +22,9 @@ import androidx.compose.ui.unit.dp
 import com.agupta07505.smartisland.data.SmartIslandSettings
 
 /**
- * Bubble merge style (push, then join), drawn BEHIND the pill so the pill's own content stays on top: while the bodies
- * push into each other the pill's touching end is pressed flat (opaque islands), then the join is drawn gooey
- * (Android 12+, opaque) or with a plain bridge. See ui/MergeBubble.kt for the maths.
+ * Bubble merge style (push, then join), drawn BEHIND the pill so the pill's own content stays on top: while the
+ * bodies push into each other the pill's touching end is pressed flat (opaque islands), then the join is drawn gooey
+ * (Android 12+, opaque) or with a plain bridge.
  */
 @Composable
 internal fun MergeBubbleBackdrop(
@@ -38,7 +38,7 @@ internal fun MergeBubbleBackdrop(
 ) {
     val density = LocalDensity.current
     if (!settings.enableNotchMode && secondary.mergeBackdropShown && !cb.currentExpanded &&
-        (layout.screenShareBubble || secondary.secondaryNotification != null) &&
+        secondary.secondaryNotification != null &&
         settings.mergeStyleKind() == com.agupta07505.smartisland.util.MergeStyle.BUBBLE
     ) {
         val gooLayer = androidx.compose.ui.graphics.rememberGraphicsLayer()

@@ -9,10 +9,7 @@ package com.agupta07505.smartisland.util
 
 import android.app.Notification
 
-/**
- * Recognises call-looking notifications. Every read is guarded: a malformed bundle must never
- * break notification handling.
- */
+/** Every read is guarded: a malformed bundle must never break notification handling. */
 object CallDiagnostics {
     fun isCallLike(n: Notification): Boolean {
         val extras = n.extras

@@ -8,27 +8,21 @@
 package com.agupta07505.smartisland.model
 
 /**
- * Landscape only: how the collapsed cutout leaves when its last card goes and the island returns to the
- * idle circle. The cutout itself slides away and fades (it keeps its own size and look while it does), then the
- * idle circle opens at its spot.
- *
- *  - Pill in the middle (anywhere far from the left and right edges): it slides up.
- *  - Pill near the left edge: it slides out to the left; near the right edge: out to the right.
- *
- * All values are dp. X positions are measured from the screen centre (like the island's x offset).
+ * Landscape: how the collapsed cutout leaves when its last card goes: it slides away and fades, then the idle circle
+ * opens at its spot.
  */
 enum class PillExitDirection { Up, Left, Right }
 
-/** "Near an edge" means the pill's centre is within this share of the screen width from that edge. */
+/** "Near an edge": the pill's centre is within this share of the screen width from it. */
 const val PILL_EXIT_EDGE_FRACTION = 0.25f
 
-/** The pill never slides further than this (it fades out on the way), so a pill low on the screen does not fly across it. */
+/** The pill slides no further than this (fading on the way), so a low pill does not fly across the screen. */
 const val PILL_EXIT_MAX_TRAVEL_DP = 120f
 
-/** Spare room past the screen edge so the pill is fully clear of it. */
+/** Spare room past the screen edge so the pill is fully clear. */
 const val PILL_EXIT_MARGIN_DP = 8f
 
-/** Base length of the exit (scaled by the animation speed). */
+/** Base exit length (scaled by the animation speed). */
 const val PILL_EXIT_MS = 360
 
 fun pillExitDirection(centerXDp: Float, screenWidthDp: Float): PillExitDirection {
@@ -43,7 +37,7 @@ fun pillExitDirection(centerXDp: Float, screenWidthDp: Float): PillExitDirection
     }
 }
 
-/** Distance (dp) the pill slides: to just past the edge it heads for, capped at [PILL_EXIT_MAX_TRAVEL_DP]. */
+/** Distance (dp) the pill slides: just past the edge it heads for, capped at [PILL_EXIT_MAX_TRAVEL_DP]. */
 fun pillExitTravelDp(
     direction: PillExitDirection,
     centerXDp: Float,
@@ -77,5 +71,4 @@ private fun smooth(t: Float): Float {
     return c * c * (3f - 2f * c)
 }
 
-/** The leaving pill stays solid for the first third, then fades out. */
 fun pillExitAlpha(progress: Float): Float = 1f - smooth((progress - 0.3f) / 0.7f)

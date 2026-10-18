@@ -8,21 +8,19 @@
 package com.agupta07505.smartisland.model
 
 /**
- * The pages of the quick-launch window. Apps and Recents sit side by side on the "apps level" (swipe left / right); the
- * Utilities page is the other level (swipe up / down), and the two levels loop into each other.
+ * Pages of the quick-launch window: Apps and Recents side by side (swipe left / right), Utilities on the other level
+ * (swipe up / down); the levels loop.
  */
 enum class LauncherPage { Apps, Recents, Utilities }
 
-/** A swipe in the launcher, named by the way the finger moves. */
 enum class LauncherSwipe { Up, Down, Left, Right }
 
 /**
- * The page a [swipe] leads to from [current].
- *
- * - Up or down switches between the apps level and Utilities, and loops: from Utilities either direction returns to the apps
- *   level, to [lastAppsLevelPage] (the page that was open when the finger left it).
- * - Left or right switches between Apps and Recents, when [recentsEnabled]; Utilities has nothing sideways.
- * - Recents is only a real page while it is enabled: with it off, any apps-level page is Apps.
+ * Page a [swipe] leads to from [current].
+ * - Up / down switches between the apps level and Utilities and loops; from Utilities it returns to
+ * [lastAppsLevelPage].
+ * - Left / right switches between Apps and Recents when [recentsEnabled]; Utilities has nothing sideways.
+ * - Recents is a real page only while enabled; with it off, any apps-level page is Apps.
  */
 fun launcherPageAfter(
     current: LauncherPage,
@@ -45,13 +43,13 @@ fun launcherPageAfter(
 }
 
 /**
- * True while the launcher window is open and a drag that moves belongs to it (its page swipes), so the island's own swipe actions
- * (collapse, dismiss, switch card) must not also fire for it. A tap, which does not move, is not a drag.
+ * True while the launcher is open and a moving drag belongs to it, so the island's own swipe actions must not also
+ * fire. A tap is not a drag.
  */
 fun launcherOwnsDrag(launcherOpen: Boolean, dragX: Float, dragY: Float): Boolean =
     launcherOpen && (kotlin.math.abs(dragX) > 0.5f || kotlin.math.abs(dragY) > 0.5f)
 
-/** The swipe a finger drag of ([dx], [dy]) makes once it passes [thresholdPx] along its longer axis; null before that. */
+/** Swipe a drag of ([dx], [dy]) makes once it passes [thresholdPx] along its longer axis; null before that. */
 fun launcherSwipeFor(dx: Float, dy: Float, thresholdPx: Float): LauncherSwipe? {
     val ax = kotlin.math.abs(dx)
     val ay = kotlin.math.abs(dy)

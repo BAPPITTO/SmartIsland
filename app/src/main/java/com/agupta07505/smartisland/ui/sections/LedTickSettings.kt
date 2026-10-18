@@ -53,11 +53,7 @@ import com.agupta07505.smartisland.ui.LedTickPreview
 import com.agupta07505.smartisland.ui.search.searchAnchor
 import kotlinx.coroutines.launch
 
-/**
- * Settings > Idle widgets > Tick style: the smooth tick (the original) or the LED footsteps tick. With the LED tick on, the card
- * shows a live sample and lets the user type the pattern ("1, 2, 3, 2, 5"), set the pace, and pick the LED colour and font. One
- * set of choices for portrait and landscape, like the other timers.
- */
+/** Settings > Idle widgets > Tick style: the smooth tick (the original) or the LED footsteps tick. */
 @Composable
 internal fun LedTickSettingsCard(settings: SmartIslandSettings, repository: SmartIslandSettingsRepository) {
     val scope = rememberCoroutineScope()
@@ -202,7 +198,6 @@ internal fun LedTickSettingsCard(settings: SmartIslandSettings, repository: Smar
                         )
                     }
 
-                    // LED colour.
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(
                             text = stringResource(R.string.led_tick_color_title),

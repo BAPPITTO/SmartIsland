@@ -15,7 +15,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The shell shape built in the draw phase matches the shape it replaced. */
+/** The shell shape built in the draw phase keeps the requested corner radius and square top. */
 class IslandShellShapeTest {
     private val density = Density(1f)
 

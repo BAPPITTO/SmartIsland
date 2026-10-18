@@ -13,35 +13,25 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * Landscape (and portrait, for an idle-circle tap only, see [IdleCloseSequence]): one state machine for the collapsed cutout leaving (last card gone, idle circle takes over)
- * and coming back (a card arrives while the idle circle shows). Exit and reverse are the SAME motion, driven
- * by one number, "presence": 1 = pill in place, 0 = pill gone. Leaving animates presence 1 -> 0, coming back
- * animates it 0 -> 1 starting from wherever it is. Both run on ONE critically damped spring (no bounce), so an
- * interruption reverses in place and keeps its velocity: it never snaps and never restarts from rest.
- *
- * The idle circle (the camera cutout circle) is not part of this motion. It does not fade, blink or pulse, and the pill
- * neither waits for it nor starts it: the circle is on or off (it stays on while the pill leaves, then the island's own
- * idle cutout takes the same spot).
- * The pill keeps its size in this app, so leaving and coming back share one geometry (no size mismatch).
+ * One state machine for the collapsed cutout leaving (last card gone, idle circle takes over) and returning (a card
+ * arrives).
  */
 enum class PillPhase {
     None,
     Leaving,
     Entering,
 
-    /** The pill has just left: the island takes the idle settings with a jump (no glide) for a couple of frames. */
+    /** The pill just left: the island takes the idle settings with a jump (no glide) for a couple of frames. */
     Settling
 }
 
-/** What the state machine does on a composition. */
 enum class PillTransition {
-    /** Nothing to start or change. */
     None,
 
-    /** Idle shown -> start the pill leaving (from fully present). */
+    /** Idle shown -> pill starts leaving (from fully present). */
     StartExit,
 
-    /** Idle shown, a card arrives -> start the pill coming back (from fully gone). */
+    /** Idle shown, a card arrives -> pill starts coming back (from fully gone). */
     StartEnter,
 
     /** Pill is leaving and a card arrives (or the user expands): reverse from the current progress. */
@@ -54,16 +44,16 @@ enum class PillTransition {
     Cancel
 }
 
-/** The pill's presence spring: critically damped (no bounce). Stiffness is scaled by the animation speed. */
+/** Presence spring: critically damped (no bounce); stiffness is scaled by the animation speed. */
 const val PILL_SPRING_DAMPING = 1f
 const val PILL_SPRING_STIFFNESS = 340f
 
-/** The spring counts as settled at this share of its travel (used to cap the merge that rides along with the exit). */
+/** The spring counts as settled at this share of its travel (caps the merge that rides along with the exit). */
 const val PILL_SPRING_SETTLED = 0.98f
 
 /**
- * Progress (0..1) of a Compose spring (mass 1, so omega = sqrt(stiffness)) that starts at rest and is aimed at 1,
- * [tSec] seconds after it started. Closed form for the under-damped and the critically damped case.
+ * Progress (0..1) of a Compose spring (mass 1, omega = sqrt(stiffness)) from rest aimed at 1, [tSec] seconds in.
+ * Closed form for the under-damped and critically damped case.
  */
 fun springProgress(tSec: Float, stiffness: Float, dampingRatio: Float): Float {
     if (tSec <= 0f || stiffness <= 0f) return 0f
@@ -91,13 +81,13 @@ fun springTimeToProgressMs(stiffness: Float, dampingRatio: Float, fraction: Floa
     return ms
 }
 
-/** How long (ms) the pill's presence spring takes to settle at the given (already speed-scaled) [stiffness]. */
+/** Time (ms) the presence spring takes to settle at the given speed-scaled [stiffness]. */
 fun pillSpringSettleMs(stiffness: Float): Long =
     springTimeToProgressMs(stiffness, PILL_SPRING_DAMPING, PILL_SPRING_SETTLED)
 
 /**
  * @param eligible landscape (or a portrait idle-circle tap in progress) and not notch mode
- * @param expanded the island is expanded: a new exit or entry never starts, but an exit already running reverses
+ * @param expanded the island is expanded: no new exit or entry starts, but a running exit reverses
  * @param hasContent a card is on the island now
  * @param hadPill the previous composition showed a collapsed pill (card, collapsed, eligible)
  * @param hadNoContent the previous composition had no card (the idle circle was showing)
@@ -120,10 +110,10 @@ fun pillTransition(
     phase == PillPhase.Leaving || phase == PillPhase.Entering -> PillTransition.None
     !eligible || expanded || !hasRecord -> PillTransition.None
     !hasContent && hadPill -> PillTransition.StartExit
-    // A card arrives on the idle circle: the pill slides in from its assigned position (same motion as the exit, backwards).
+    // A card arrives on the idle circle: the pill slides in from its assigned position (the exit backwards).
     hasContent && hadNoContent -> PillTransition.StartEnter
     else -> PillTransition.None
 }
 
-/** Slide progress of the pill (0 = in place, 1 = gone) for a [presence] value. Exit and reverse use the same curve. */
+/** Slide progress of the pill (0 = in place, 1 = gone) for a [presence] value; exit and reverse share the curve. */
 fun pillSlideProgress(presence: Float): Float = 1f - presence.coerceIn(0f, 1f)

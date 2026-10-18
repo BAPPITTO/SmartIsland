@@ -11,25 +11,23 @@ import java.util.Calendar
 import java.util.TimeZone
 
 /**
- * The clock idle widget does not show the time (the status bar already does). Once an hour, on the full hour, the pill shows the hour in its
- * left slot and the minutes in its right slot ticking over: the old hour ticks away downwards and the new hour ticks in from above, the minutes
- * "59" tick away upwards and "00" ticks in from below. Pure rules here; the drawing is ui/HourChime.kt.
+ * Clock widget: once an hour the pill ticks the hour (left slot) and minutes (right slot) over; the status bar
+ * already shows the time. Drawing is in ui/HourChime.kt.
  */
 object HourChime {
     const val MINUTES_BEFORE = "59"
     const val MINUTES_AFTER = "00"
 
-    /** The pill shows the old time for this long (ms) before it ticks over, so "59" is seen. */
+    /** The old time is shown this long (ms) before the tick, so "59" is seen. */
     const val HOLD_BEFORE_MS = 700
-    /** The tick itself (ms), including its slow suspended pull-back ([IdleSlots.heavyTickProgress]). */
+    /** Tick length (ms), including its slow suspended pull-back ([IdleSlots.heavyTickProgress]). */
     const val TICK_MS = 2200
-    /** The new time stays this long (ms) after the tick, then the pill goes back to what it showed. */
+    /** The new time stays this long (ms), then the pill goes back to what it showed. */
     const val HOLD_AFTER_MS = 2500
-    /** Fade of the chime in and out (ms). */
     const val FADE_IN_MS = 160
     const val FADE_OUT_MS = 260
 
-    /** The next full hour strictly after [nowMs], in [zone] (right for half-hour zones and daylight saving). */
+    /** Next full hour strictly after [nowMs] in [zone] (right for half-hour zones and daylight saving). */
     fun nextFullHourMs(nowMs: Long, zone: TimeZone = TimeZone.getDefault()): Long {
         val cal = Calendar.getInstance(zone)
         cal.timeInMillis = nowMs
@@ -40,21 +38,17 @@ object HourChime {
         return cal.timeInMillis
     }
 
-    /** The hour of day (0..23) at [ms] in [zone]. */
     fun hourOf(ms: Long, zone: TimeZone = TimeZone.getDefault()): Int =
         Calendar.getInstance(zone).also { it.timeInMillis = ms }.get(Calendar.HOUR_OF_DAY)
 
-    /** The hour before [hour] (0..23): the one that ticks away. */
     fun previousHour(hour: Int): Int = ((hour % 24) + 23) % 24
 
-    /** How the hour reads: two digits in 24 hour mode ("01", "13"), as on a 12 hour clock otherwise ("1", "12"). */
     fun hourLabel(hour: Int, is24: Boolean): String {
         val h = ((hour % 24) + 24) % 24
         return if (is24) "%02d".format(h) else (if (h % 12 == 0) 12 else h % 12).toString()
     }
 }
 
-/** What the chime shows: the hour that ticks away and the one that ticks in. */
 class HourChimeLabels(val oldHour: String, val newHour: String)
 
 fun hourChimeLabels(newHour: Int, is24: Boolean): HourChimeLabels =

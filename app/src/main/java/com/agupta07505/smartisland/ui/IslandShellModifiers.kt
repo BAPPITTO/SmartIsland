@@ -37,7 +37,7 @@ import androidx.compose.ui.unit.dp
  * frame of the size animation. Every function keeps the maths of the modifier it replaces.
  */
 
-/** The island shape: all four corners `radiusPx`, or (notch mode, collapsed) square top corners. Same result as the old `mainShape`. */
+/** The island shape: all four corners `radiusPx`, or (notch mode, collapsed) square top corners. */
 internal fun islandShellShape(radiusPx: Float, squareTop: Boolean): RoundedCornerShape {
     val r = CornerSize(radiusPx.coerceAtLeast(0f))
     return if (squareTop) {
@@ -89,8 +89,8 @@ internal fun Modifier.islandShellShadow(
 }
 
 /**
- * Like `background(brush or colour, shape, alpha)`: the outline comes from the same shape as the clip, built in the draw block.
- * With a [brush] the island is filled with it at [alpha]; otherwise with [color] at [alpha].
+ * Like `background(brush or colour, shape, alpha)`: the outline comes from the same shape as the clip, built in the
+ * draw block.
  */
 internal fun Modifier.islandShellSurface(
     radius: () -> Dp,
@@ -98,10 +98,7 @@ internal fun Modifier.islandShellSurface(
     brush: Brush?,
     color: Color,
     alpha: () -> Float,
-    /**
-     * The light look: the colour the island has when fully open. The shell eases from [color] (the pill) to it by [expandedFraction]
-     * (0 = pill, 1 = open, read while drawing), so a light card grows out of a black pill instead of flashing white. Null = no change.
-     */
+    /** The light look: the colour the island has when fully open. */
     expandedColor: Color? = null,
     expandedFraction: () -> Float = { 1f }
 ): Modifier = drawBehind {
@@ -116,8 +113,7 @@ internal fun Modifier.islandShellSurface(
         else drawSquareTopShell(r, base.copy(alpha = a), null, a)
     }
     if (!squareTop) {
-        // The normal shell is a plain rounded rectangle, so it is drawn directly. No Outline or Path is built
-        // on each frame of the size animation (no allocation per frame); the radius is clamped to half the short side by the canvas.
+        // The normal shell is a plain rounded rectangle, so it is drawn directly.
         val corner = CornerRadius(r, r)
         if (brush != null) drawRoundRect(brush, size = size, cornerRadius = corner, alpha = brushAlpha)
         else drawRoundRect(base.copy(alpha = a), size = size, cornerRadius = corner)
@@ -127,7 +123,6 @@ internal fun Modifier.islandShellSurface(
     }
 }
 
-/** The notch-mode shell: [brush] at [brushAlpha] when given, else [fill]. */
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSquareTopShell(r: Float, fill: Color, brush: Brush?, brushAlpha: Float) {
     val path = squareTopPath.getOrSet { Path() }
     path.rewind()
@@ -141,14 +136,13 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSquareTopShell(
     if (brush != null) drawPath(path, brush, alpha = brushAlpha) else drawPath(path, fill)
 }
 
-/** The notch-mode shell path, kept per thread (drawing runs on one thread) so each frame only rewinds it. */
 private val squareTopPath = ThreadLocal<Path>()
 
 private inline fun <T : Any> ThreadLocal<T>.getOrSet(create: () -> T): T = get() ?: create().also { set(it) }
 
 /**
- * The thin outline of the swipe-lock cue, drawn over the content in the shape [shape]. [cue] (0..1) is read at draw time,
- * so the fade never recomposes anything. Half of the stroke falls outside a clipped shell, so it is drawn twice as wide.
+ * The thin outline of the swipe-lock cue, drawn over the content in the shape [shape]. [cue] (0..1) is read at draw
+ * time, so the fade never recomposes anything.
  */
 internal fun Modifier.lockCueOutline(shape: Density.() -> Shape, cue: () -> Float, color: Color = Color.White): Modifier = drawWithContent {
     drawContent()

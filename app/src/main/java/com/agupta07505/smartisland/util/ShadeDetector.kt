@@ -12,7 +12,6 @@ data class ShadeWindow(
     val packageName: String?,
     /** The window's accessibility title (SystemUI sets "Notification shade.", "Quick settings.", "Lock screen."). */
     val title: String?,
-    /** `AccessibilityWindowInfo.TYPE_SYSTEM`. */
     val isSystemType: Boolean,
     val isActive: Boolean,
     val isFocused: Boolean,
@@ -35,16 +34,6 @@ data class ShadeTitles(
     }
 }
 
-/**
- * Tells whether the notification shade (or quick settings) is pulled down, from the accessibility windows.
- *
- * SystemUI keeps ONE window for the shade, the lock screen and heads-up notifications, and makes it full height for all
- * three, so size alone is not enough:
- * - Unlocked: the shade window is full height AND is the active / focused window. A heads-up notification makes the
- *   window tall too but it never takes the focus, so it does not count.
- * - Locked: the lock screen itself is also a tall, active SystemUI window, so the window title decides: it must be the
- *   shade's or quick settings' title, and not the lock screen's.
- */
 object ShadeDetector {
     const val SYSTEM_UI = "com.android.systemui"
 

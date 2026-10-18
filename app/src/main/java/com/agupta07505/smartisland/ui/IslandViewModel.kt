@@ -24,7 +24,6 @@ import com.agupta07505.smartisland.model.IslandEvent
 import com.agupta07505.smartisland.model.IslandMode
 import com.agupta07505.smartisland.model.IslandPriority
 import com.agupta07505.smartisland.model.IslandNotification
-import com.agupta07505.smartisland.model.PrivacyIndicatorState
 import com.agupta07505.smartisland.model.appGroupKey
 import com.agupta07505.smartisland.model.landscapeWidgetPillWanted
 import com.agupta07505.smartisland.model.pillOnIsland
@@ -34,7 +33,6 @@ import com.agupta07505.smartisland.model.siblingIndices
 import com.agupta07505.smartisland.util.AppEventRules
 import com.agupta07505.smartisland.util.ExpandedSelection
 import com.agupta07505.smartisland.util.IslandTimings
-import com.agupta07505.smartisland.util.PrivacyIndicatorTracker
 import kotlinx.coroutines.flow.collectLatest
 import com.agupta07505.smartisland.util.runSuspendCatchingLogged
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -49,7 +47,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -65,7 +62,6 @@ class IslandViewModel(
     /** True while the phone is turning and the island is hidden until the new orientation has settled (model/RotationVeil.kt). */
     val rotationVeil = MutableStateFlow(false)
 
-    /** Settings with the portrait or landscape profile already applied. */
     val settings: StateFlow<SmartIslandSettings> = combine(
         settingsRepo.settings,
         orientation
@@ -76,8 +72,8 @@ class IslandViewModel(
     )
 
     /**
-     * Landscape sibling picker: true when it opens on the left, i.e. the camera is on the right
-     * (reverse landscape), so the picker always sits on the side away from the camera.
+     * Landscape sibling picker: true when it opens on the left, i.e. the camera is on the right (reverse landscape),
+     * so the picker always sits on the side away from the camera.
      */
     val pickerOnLeft: StateFlow<Boolean> = combine(
         settingsRepo.settings,
@@ -91,7 +87,6 @@ class IslandViewModel(
         initialValue = false
     )
 
-    /** Latest stored (raw, orientation-free) settings, for callers that need a synchronous read. */
     fun settingsSnapshot(): SmartIslandSettings = rawSettings.value
 
     private val rawSettings: StateFlow<SmartIslandSettings> = settingsRepo.settings.stateIn(
@@ -109,16 +104,10 @@ class IslandViewModel(
      */
     val isLocked = MutableStateFlow(false)
 
-    /** Keys of the list the selection collector has handled last; lets other collectors tell if it has seen a list yet. */
     private var selectionKeys: List<String> = emptyList()
 
-    /**
-     * Card the auto-expand collector selected before the selection collector has seen the list that holds it. Without it
-     * the collector would read the new index against the PREVIOUS list and move the selection back to the old card.
-     */
     private var pendingSelectKey: String? = null
 
-    /** Notifications allowed by the event switches and the foreground app (before the idle timeout). */
     private val baseVisible: StateFlow<List<IslandNotification>> = combine(
         notifications,
         foregroundPackage,
@@ -141,11 +130,6 @@ class IslandViewModel(
         initialValue = emptyList()
     )
 
-    /**
-     * Cards (static notifications, paused media, paused stopwatch/timer/recorders) that the idle
-     * timeout has put away. They stay in the repository (and the shade copy is untouched); a card
-     * that is updated with new content, or that resumes, shows again.
-     */
     private val idleHidden = MutableStateFlow<Set<IdleToken>>(emptySet())
 
     /** True while the idle timeout has put cards away that a tap on the idle cutout can bring back. */
@@ -160,29 +144,19 @@ class IslandViewModel(
         initialValue = false
     )
 
-    /**
-     * Keys of live cards the user brought back himself (idle cutout tap, event swipe). They stay until the user puts
-     * them away again: the live auto timer (see "Live idle timeout" below) skips them. Cards that appear on their own
-     * are not in this set, so they do go back to the idle cutout after the normal collapsed-pill timer.
-     */
     private val userRevealedLive = MutableStateFlow<Set<String>>(emptySet())
 
     /** Half-typed quick replies per notification; ended by a send or when the notification is gone. */
     val replyDrafts = com.agupta07505.smartisland.model.ReplyDrafts()
 
-    /**
-     * Key of the card being typed on when a ringing call took the island. Typing resumes on that card (box open, draft
-     * back) once no call is ringing any more: answered, declined or dismissed.
-     */
     private val callInterruptReplyKey = MutableStateFlow<String?>(null)
 
     /**
-     * Tap on the idle cutout: the cards the idle timeout put away come back and the island behaves
-     * as it did before idling. Live cards brought back this way get NO auto timer; the static ones
-     * idle out again by the normal countdown, as before. This is also the moment the normal rules come back after a tap
-     * put-away: until then every new live event (calls excepted) runs the auto timer.
+     * Tap on the idle cutout: the cards the idle timeout put away come back. Live cards brought back this way get NO
+     * auto timer; the static ones idle out again by the normal countdown.
      */
     fun revealIdleCards(tapAnimation: Boolean = true) {
+        if (tapAnimation && widgetIslandHolds()) return
         // A tap that brings the stored cards back is a tap to open: the widgets may show again (the automatic reveal is not a tap).
         if (tapAnimation) _idleClosedByTap.value = false
         // Portrait only animates a card's arrival on the idle cutout for a tap (the same slide-in as landscape). The flag
@@ -213,30 +187,22 @@ class IslandViewModel(
             initialValue = null
         )
 
-    /**
-     * Tap on the landscape idle dot: every card on the island goes away at once, live ones included (no
-     * exceptions); a tap on the dot when the cards are already away brings them all back. New events that
-     * arrive afterwards show as usual. Returns what happened, for the caller and the log.
-     */
     private var idleTapJob: kotlinx.coroutines.Job? = null
 
-    /** True during step 1 of the close: the expanded island closes and the secondary cutout merges (the overlay forces the merge), the pill stays. */
+    /**
+     * True during step 1 of the close: the expanded island closes and the secondary cutout merges (the overlay forces
+     * the merge), the pill stays.
+     */
     val idleClosing = MutableStateFlow(false)
 
-    /**
-     * Tap on the idle cutout: EVERY card on the island goes away, with no exceptions (calls, playing media,
-     * navigation, screen recording, timers and the rest included). [putAwayIdleCards] is not used by the idle timer,
-     * which still only puts away the cards that [IslandPriority.canIdleOut].
-     */
     private fun putAwayIdleCards() {
         val tokens = visibleNotifications.value.map { it.awayToken() }
         if (tokens.isNotEmpty()) idleHidden.update { it + tokens }
     }
 
     /**
-     * True while a tap on the idle circle runs its open or close sequence ([com.agupta07505.smartisland.model.IdleCloseSequence]).
-     * Landscape always animates the pill's arrival and exit; portrait does it only while this is up (a tap), and keeps its
-     * normal arrival and exit for everything else.
+     * True while a tap on the idle circle runs its open or close sequence
+     * ([com.agupta07505.smartisland.model.IdleCloseSequence]).
      */
     val idleTapActive = MutableStateFlow(false)
 
@@ -245,7 +211,6 @@ class IslandViewModel(
 
     private var idleTapActiveJob: Job? = null
 
-    /** Keeps [idleTapActive] up for [sequenceMs] plus a margin, so the overlay's state machine can finish before it drops. */
     private fun holdIdleTapActive(sequenceMs: Long) {
         idleTapActive.value = true
         idleTapActiveJob?.cancel()
@@ -256,17 +221,9 @@ class IslandViewModel(
         }
     }
 
-    /** The animation speed of the orientation the island is in now. */
     private fun openingSpeed(): com.agupta07505.smartisland.util.AnimationSpeed =
         settings.value.animationSpeed(orientation.value.isLandscape)
 
-    /**
-     * Closes every card in two steps ([com.agupta07505.smartisland.model.IdleCloseSequence]), the same in both orientations:
-     *  1. an expanded island closes while the secondary cutout merges; the collapsed pill stays where it is;
-     *  2. only when step 1 is over the cards are put away, so the collapsed pill leaves and the idle circle blinks in.
-     * Together they last as long as the idle circle's opening animation. Nothing expanded: step 1 is skipped and the pill
-     * leaves at once (on the same exit spring).
-     */
     private fun putAwayAllWithLead() {
         val wasExpanded = expanded.value
         // Putting every card away with a tap on the cutout is a tap to close: "off after tap to close" holds the widgets off from here.
@@ -295,8 +252,7 @@ class IslandViewModel(
                 // Step 2: the exit flag first, so the overlay knows which spring the pill leaves on when the cards go.
                 idleLeaving.value = true
                 putAwayIdleCards()
-                // After a tap put-away the next live events (not calls) run the auto timer like any new event. The
-                // cards the user had brought back himself lose that protection; a tap that reveals cards again restores it.
+                // After a tap put-away the next live events (not calls) run the auto timer like any new event.
                 userRevealedLive.value = emptySet()
                 idleClosing.value = false
                 delay(step2Ms + IDLE_TAP_ACTIVE_MARGIN_MS)
@@ -337,7 +293,7 @@ class IslandViewModel(
 
     /**
      * True while the notification shade (or quick settings) is pulled down. Every event is hidden then and only the
-     * idle cutout stays; the overlay service sets it from the accessibility windows (see util/ShadeDetector.kt).
+     * idle cutout stays; the overlay service sets it from the accessibility windows.
      */
     val shadeOpen = MutableStateFlow(false)
 
@@ -351,11 +307,6 @@ class IslandViewModel(
         }
     }
 
-    /**
-     * True after a long press hid the collapsed pill: only calls stay on the island, so the idle
-     * pill is what shows. Toggled by [togglePillHidden]. Rotating the phone never changes it, and
-     * the pill is shown by default in portrait and landscape alike.
-     */
     private val _pillHidden = MutableStateFlow(false)
     val pillHidden: StateFlow<Boolean> = _pillHidden
 
@@ -370,15 +321,9 @@ class IslandViewModel(
 
     fun togglePillHidden() = setPillHidden(!_pillHidden.value)
 
-    /**
-     * Landscape: a tick (hourly, day moment, weather change) needs the wide pill although a long press hid it or the widgets are held off.
-     * While true the pill is on the island ([landscapeWidgetPill]); the tick layers set it (ui/TickPill.kt) and clear it when they are done.
-     */
-    /** Landscape: the empty collapsed pill was asked for with a tap on the idle cutout. */
     private val _emptyPillShown = MutableStateFlow(false)
     private var emptyPillJob: Job? = null
 
-    /** Shows the pill with no card until the idle timeout. */
     private fun showEmptyPill() {
         _emptyPillShown.value = true
         emptyPillJob?.cancel()
@@ -388,6 +333,10 @@ class IslandViewModel(
             delay(settings.value.idleTimeoutMs.toLong() + IDLE_TIMER_EXTRA_MS)
             _emptyPillShown.value = false
         }
+    }
+
+    private fun keepEmptyPillAfterLauncher() {
+        if (appsLauncherOpen.value && _emptyPillShown.value) showEmptyPill()
     }
 
     private fun hideEmptyPill() {
@@ -402,16 +351,11 @@ class IslandViewModel(
         _tickHold.value = hold
     }
 
-    /**
-     * True after a tap on the cutout closed the open island (Settings > Idle widgets: "off after tap to close"). It holds the widgets off when the
-     * pill later times out into idle, until a tap opens the island (or brings the stored cards back) again. New cards and the screen turning
-     * off do not clear it.
-     */
     private val _idleClosedByTap = MutableStateFlow(false)
 
     /**
-     * The idle widgets are held off the pill right now: the chosen orientation's "off after tap to close" / "off after long press to hide"
-     * switches, together with what just happened ([IdleWidgetOff]).
+     * The idle widgets are held off the pill right now: the chosen orientation's "off after tap to close" / "off
+     * after long press to hide" switches, together with what just happened ([IdleWidgetOff]).
      */
     val idleWidgetsSuppressed: StateFlow<Boolean> = combine(
         _idleClosedByTap,
@@ -435,8 +379,8 @@ class IslandViewModel(
     )
 
     /**
-     * The app in the foreground is exempt in the current orientation (Settings > Exempt apps): the island is totally off while it stays
-     * there. The overlay service hides the island's window on this, and the island closes if it was open.
+     * The app in the foreground is exempt in the current orientation (Settings > Exempt apps): the island is totally
+     * off while it stays there.
      */
     val islandExemption: StateFlow<ExemptMode> = combine(
         foregroundPackage,
@@ -464,10 +408,7 @@ class IslandViewModel(
         .distinctUntilChanged()
         .stateIn(scope = viewModelScope, started = SharingStarted.Eagerly, initialValue = false)
 
-    /**
-     * The exemption right now, computed from the current values instead of the flow above. The flow lags a moment behind the
-     * foreground app, and the overlay service sizes and shows its window straight after it changes the foreground app.
-     */
+    /** The exemption right now, computed from the current values instead of the flow above. */
     fun exemptionNow(): ExemptMode {
         val raw = rawSettings.value
         return IslandExemption.modeFor(
@@ -476,7 +417,6 @@ class IslandViewModel(
         )
     }
 
-    /** Visible cards in arrival order, before the priority order and the popup are applied. */
     private val visibleUnordered: StateFlow<List<IslandNotification>> = combine(
         baseVisible,
         idleHidden,
@@ -500,10 +440,6 @@ class IslandViewModel(
         initialValue = emptyList()
     )
 
-    /**
-     * Diagnostic trace: cards that were on the island but are kept off screen by one of the view
-     * model's own rules (event switches, idle timeout, hidden pill). Only while the log records.
-     */
     private fun traceHidden(
         before: List<IslandNotification>,
         after: List<IslandNotification>,
@@ -524,13 +460,10 @@ class IslandViewModel(
         }
     }
 
-    /** Key of the short event that currently holds the primary cutout, or null. */
     private val popupKey = MutableStateFlow<String?>(null)
 
     /**
-     * What the island shows, in priority order (see [IslandPriority]): index 0 owns the primary
-     * cutout, index 1 the secondary round cutout. A fresh short event is moved to index 0 for
-     * the popup length from settings (default [IslandTimings.POPUP_MS]).
+     * What the island shows, in priority order: index 0 owns the primary cutout, index 1 the secondary round cutout.
      */
     val visibleNotifications: StateFlow<List<IslandNotification>> = combine(
         visibleUnordered,
@@ -542,8 +475,8 @@ class IslandViewModel(
     )
 
     /**
-     * Landscape: the collapsed pill stays on screen to carry the idle widgets while no card is on the island (the idle circle
-     * remains at its own spot as the toggle). See model/LandscapeWidgetPill.kt.
+     * Landscape: the collapsed pill stays on screen to carry the idle widgets while no card is on the island (the
+     * idle circle remains at its own spot as the toggle). See model/LandscapeWidgetPill.kt.
      */
     val landscapeWidgetPill: StateFlow<Boolean> = combine(
         settingsRepo.settings,
@@ -569,10 +502,9 @@ class IslandViewModel(
     )
 
     /**
-     * [settings] plus the content-dependent collapsed geometry (LR3: with cards on the island the
-     * landscape cutout is the vertical corner pill). The overlay window, its touch region and the
-     * island view read this one; everything in this class keeps reading [settings] (the cards
-     * themselves depend on it, so using this flow there would be circular).
+     * [settings] plus the content-dependent collapsed geometry (with cards on the island the landscape cutout is the vertical
+     * corner pill). The overlay window, its touch region and the island view read this one; everything in this class keeps
+     * reading [settings] (the cards depend on it, so using this flow there would be circular).
      */
     val displaySettings: StateFlow<SmartIslandSettings> = combine(
         settingsRepo.settings,
@@ -588,76 +520,27 @@ class IslandViewModel(
         initialValue = SmartIslandSettings.Default
     )
 
-    /**
-     * Privacy indicators (camera, microphone, location, screen sharing) after the shared rules:
-     * each switch gates its own kind, screen sharing waits out the recorder check ([ScreenShareGate]),
-     * and [PrivacyIndicatorController] gives the secondary cutout to one indicator at a time for 2 s.
-     */
-    val privacyTracker = PrivacyIndicatorTracker()
-    private val screenShareGate = com.agupta07505.smartisland.model.ScreenShareGate()
-    private val privacyController = com.agupta07505.smartisland.model.PrivacyIndicatorController()
-
-    /** Wall clock for the privacy timers. Tests swap in the virtual clock. Must stay above [privacy]. */
-    internal var clock: () -> Long = { System.currentTimeMillis() }
-
-    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    val privacy: StateFlow<PrivacyIndicatorState> = combine(
-        privacyTracker.state,
-        privacyTracker.holderPackage,
-        settings,
-        notifications,
-        isLocked
-    ) { state, holder, s, cards, locked -> PrivacyInputs(state.active, holder, s, cards, locked) }
-        .transformLatest { input ->
-            // Re-evaluates every 250 ms, but only while something is in use or still showing, so an idle
-            // phone (and the unit tests) run no timer at all.
-            while (true) {
-                val now = clock()
-                val recorderPresent = input.cards.any { it.mode == IslandMode.ScreenRecording } ||
-                    (input.holder != null && com.agupta07505.smartisland.util.OemDeviceRules.isScreenRecording(input.holder, ""))
-                val shareVisible = screenShareGate.shouldShow(
-                    projectionActive = com.agupta07505.smartisland.model.PrivacyKind.ScreenShare in input.raw,
-                    recorderPresent = recorderPresent,
-                    nowMs = now
-                )
-                val active = input.raw.filterTo(mutableSetOf()) { kind ->
-                    input.settings.isEventEnabled(kind.eventId) &&
-                        !(input.locked && input.settings.isEventHiddenOnLockScreen(kind.eventId)) &&
-                        (kind != com.agupta07505.smartisland.model.PrivacyKind.ScreenShare || shareVisible)
-                }
-                val result = privacyController.update(active, now)
-                emit(result)
-                if (input.raw.isEmpty() && result.shown == null && result.leaving == null) break
-                kotlinx.coroutines.delay(250L)
-            }
-        }
-        .distinctUntilChanged()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.Eagerly,
-            initialValue = PrivacyIndicatorState()
-        )
-
-    private class PrivacyInputs(
-        val raw: Set<com.agupta07505.smartisland.model.PrivacyKind>,
-        val holder: String?,
-        val settings: SmartIslandSettings,
-        val cards: List<IslandNotification>,
-        val locked: Boolean
-    )
-
     val expanded = MutableStateFlow(false)
     /**
-     * The semi-expanded idle widget island is open (a tap on the idle widget's glyph). The overlay draws it; the service gives the window the whole
-     * frame while it is open, so a tap outside can close it.
+     * The semi-expanded idle widget island is open (a tap on the idle widget's glyph). The overlay draws it; the
+     * service gives the window the whole frame while it is open, so a tap outside can close it.
      */
     val widgetIslandOpen = MutableStateFlow(false)
-    /** Counts the closes that skip the closing animation (shade, screen off, lock, rotation); the overlay snaps the island shut when it changes. */
+    /**
+     * Counts the closes that skip the closing animation (shade, screen off, lock, rotation); the overlay snaps the
+     * island shut when it changes.
+     */
     val widgetIslandSnap = MutableStateFlow(0)
-    /** True from a snap close until the island opens again: the service shrinks the window at once instead of after the closing animation. */
     @Volatile var widgetIslandSnapPending = false
         private set
     private var widgetIslandOpenedAt = 0L
+
+    /** The widget island is drawn at all (growing, open or shrinking back into the cutout); set by the overlay. */
+    val widgetIslandShown = MutableStateFlow(false)
+    private var deferredExpandKey: String? = null
+
+    private fun widgetIslandHolds(): Boolean =
+        com.agupta07505.smartisland.model.widgetIslandHoldsExpand(widgetIslandOpen.value, widgetIslandShown.value)
 
     fun setWidgetIslandOpen(open: Boolean) {
         // An exempt app is in front: the island stays shut.
@@ -670,8 +553,9 @@ class IslandViewModel(
     }
 
     /**
-     * Closes the widget island for a reason outside it: the shade, the screen turning off, the lock, a rotation ([snap] = no closing animation),
-     * or another window coming up ([snap] false, with [graceMs] after the open so the tap that opened it is never mistaken for one).
+     * Closes the widget island for a reason outside it: the shade, the screen turning off, the lock, a rotation
+     * ([snap] = no closing animation), or another window coming up ([snap] false, with [graceMs] after the open so
+     * the tap that opened it is never mistaken for one).
      */
     fun closeWidgetIsland(snap: Boolean, graceMs: Long = 0L) {
         if (!widgetIslandOpen.value) return
@@ -684,14 +568,14 @@ class IslandViewModel(
     }
     val selectedIndex = MutableStateFlow(0)
     /**
-     * True while the expanded island shows the list of the current app's cards (the sibling
-     * picker) instead of the card pager. Always false while collapsed.
+     * True while the expanded island shows the list of the current app's cards (the sibling picker) instead of the
+     * card pager. Always false while collapsed.
      */
     val siblingPickerOpen = MutableStateFlow(false)
 
     /**
-     * The notification picture or sticker open at full size in the expanded card: the card's key and
-     * the picture's position. Closed first by a tap outside the island (see [closeExpandedMedia]).
+     * The notification picture or sticker open at full size in the expanded card: the card's key and the picture's
+     * position. Closed first by a tap outside the island.
      */
     val expandedMedia = MutableStateFlow<Pair<String, Int>?>(null)
 
@@ -711,10 +595,6 @@ class IslandViewModel(
         if (old.pictureHalf) cardStepState.value = old.copy(pictureHalf = false)
     }
 
-    /**
-     * How many pictures the step logic counts for [card]: a card with a sticker has none (stickers have no preview, half or
-     * full picture), see model/CardDepth.kt.
-     */
     private fun stepMediaCount(card: IslandNotification): Int =
         if (card.media.any { it.isSticker }) 0 else card.media.size
 
@@ -723,7 +603,6 @@ class IslandViewModel(
 
     private fun shownCard(): IslandNotification? = visibleNotifications.value.getOrNull(selectedIndex.value)
 
-    /** The card the island is showing right now (what a floating-window pull should open). */
     fun currentShownNotification(): IslandNotification? = shownCard()
 
     private fun currentSteps(card: IslandNotification): com.agupta07505.smartisland.model.CardSteps {
@@ -731,7 +610,6 @@ class IslandViewModel(
         return cardStepState.value.steps(card.key, picture?.first, picture?.second ?: 0)
     }
 
-    /** How deep the shown card is (the swipe handler reads it when a touch starts). */
     val cardDepth: StateFlow<com.agupta07505.smartisland.model.CardDepth> = combine(
         cardStepState, expandedMedia, visibleNotifications, selectedIndex
     ) { step, picture, list, index ->
@@ -743,18 +621,12 @@ class IslandViewModel(
         initialValue = com.agupta07505.smartisland.model.CardDepth.First
     )
 
-    /**
-     * The depth of the shown card right now, read from the same state [cardDepth] is built from. [cardDepth] is a flow that lags a few
-     * coroutine hops behind a step change, so the auto-collapse timer reads this instead: a countdown that ends in that gap must not
-     * close a card the user has just opened deeper.
-     */
     private fun cardDepthNow(): com.agupta07505.smartisland.model.CardDepth {
         val picture = expandedMedia.value
         val card = visibleNotifications.value.getOrNull(selectedIndex.value)
         return cardStepState.value.steps(card?.key, picture?.first, picture?.second ?: 0).depth
     }
 
-    /** Sets the steps of a card (the arrow on the card, or a swipe). The picture is written to [expandedMedia]. */
     fun setCardSteps(key: String, steps: com.agupta07505.smartisland.model.CardSteps) {
         val old = cardStepState.value
         cardStepState.value = com.agupta07505.smartisland.model.CardStepState(
@@ -803,17 +675,15 @@ class IslandViewModel(
 
     val isInputActive = MutableStateFlow(false)
 
-    /**
-     * True while the island is open because an event opened it by itself and the user has not touched it yet.
-     * Then the overlay window only catches touches on the island: every other tap goes through to the app below
-     * and, at the same time, closes the island (the window watches outside touches). The first touch on the island
-     * (or a reply box opening) ends this and the island behaves as before.
-     */
+    /** True while the island is open because an event opened it by itself and the user has not touched it yet. */
     val autoExpanded = MutableStateFlow(false)
 
     fun markUserEngaged() {
         if (autoExpanded.value) autoExpanded.value = false
     }
+
+    private fun navigationOpenedByUser(): Boolean =
+        !autoExpanded.value && visibleNotifications.value.getOrNull(selectedIndex.value)?.mode == IslandMode.Navigation
 
     val mode: StateFlow<IslandMode> = combine(visibleNotifications, selectedIndex) { list, idx ->
         list.getOrNull(idx)?.mode ?: IslandMode.Empty
@@ -827,10 +697,6 @@ class IslandViewModel(
     private var popupJob: Job? = null
     private var switchJob: Job? = null
 
-    /**
-     * True while the user is reading an expanded message: the auto-collapse countdown is held
-     * (unlike [isInputActive] it does not lock the island's gestures).
-     */
     private val autoCollapsePaused = MutableStateFlow(false)
 
     /** True while the expanded notification's text is open for reading (it scrolls). */
@@ -840,20 +706,14 @@ class IslandViewModel(
         autoCollapsePaused.value = paused
     }
 
-    /**
-     * True while a finger is down on the floating-window pull: the auto-collapse countdown is held (it must not close the island under
-     * the finger), and starts again from zero when the finger lets go. Unlike [autoCollapsePaused] it is not the reader's flag.
-     */
     private val autoCollapseHeld = MutableStateFlow(false)
 
     fun setAutoCollapseHeld(held: Boolean) {
         autoCollapseHeld.value = held
     }
 
-    /** Short-event popups stay quiet until this time, so cards a swipe pulls in do not steal the cutout. */
     private var popupSuppressedUntilMs = 0L
 
-    /** After an open island closed because its card ended, no event opens it by itself until this time (a ringing call still does). */
     private var autoExpandSuppressedUntilMs = 0L
     private var lastShadeImportMs = 0L
 
@@ -914,11 +774,8 @@ class IslandViewModel(
                             pendingIndex != null -> pendingIndex
                             // The shown card was replaced by the same app's new card: show that one.
                             goneOutcome is ExpandedSelection.Outcome.Select -> goneOutcome.index
-                            // Expanded: keep the card the user is looking at. It is the card at the
-                            // selected index of the PREVIOUS list: the selection can be changed from
-                            // outside (swipe, picker) between two list updates, so a key remembered
-                            // at the last update would be stale (a popup ending on expand reorders
-                            // the list, and the open card must not jump to the card that held the popup).
+                            // Expanded: keep the card the user is looking at: the card at the selected index of the
+                            // PREVIOUS list.
                             orderChanged -> previousKeys.getOrNull(currentSelected)
                                 ?.let { keys.indexOf(it) }
                                 ?.takeIf { it >= 0 }
@@ -957,9 +814,7 @@ class IslandViewModel(
         }
         viewModelScope.launch {
             runSuspendCatchingLogged(TAG, "Popup collector failed") {
-                // Tokens of short events already seen. A card that returns after being hidden by
-                // the foreground app or an event switch has an old token and does not pop up again;
-                // a re-posted one (new time or text) does.
+                // Tokens of short events already seen.
                 val seen = HashSet<PopupToken>()
                 visibleUnordered.collect { list ->
                     val liveKeys = notifications.value.mapTo(HashSet()) { it.key }
@@ -997,10 +852,8 @@ class IslandViewModel(
         }
         viewModelScope.launch {
             runSuspendCatchingLogged(TAG, "Static idle timeout failed") {
-                // Island collapsed, not being typed in, and every card is idle-able (static
-                // notification, paused media, paused live card): after the timeout the island
-                // returns to the idle cutout. The countdown restarts only when the set of cards
-                // changes, not on every re-post of the same cards.
+                // Island collapsed, not being typed in, and every card is idle-able (static notification, paused
+                // media, paused live card): after the timeout the island returns to the idle cutout.
                 combine(visibleNotifications, expanded, isInputActive) { list, isExpanded, inputActive ->
                     if (isExpanded || inputActive || list.isEmpty()) null
                     else if (list.any { !IslandPriority.canIdleOut(it) }) null
@@ -1020,11 +873,7 @@ class IslandViewModel(
         viewModelScope.launch {
             runSuspendCatchingLogged(TAG, "Live idle timeout failed") {
                 // Live idle timeout: a live card (music, navigation, timer, recorder, ...) that came onto the island
-                // by itself goes back to the idle cutout after the collapsed-pill timer, like a static one. Waits
-                // while the island is expanded or being typed in. Cards the user brought back himself
-                // ([userRevealedLive]) and calls never time out. The countdown restarts only when the set of timed
-                // live cards changes, not on every tick or re-post.
-                // [orientation] is an input so a turn re-evaluates which live cards may time out.
+                // by itself goes back to the idle cutout after the collapsed-pill timer, like a static one.
                 combine(visibleNotifications, expanded, isInputActive, userRevealedLive, orientation) { list, isExpanded, inputActive, revealed, _ ->
                     if (isExpanded || inputActive) null
                     else list.filter { liveMayTimeOut(it) && it.key !in revealed }
@@ -1050,25 +899,23 @@ class IslandViewModel(
                     if (isLocked.value && !settings.value.autoExpandOnLockScreen &&
                         notifications.value.firstOrNull { it.key == key }?.mode != IslandMode.IncomingCall
                     ) return@collect
-                    // The notification shade (or quick settings) is open: every event is hidden, so there is no card to open.
-                    // The card waits in the repository and shows in the pill when the shade closes; it does not open then.
+                    // The notification shade (or quick settings) is open: every event is hidden, so there is no card
+                    // to open.
                     if (shadeOpen.value) return@collect
-                    // The island has just closed because the live event it showed ended: a new event or notification does not
-                    // open it again right away. It waits in the list and shows in the pill; only a ringing call gets through.
+                    // The island has just closed because the live event it showed ended: a new event or notification
+                    // does not open it again right away.
                     if (System.currentTimeMillis() < autoExpandSuppressedUntilMs) {
                         val arrivingNow = notifications.value.firstOrNull { it.key == key }
                         if (!(arrivingNow?.mode == IslandMode.IncomingCall && arrivingNow.isCallRinging)) return@collect
                     }
-                    // An island that is already open is never interrupted: the card on screen stays, whatever arrives. Only a
-                    // ringing call takes it over. The other events wait in the list and show once the island has closed.
+                    // An island that is already open is never interrupted: the card on screen stays, whatever
+                    // arrives. Only a ringing call takes it over.
                     if (expanded.value) {
                         val arriving = notifications.value.firstOrNull { it.key == key }
                         if (!(arriving?.mode == IslandMode.IncomingCall && arriving.isCallRinging)) return@collect
                     }
-                    // Look the card up in the list the UI actually shows. The raw list contains
-                    // cards hidden by event switches or the foreground app, which would pick the
-                    // wrong index or open an empty island. Computed on demand because the
-                    // derived StateFlow may not have caught up with this event yet.
+                    // Look the card up in the list the UI actually shows. The raw list contains cards hidden by event
+                    // switches or the foreground app, which would pick the wrong index or open an empty island.
                     endPopup()
                     val visible = IslandPriority.order(
                         applyPillHidden(
@@ -1102,13 +949,16 @@ class IslandViewModel(
                                 isLoud = card.isLoud
                             )
                         ) {
-                            val wasExpanded = expanded.value
-                            expand()
-                            if (!wasExpanded && expanded.value) autoExpanded.value = true
+                            if (widgetIslandHolds()) {
+                                if (com.agupta07505.smartisland.model.cardClosesWidgetIsland(card.mode)) deferredExpandKey = key
+                            } else {
+                                val wasExpanded = expanded.value
+                                expand()
+                                if (!wasExpanded && expanded.value) autoExpanded.value = true
+                            }
                         }
-                        // The island did not open for this card (its event or app may not auto-expand, the shade is open, ...):
-                        // the collapsed primary cutout keeps showing the top-priority card. Leaving the selection on the arriving
-                        // card put a battery event (which waits behind a live event) over the live activity in the pill.
+                        // The island did not open for this card (its event or app may not auto-expand, the shade is
+                        // open, ...): the collapsed primary cutout keeps showing the top-priority card.
                         if (!expanded.value) {
                             pendingSelectKey = null
                             selectedIndex.value = 0
@@ -1119,9 +969,8 @@ class IslandViewModel(
         }
         viewModelScope.launch {
             runSuspendCatchingLogged(TAG, "Exempt-app collector failed") {
-                // An exempt app came to the front: whatever was open closes (an off island's window is hidden by the service,
-                // a static one stops taking touches). Nothing may open while the app stays in front either (a card that
-                // pops up by itself would be sitting open when the user comes back), so an open island closes again at once.
+                // An exempt app came to the front: whatever was open closes (an off island's window is hidden by the
+                // service, a static one stops taking touches).
                 combine(islandExemption, expanded) { mode, open -> Pair(mode != ExemptMode.None, open) }
                     .distinctUntilChanged()
                     .collect { (exempt, open) ->
@@ -1129,6 +978,22 @@ class IslandViewModel(
                             if (open) collapse()
                             closeWidgetIsland(snap = true)
                         }
+                    }
+            }
+        }
+        viewModelScope.launch {
+            runSuspendCatchingLogged(TAG, "Widget-island release collector failed") {
+                combine(widgetIslandOpen, widgetIslandShown) { open, shown -> open || shown }
+                    .distinctUntilChanged()
+                    .collect { holds ->
+                        val key = deferredExpandKey
+                        if (holds || key == null) return@collect
+                        deferredExpandKey = null
+                        val index = visibleNotifications.value.indexOfFirst { it.key == key }
+                        if (index < 0 || expanded.value) return@collect
+                        selectedIndex.value = index
+                        expand()
+                        if (expanded.value) autoExpanded.value = true
                     }
             }
         }
@@ -1141,9 +1006,8 @@ class IslandViewModel(
         }
         viewModelScope.launch {
             runSuspendCatchingLogged(TAG, "Empty-island guard failed") {
-                // Safety net: an expanded island with nothing to show closes. The short wait lets a card that was just
-                // posted reach the visible list first (the auto-expand path sets `expanded` a moment before it).
-                // The Open Apps shortcut opens the island on the quick-launch grid with no card: that is not "empty".
+                // Safety net: an expanded island with nothing to show closes. The short wait lets a card that was
+                // just posted reach the visible list first (the auto-expand path sets `expanded` a moment before it).
                 combine(expanded, visibleNotifications, appsLauncherOpen) { open, list, apps -> open && list.isEmpty() && !apps }
                     .distinctUntilChanged()
                     .collectLatest { emptyOpen ->
@@ -1177,7 +1041,6 @@ class IslandViewModel(
                         expandedMedia.value = null
                         replyDrafts.resume.value = null
                         pendingSelectKey = null
-                        // Back to the top-priority card in the primary cutout.
                         selectedIndex.value = 0
                     }
                 }
@@ -1234,11 +1097,17 @@ class IslandViewModel(
         viewModelScope.launch {
             runSuspendCatchingLogged(TAG, "Auto-collapse pause collector failed") {
                 // The quick-launch window (Open Apps shortcut) is in use, not a card to be put away: no countdown while it is open.
-                combine(autoCollapsePaused, siblingPickerOpen, autoCollapseHeld, appsLauncherOpen, cardDepth) { reading, picking, held, apps, depth ->
-                    // The card's own open step (reader, preview, picture selector, picture) also holds the countdown. It is read from the
-                    // view model's state, not only from the card's report, so a reordered list or a re-selection cannot lose the hold.
-                    reading || picking || held || apps || depth != com.agupta07505.smartisland.model.CardDepth.First
-                }
+                combine(
+                    combine(autoCollapsePaused, siblingPickerOpen, autoCollapseHeld, appsLauncherOpen, cardDepth) { reading, picking, held, apps, depth ->
+                        // The card's own open step (reader, preview, picture selector, picture) also holds the
+                        // countdown.
+                        reading || picking || held || apps || depth != com.agupta07505.smartisland.model.CardDepth.First
+                    },
+                    // Map navigation opened by the user stays open until the user puts it away.
+                    combine(visibleNotifications, selectedIndex, autoExpanded) { list, index, auto ->
+                        !auto && list.getOrNull(index)?.mode == IslandMode.Navigation
+                    }
+                ) { stepHold, navigationHold -> stepHold || navigationHold }
                     .distinctUntilChanged()
                     .collect { paused ->
                     if (paused) {
@@ -1278,9 +1147,7 @@ class IslandViewModel(
         }
         viewModelScope.launch {
             runSuspendCatchingLogged(TAG, "Typing resume failed") {
-                // A call took the island while a reply was being typed. When no call is ringing any more (answered,
-                // declined, dismissed) and the shade is closed, the island opens on that card again with the reply box
-                // open and the draft in it. If that notification is gone meanwhile, nothing resumes.
+                // A call took the island while a reply was being typed.
                 combine(notifications, callInterruptReplyKey, shadeOpen) { raw, replyKey, shade ->
                     when {
                         replyKey == null -> ResumeState.NONE
@@ -1303,9 +1170,8 @@ class IslandViewModel(
                                 delay(RESUME_CARD_SHOWN_MS)
                                 replyDrafts.resume.value = replyKey
                             }
-                            // Cleared only now: clearing it earlier made this collector restart (state NONE) and cancel the
-                            // wait above, so the box never opened. A new ringing call meanwhile cancels this block and
-                            // keeps the request for after that call.
+                            // Cleared only now: clearing it earlier made this collector restart (state NONE) and
+                            // cancel the wait above, so the box never opened.
                             callInterruptReplyKey.value = null
                         }
                         else -> Unit
@@ -1323,8 +1189,11 @@ class IslandViewModel(
     /** Open Apps shortcut (long press on the collapsed cutout, portrait): expands the island onto the quick-launch grid. */
     fun openAppsLauncher() {
         if (!settings.value.enableAppShortcuts || shadeOpen.value || expanded.value) return
-        if (exemptionNow() != ExemptMode.None) return
-        hideEmptyPill()
+        if (exemptionNow() != ExemptMode.None || widgetIslandHolds()) return
+        // Landscape, the empty collapsed pill the long press was made on: it stays while the shortcuts are open, so
+        // the island grows out of that pill (size, position, opacity) and closes back into it; hiding it swapped it
+        // for the small see-through idle circle mid-opening.
+        emptyPillJob?.cancel()
         appsLauncherOpen.value = true
         expanded.value = true
     }
@@ -1334,17 +1203,15 @@ class IslandViewModel(
         if (shadeOpen.value) return
         if (!currentCardMayExpand()) return
         // An exempt app is in front (island off or static): nothing opens, a popup included.
-        if (exemptionNow() != ExemptMode.None) return
+        if (exemptionNow() != ExemptMode.None || widgetIslandHolds()) return
         expanded.value = true
     }
 
-    /** False when the per-app rules say the selected card's app never opens the expanded card. */
     private fun currentCardMayExpand(): Boolean {
         val card = visibleNotifications.value.getOrNull(selectedIndex.value) ?: return true
         return AppEventRules.mayExpandCard(settings.value.noExpandPackages, card.packageName, card.mode)
     }
 
-    /** Re-reads the shade on expand so a non-silent notification the island missed shows up. */
     private fun requestShadeImport() {
         val now = System.currentTimeMillis()
         if (now - lastExpandImportMs < EXPAND_IMPORT_INTERVAL_MS) return
@@ -1357,7 +1224,6 @@ class IslandViewModel(
 
     private var lastExpandImportMs = 0L
 
-    /** Asks the service for the current card's app's other cards, so the secondary cutout has them. */
     private fun requestSameAppCards() {
         val current = visibleNotifications.value.getOrNull(selectedIndex.value) ?: return
         if (current.mode != IslandMode.Notification && current.mode != IslandMode.DownloadUpload) return
@@ -1376,8 +1242,7 @@ class IslandViewModel(
 
     /**
      * A touch landed outside an island that opened by itself. The touch already went to the app below; the island
-     * stays [OUTSIDE_CLOSE_DELAY_MS] longer so the event can still be seen. A touch on the island in the meantime
-     * (it is no longer auto-expanded) or any other close cancels this.
+     * stays [OUTSIDE_CLOSE_DELAY_MS] longer so the event can still be seen.
      */
     fun collapseAfterOutsideTouch() {
         if (!autoExpanded.value || outsideCloseJob?.isActive == true) return
@@ -1389,6 +1254,7 @@ class IslandViewModel(
     }
 
     fun collapse() {
+        keepEmptyPillAfterLauncher()
         appsLauncherOpen.value = false
         outsideCloseJob?.cancel()
         outsideCloseJob = null
@@ -1411,10 +1277,13 @@ class IslandViewModel(
         lastToggleTimeMs = now
         // Opening is refused for apps that never expand; closing is always allowed.
         if (!expanded.value && !currentCardMayExpand()) return
-        if (!expanded.value && exemptionNow() != ExemptMode.None) return
+        if (!expanded.value && (exemptionNow() != ExemptMode.None || widgetIslandHolds())) return
         // Opening needs a card to show, and no shade: otherwise the island would open empty.
         if (!expanded.value && (shadeOpen.value || visibleNotifications.value.isEmpty())) return
-        if (expanded.value) appsLauncherOpen.value = false
+        if (expanded.value) {
+            keepEmptyPillAfterLauncher()
+            appsLauncherOpen.value = false
+        }
         // A tap that closes the open island is what "off after tap to close" waits for; opening it again brings the widgets back.
         _idleClosedByTap.value = expanded.value
         expanded.update { !it }
@@ -1433,9 +1302,9 @@ class IslandViewModel(
         }
     }
 
-    /** True while something holds the auto-collapse countdown (typing, the reader or any deeper step, the pickers, a finger on the pull). */
     private fun autoCollapseBlocked(): Boolean =
         isInputActive.value || autoCollapsePaused.value || siblingPickerOpen.value || autoCollapseHeld.value || appsLauncherOpen.value ||
+            navigationOpenedByUser() ||
             cardDepthNow() != com.agupta07505.smartisland.model.CardDepth.First ||
             cardDepth.value != com.agupta07505.smartisland.model.CardDepth.First
 
@@ -1509,10 +1378,7 @@ class IslandViewModel(
     }
 
     /**
-     * Swipe action "next / previous notification": moves to the next (or previous) app entry in
-     * the cards on screen. All cards of one app are one entry, so a sibling is never the target;
-     * the target is the first card of that entry. Works the same collapsed and expanded.
-     * Returns false when there is only one entry, so the caller can fall back (e.g. skip a track).
+     * Swipe action "next / previous notification": moves to the next (or previous) app entry in the cards on screen.
      */
     fun switchNotification(forward: Boolean): Boolean {
         val list = visibleNotifications.value
@@ -1524,8 +1390,8 @@ class IslandViewModel(
     }
 
     /**
-     * Expanded-island gesture "next / previous sibling": moves between the cards of the current
-     * card's own app only (wrapping). Returns false when the current card has no sibling.
+     * Expanded-island gesture "next / previous sibling": moves between the cards of the current card's own app only
+     * (wrapping). Returns false when the current card has no sibling.
      */
     fun switchSibling(forward: Boolean): Boolean {
         val list = visibleNotifications.value
@@ -1537,9 +1403,8 @@ class IslandViewModel(
     }
 
     /**
-     * Opens the sibling picker: the list of every card of the current card's app. Only while
-     * expanded, not while a reply is being typed, and only when the current card has siblings;
-     * returns false otherwise.
+     * Opens the sibling picker: the list of every card of the current card's app. Only while expanded, not while a
+     * reply is being typed, and only when the current card has siblings; returns false otherwise.
      */
     fun openSiblingPicker(): Boolean {
         if (!expanded.value) return false
@@ -1555,7 +1420,6 @@ class IslandViewModel(
         siblingPickerOpen.value = false
     }
 
-    /** Picker row tap: shows the card with [key] and closes the picker. False if it is gone. */
     fun selectSibling(key: String): Boolean {
         val index = visibleNotifications.value.indexOfFirst { it.key == key }
         if (index < 0) return false
@@ -1592,21 +1456,13 @@ class IslandViewModel(
 
     private fun IslandNotification.idleToken() = IdleToken(key, timeMillis, (title to text).hashCode())
 
-    /**
-     * What identifies a card that was put away. Cards that may idle out use [idleToken]: new content brings them back.
-     * Live cards (a call, playing media, navigation, a running recording) tick or re-post all the time, so they are
-     * matched by key alone and stay away until the idle cutout is tapped again, they end, or they change state.
-     */
     private fun IslandNotification.awayToken() =
         if (IslandPriority.canIdleOut(this)) idleToken() else IdleToken(key, 0L, liveAwayHash(this))
 
-    /**
-     * Live cards the live idle timeout may put away: everything that never idles out by itself, except calls (a
-     * ringing or ongoing call must stay reachable). In portrait a live activity is exempt too: only the tap-to-close
-     * put-away (idle cutout tap) or its own end removes it.
-     */
     private fun liveMayTimeOut(n: IslandNotification) =
         !IslandPriority.canIdleOut(n) && n.mode != IslandMode.IncomingCall &&
+            // Navigation stays until the trip ends or the user puts it away; it never times out by itself.
+            n.mode != IslandMode.Navigation &&
             // Portrait: a live activity stays until it ends or the user puts it away (tap on the idle cutout).
             !(n.mode == IslandMode.LiveActivity && !orientation.value.isLandscape)
 
@@ -1644,19 +1500,13 @@ class IslandViewModel(
                     com.agupta07505.smartisland.util.ForegroundApp.hidesCard(notif.mode, notif.packageName, foregroundPackage))
         }
         /**
-         * While the pill is hidden only calls (incoming, ringing or ongoing) stay on the island;
-         * everything else waits in the repository and comes back when the pill is shown again.
+         * While the pill is hidden only calls (incoming, ringing or ongoing) stay on the island; everything else
+         * waits in the repository and comes back when the pill is shown again.
          */
         internal fun applyPillHidden(list: List<IslandNotification>, pillHidden: Boolean): List<IslandNotification> =
             if (pillHidden) list.filter { it.mode == IslandMode.IncomingCall } else list
 
-        /**
-         * The part of a live card's put-away token that is not its key. Playing media is put away by the live idle
-         * timeout (or an idle tap) under its key alone, and a player keeps ONE key for every track, so the next
-         * track (or a stream's next song) stayed hidden until the user swiped to the next event, which brings the
-         * stored cards back. The track's title and text now count: a new track makes the card show again, while
-         * position ticks and re-posts of the same track do not. Other live cards keep matching by key alone.
-         */
+        /** The part of a live card's put-away token that is not its key. */
         internal fun liveAwayHash(n: IslandNotification): Int =
             if (n.mode == IslandMode.Music) (n.title to n.text).hashCode() else 0
 
@@ -1666,7 +1516,6 @@ class IslandViewModel(
         private const val EMPTY_ISLAND_GRACE_MS = 400L
         private const val GONE_CARD_NO_EXPAND_MS = 1_500L
 
-        /** After an open island closed because the screen recording ended, no event opens it by itself for this long (a ringing call still does). */
         private const val RECORDER_END_NO_EXPAND_MS = 1_800L
         private const val RESUME_CARD_SHOWN_MS = 150L
         private const val SHADE_IMPORT_INTERVAL_MS = 30_000L
@@ -1676,11 +1525,8 @@ class IslandViewModel(
         private const val IMPORT_POPUP_GRACE_MS = 3_000L
 
         /**
-         * The card a swipe moves to: the first card of the next (or previous) app entry after the
-         * one holding [currentKey] in [ordered], wrapping around. Cards of one app are ONE entry
-         * (see [appGroupKey]), so a sibling of the current card is never the target. Silent
-         * standard notifications are skipped (an entry with only silent cards is skipped whole).
-         * Null when there is nowhere to go.
+         * The card a swipe moves to: the first card of the next (or previous) app entry after the one holding
+         * [currentKey] in [ordered], wrapping around.
          */
         internal fun nextEventTarget(
             ordered: List<IslandNotification>,

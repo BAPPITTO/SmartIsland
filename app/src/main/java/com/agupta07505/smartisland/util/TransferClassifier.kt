@@ -10,8 +10,8 @@ package com.agupta07505.smartisland.util
 import com.agupta07505.smartisland.model.TransferKind
 
 /**
- * Decides what kind of transfer a progress notification is, and holds the per-app workarounds
- * for apps whose notifications do not look like a normal download.
+ * Decides what kind of transfer a progress notification is, and holds the per-app workarounds for apps whose
+ * notifications do not look like a normal download.
  */
 object TransferClassifier {
 
@@ -45,7 +45,6 @@ object TransferClassifier {
         "seeding", "semeando", "sembrando"
     )
 
-    /** Transfer words that are not a plain up/down: sync, copy, install in other languages. */
     private val OTHER_ACTIVE_I18N = listOf(
         "sincronizando", "synchronisation", "synchronisiere", "sincronizzazione", "copiando", "kopiere",
         "copie en cours", "instalando", "installation en cours", "installiere", "同步", "复制", "安装",
@@ -65,7 +64,6 @@ object TransferClassifier {
         "completato", "tamamlandı", "selesai", "завершено", "завершена", "完成", "完了"
     )
 
-    /** Download managers, torrent clients and yt-dlp front ends: any progress bar is a download. */
     private val DOWNLOADER_PACKAGES = setOf(
         "com.deniscerri.ytdl", "com.deniscerri.ytdlnis",
         "com.dv.adm", "com.dv.adm.pay",
@@ -77,7 +75,6 @@ object TransferClassifier {
         "com.dv.get", "com.mxtech.videoplayer.ad.download"
     )
 
-    /** Cloud storage, photo backup and sync apps: their progress is an upload or a backup. */
     private val CLOUD_PACKAGES = setOf(
         "com.google.android.apps.photos", "com.google.android.apps.docs", "com.dropbox.android",
         "com.microsoft.skydrive", "com.nextcloud.client", "com.owncloud.android",
@@ -87,7 +84,6 @@ object TransferClassifier {
         "com.nutomic.syncthingandroid", "org.nextcloud.client"
     )
 
-    /** Browsers: file names without a known extension carry no keyword, so trust the package. */
     private val BROWSER_PREFIXES = listOf(
         "com.android.chrome", "com.chrome.", "org.chromium.", "com.brave.browser",
         "com.microsoft.emmx", "com.opera.", "com.vivaldi.browser", "com.kiwibrowser.browser",
@@ -95,7 +91,6 @@ object TransferClassifier {
         "com.duckduckgo.mobile.android", "org.mozilla."
     )
 
-    /** File managers: a progress bar with unhelpful wording is a copy or move. */
     private val FILE_MANAGER_PACKAGES = setOf(
         "com.google.android.documentsui", "com.android.documentsui",
         "com.google.android.apps.nbu.files", "com.sec.android.app.myfiles",
@@ -120,19 +115,17 @@ object TransferClassifier {
     )
     private val UPLOAD_WORDS = listOf("upload", "sending", "posting", "exporting", "sharing", "seeding")
 
-    /** Phrases a voice recorder uses for its cloud backup (Google Recorder syncs to the account). */
     private val RECORDER_SYNC_WORDS = listOf(
         "backup", "back up", "backing up", "backed up", "upload", "syncing", "sync in progress", "cloud"
     )
 
     fun isCloudApp(packageName: String): Boolean = packageName.lowercase() in CLOUD_PACKAGES
 
-    /** English wording of a finished transfer ("Download complete", "Uploaded", "Saved to Downloads"). */
     private val FINISHED_WORDS = listOf("complete", "finished", "downloaded", "uploaded", "saved", "done")
 
     /**
-     * True when the text says a transfer has finished. The finished notification has no progress bar, so it is
-     * not read as a transfer card and would otherwise count as an ordinary alert.
+     * True when the text says a transfer has finished. The finished notification has no progress bar, so it is not
+     * read as a transfer card and would otherwise count as an ordinary alert.
      */
     fun looksFinished(lowerText: String): Boolean =
         FINISHED_WORDS.any { lowerText.contains(it) } || COMPLETE_WORDS_I18N.any { lowerText.contains(it) }
@@ -156,10 +149,8 @@ object TransferClassifier {
     }
 
     /**
-     * Voice recorders announce their cloud backup with the same notification channel as a live
-     * recording ("Backing up recordings"), which the audio-recording rules would read as a
-     * recording in progress. A recorder notification that talks about backup/sync, or shows a real
-     * progress bar, is a transfer instead.
+     * Voice recorders announce their cloud backup with the same notification channel as a live recording ("Backing up
+     * recordings"), which the audio-recording rules would read as a recording in progress.
      */
     fun isRecorderTransfer(packageName: String, titleText: String, hasDeterminateProgress: Boolean): Boolean {
         if (!OemDeviceRules.isRecorderPackage(packageName)) return false

@@ -17,17 +17,13 @@ import android.provider.Settings
 import android.widget.Toast
 
 object HotspotUtil {
-    /**
-     * Shell commands that start and stop Wi-Fi tethering on Android 11+ (the tethering service). They are what people use from adb,
-     * but they are not part of a public interface and some ROMs change them, which is why the app only uses them after the
-     * Shizuku check (see [ShizukuMethodCheck]) saw them work on this phone.
-     */
+    /** Shell commands that start and stop Wi-Fi tethering on Android 11+. */
     internal const val START_COMMAND = "service call tethering 4 null s16 random"
     internal const val STOP_COMMAND = "service call tethering 5 s16 random"
 
     /**
-     * Whether the hotspot is on. Reads the platform's own flag when the ROM allows it; otherwise it goes by the island's Hotspot
-     * card, which the notification listener shows while the hotspot's notification is up.
+     * Reads the platform's own flag when the ROM allows it, otherwise goes by the island's Hotspot card that the
+     * notification listener shows while the hotspot's notification is up.
      */
     fun isOn(context: Context): Boolean {
         val byFlag = runCatching {
@@ -41,7 +37,7 @@ object HotspotUtil {
         }.getOrDefault(false)
     }
 
-    /** Switches the hotspot with the Shizuku shell command that matches its current state. Blocking: call it off the main thread. */
+    /** Blocking: call it off the main thread. */
     suspend fun toggleWithShizuku(context: Context) {
         val command = if (isOn(context)) STOP_COMMAND else START_COMMAND
         ShizukuManager.runShellForOutput(command)
@@ -70,10 +66,6 @@ object HotspotUtil {
         return 0
     }
 
-    /**
-     * Opens the device's Hotspot & Tethering configuration page.
-     * Uses contentIntent if available, otherwise attempts platform and OEM specific tethering intents.
-     */
     fun openHotspotSettings(context: Context, contentIntent: PendingIntent? = null, floating: Boolean = false) {
         if (contentIntent != null) {
             val sent = runCatching {
@@ -95,19 +87,18 @@ object HotspotUtil {
         }
 
         val intents = listOf(
-            // 1. Android Standard WiFi Tethering Settings (API 30+)
+            // API 30+
             Intent("android.settings.WIFI_TETHER_SETTINGS"),
-            // 2. Android Standard Tethering Settings (API 26+)
+            // API 26+
             Intent("android.settings.TETHER_SETTINGS"),
-            // 3. Xiaomi / HyperOS / MIUI Component Tethering
+            // Xiaomi, HyperOS, MIUI
             Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.TetherSettings")),
             Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.wifi.tether.TetherSettings")),
             Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.Settings\$TetherSettingsActivity")),
             Intent("miui.intent.action.TETHER_SETTINGS"),
-            // 4. Samsung Hotspot Settings
+            // Samsung
             Intent("com.samsung.android.settings.WIFI_AP_SETTINGS"),
             Intent().setComponent(ComponentName("com.android.settings", "com.android.settings.Settings\$WifiApSettingsActivity")),
-            // 5. General Wireless / Network Settings Fallbacks
             Intent(Settings.ACTION_WIRELESS_SETTINGS),
             Intent(Settings.ACTION_SETTINGS)
         )

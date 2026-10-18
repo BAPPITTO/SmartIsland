@@ -180,7 +180,6 @@ fun CustomizationsSection(
             .animateContentSize(),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // 1. Transparency & Pill Appearance
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -202,7 +201,6 @@ fun CustomizationsSection(
                     letterSpacing = 0.8.sp
                 )
 
-                // Opacity Slider
                 SliderSettingItem(
                     label = stringResource(R.string.slider_precision_opacity),
                     value = (localOpacity * 100f),
@@ -213,7 +211,6 @@ fun CustomizationsSection(
                     onValueChangeFinished = { scope.launch { repository.setOpacity(localOpacity) } }
                 )
 
-                // Quick Opacity Chips
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -250,7 +247,6 @@ fun CustomizationsSection(
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f), modifier = Modifier.padding(vertical = 4.dp))
 
-                // Pill Background Color Row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -285,7 +281,6 @@ fun CustomizationsSection(
             }
         }
 
-        // 1b. Expanded card style: real-time background blur and gradient
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -307,7 +302,6 @@ fun CustomizationsSection(
                     letterSpacing = 0.8.sp
                 )
 
-                // Dark / Light / System look of the open island (System follows the phone live).
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         text = stringResource(R.string.expanded_theme_title),
@@ -412,7 +406,6 @@ fun CustomizationsSection(
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f), modifier = Modifier.padding(vertical = 4.dp))
 
-                // Gradient
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -475,7 +468,6 @@ fun CustomizationsSection(
             }
         }
 
-        // 2. Feature & Mode Accent Color Studio Card
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -593,7 +585,6 @@ internal fun ColorPresetRow(
             }
         }
 
-        // Custom RGB Button
         val isCustom = swatches.take(4).none { it.first == selectedColor }
         val rainbowBrush = remember {
             Brush.linearGradient(
@@ -672,7 +663,6 @@ internal fun RgbColorPickerDialog(
         title = { Text(title, fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                // Color Preview Box
                 val previewColor = Color(0xFF000000L or (red.toLong() shl 16) or (green.toLong() shl 8) or blue.toLong())
                 Box(
                     modifier = Modifier
@@ -690,7 +680,6 @@ internal fun RgbColorPickerDialog(
                     )
                 }
 
-                // Hex input
                 OutlinedTextField(
                     value = hexInput,
                     onValueChange = { updateFromHex(it) },
@@ -706,7 +695,6 @@ internal fun RgbColorPickerDialog(
                     shape = RoundedCornerShape(12.dp)
                 )
 
-                // Quick Palette Row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -743,7 +731,6 @@ internal fun RgbColorPickerDialog(
                     }
                 }
 
-                // RGB Sliders
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -811,8 +798,6 @@ internal fun RgbColorPickerDialog(
     )
 }
 
-
-/** Segmented Dark / Light / System switch for the expanded island's look. */
 @Composable
 private fun ExpandedThemeSelector(selected: String, onSelected: (String) -> Unit) {
     val options = listOf(
@@ -850,8 +835,6 @@ private fun ExpandedThemeSelector(selected: String, onSelected: (String) -> Unit
     }
 }
 
-
-/** Segmented Off / Card blur switch for the expanded island's background blur. */
 @Composable
 private fun ExpandedBlurModeSelector(selected: ExpandedBlurMode, onSelected: (ExpandedBlurMode) -> Unit) {
     val options = listOf(

@@ -210,7 +210,6 @@ private fun TimerExpandedMiui(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Left: Hourglass / Timer Glyph
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)
@@ -270,12 +269,10 @@ private fun TimerExpandedMiui(
             }
         }
 
-        // Right: Interactive Quick Actions (Pause/Resume, Stop/Reset)
         Row(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 1. Pause / Resume Button
             val pauseAction = if (isPaused) {
                 notification?.actionIntents?.firstOrNull { act ->
                     val t = act.title.lowercase()
@@ -347,7 +344,6 @@ private fun TimerExpandedMiui(
                 )
             }
 
-            // 2. Reset / Stop / Cancel Button
             val stopAction = notification?.actionIntents?.firstOrNull { act ->
                 val t = act.title.lowercase()
                 destructiveKeywords.any { t.contains(it) }
@@ -506,7 +502,6 @@ private fun TimerExpandedCurrent(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Left: Hourglass / Timer Glyph
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)
@@ -566,12 +561,11 @@ private fun TimerExpandedCurrent(
             }
         }
 
-        // Right: Interactive Quick Actions (Pause/Resume, +1 min, Stop/Reset)
         Row(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 1. Pause / Resume: only shown when the timer app offers that button.
+            // Pause / Resume: only shown when the timer app offers that button.
             val toggleAction = if (isPaused) notification.actionWithRole(ActionRole.Resume)
             else notification.actionWithRole(ActionRole.Pause)
 
@@ -599,7 +593,7 @@ private fun TimerExpandedCurrent(
                 }
             }
 
-            // 2. +1 min: only shown when the timer app offers its own add-a-minute button.
+            // +1 min: only shown when the timer app offers its own add-a-minute button.
             val addMinuteAction = notification.actionWithRole(ActionRole.AddMinute)
             if (addMinuteAction != null && notification != null) {
                 Box(
@@ -633,7 +627,7 @@ private fun TimerExpandedCurrent(
                 }
             }
 
-            // 3. Stop / Reset / Cancel: fires the app's own button, then clears the island card.
+            // Stop / Reset / Cancel: fires the app's own button, then clears the island card.
             val stopAction = notification.actionWithRole(ActionRole.Stop, ActionRole.Reset)
             if (stopAction != null && notification != null) {
                 Box(
@@ -669,7 +663,7 @@ private fun TimerExpandedCurrent(
                 }
             }
 
-            // 4. Any other button the timer app put in its notification, shown as the app labels it.
+            // Any other button the timer app put in its notification, shown as the app labels it.
             if (notification != null) {
                 notification.leftoverActions(toggleAction, addMinuteAction, stopAction).forEach {
                     ShadeActionChip(notification, it, timerColor)
@@ -679,5 +673,4 @@ private fun TimerExpandedCurrent(
     }
 }
 
-/** Text that is only a clock reading (digits, colons, dots); built once. */
 private val ClockOnlyRegex = Regex("""^[\d:.]+$""")

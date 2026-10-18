@@ -18,10 +18,8 @@ package com.agupta07505.smartisland.util
 internal object NavigationLocale {
 
     private const val LETTER_OR_DIGIT = "\\p{L}\\p{N}"
-    /** What may not follow a Latin or Cyrillic unit; a CJK character may ("300m先、右折"). */
     private const val LATIN_CYRILLIC_OR_DIGIT = "\\p{IsLatin}\\p{IsCyrillic}\\p{N}"
 
-    /** Scripts whose words run into each other, so a whole-word match would miss them. */
     private fun isBoundarySafe(phrase: String): Boolean = phrase.none { ch ->
         val block = Character.UnicodeBlock.of(ch)
         block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS ||
@@ -42,8 +40,6 @@ internal object NavigationLocale {
         return Regex(parts.joinToString("|"), setOf(RegexOption.IGNORE_CASE))
     }
 
-    // ---------------------------------------------------------------------------------------------------------------------
-    // Distances
 
     private val METRIC_AND_IMPERIAL_UNITS = listOf(
         // English and the Latin-script languages that share the symbols
@@ -71,7 +67,8 @@ internal object NavigationLocale {
         "मीटर", "किमी", "किलोमीटर", "मील"
     ).distinct().sortedByDescending { it.length }
 
-    // A Latin or Cyrillic unit must end the word ("24 min" is not "24 m"); CJK, Arabic and Devanagari units run into the next word ("300米后左转").
+    // A Latin or Cyrillic unit must end the word ("24 min" is not "24 m"); CJK, Arabic and Devanagari units run into
+    // the next word ("300米后左转").
     private val UNIT_ALTERNATION = METRIC_AND_IMPERIAL_UNITS.joinToString("|") { unit ->
         if (isBoundarySafe(unit)) Regex.escape(unit) + "(?![$LATIN_CYRILLIC_OR_DIGIT])" else Regex.escape(unit)
     }
@@ -95,8 +92,6 @@ internal object NavigationLocale {
     /** A whole segment that is a trip distance ("8.5 km", "5 мили", "12公里") rather than the distance to the next turn. */
     val TRIP_DISTANCE = Regex("^$NUMBER\\s*(?:km|mi|miles?|км|кілометрів|公里|千米|英里|킬로미터|마일|كم|किमी|मील)$", unitOptions)
 
-    // ---------------------------------------------------------------------------------------------------------------------
-    // Turn directions
 
     val U_TURN = listOf(
         "u-turn", "uturn", "u turn", "make a u turn", "разворот", "развернитесь", "развороте", "розворот", "demi-tour", "faites demi-tour",
@@ -169,8 +164,6 @@ internal object NavigationLocale {
         U_TURN + SLIGHT_LEFT + SLIGHT_RIGHT + LEFT + RIGHT + ROUNDABOUT + DESTINATION + OTHER_MANEUVER
     )
 
-    // ---------------------------------------------------------------------------------------------------------------------
-    // Trip statistics (ETA, time left, arrival time)
 
     val TRIP_STAT: Regex = Regex(
         "(?<![$LETTER_OR_DIGIT])\\p{Nd}+(?:[.,]\\p{Nd}+)?\\s*(?:min|mins|minutes?|minuti|minutos?|minuten|minuut|minuta|minut|menit|phút|dakika|dk|мин|хв|分钟|分鐘|分|분|دقيقة|دقائق|मिनट|h|hr|hrs|hours?|std|stunden?|heures?|horas?|ore|uur|saat|godz|jam|giờ|ч|час|часа|часов|год|小时|時間|시간|ساعة|ساعات|घंटे?)(?![$LETTER_OR_DIGIT])" +
@@ -179,7 +172,6 @@ internal object NavigationLocale {
         setOf(RegexOption.IGNORE_CASE)
     )
 
-    // ---------------------------------------------------------------------------------------------------------------------
     // Delivery and ride wording: a notification with these is about an order or a ride, not about guidance.
 
     val DELIVERY_OR_RIDE_WORDING: Regex = anyOf(

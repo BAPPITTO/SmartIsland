@@ -23,6 +23,25 @@ class IdleWidgetNewKindsTest {
     }
 
     @Test
+    fun theClockWidgetIsSeparateFromTheHourTick() {
+        assertEquals(IdleWidgetKind.LiveClock, IdleWidgetKind.fromId("liveclock"))
+        assertEquals(IdleWidgetKind.Clock, IdleWidgetKind.fromId("clock"))
+        val kinds = listOf(IdleWidgetKind.LiveClock, IdleWidgetKind.Date)
+        assertEquals(kinds, IdleWidgets.parse(IdleWidgets.serialize(kinds)))
+        assertTrue(IdleWidgetKind.LiveClock in IdleWidgets.parse(IdleWidgetOff.allIds()))
+        // Unlike the hour tick, the clock widget has something to say on the island.
+        assertTrue(WidgetIslandContent.hasContent(IdleWidgetKind.LiveClock, false, 0L, 0L, false))
+        assertFalse(WidgetIslandContent.hasContent(IdleWidgetKind.Clock, false, 0L, 0L, false))
+    }
+
+    @Test
+    fun theClockWidgetTakesNoBeatTickOnEitherSlot() {
+        for (right in listOf(false, true)) {
+            assertFalse(IdleSlots.takesSideTick(IdleWidgetKind.LiveClock, right, ownTickRunning = false, lead = IdleSlots.SpeedLead.None))
+        }
+    }
+
+    @Test
     fun selectAllIncludesThem() {
         val all = IdleWidgets.parse(IdleWidgetOff.allIds())
         assertTrue(IdleWidgetKind.Notifications in all)
@@ -47,9 +66,9 @@ class IdleWidgetNewKindsTest {
         assertTrue(has(IdleWidgetKind.Notifications, count = 2))
         assertFalse(has(IdleWidgetKind.Modes))
         assertTrue(has(IdleWidgetKind.Modes, mode = true))
-        // The old widgets are unchanged by the new arguments.
+        // Existing widgets are unaffected by the extra arguments.
         assertTrue(has(IdleWidgetKind.Date))
-        assertFalse(has(IdleWidgetKind.Battery))
+        assertTrue(has(IdleWidgetKind.Battery))
     }
 
     @Test

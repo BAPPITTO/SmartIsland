@@ -7,26 +7,8 @@
 
 package com.agupta07505.smartisland.model
 
-/**
- * Which card owns the primary (main) cutout and which one goes to the secondary round cutout.
- *
- * Order, highest first: Navigation > Live updates > Music (playing before paused) > Downloads (downloads, uploads,
- * backups, copies and the other transfer kinds) > ordinary notifications. The second card in this
- * order is the one shown in the secondary round cutout. Among ordinary notifications the newest comes first, so
- * the latest one is in the pill and the one before it in the secondary cutout (other kinds keep arrival order).
- *
- * Modes outside that list are placed by judgment, change the numbers here to move them:
- * a ringing/active call tops everything, other ongoing activities (timer, stopwatch, recorders,
- * hotspot, flashlight) share the live-updates level, and system cards (Bluetooth, Wi-Fi, VPN) rank with
- * ordinary notifications.
- *
- * Short events (notifications, battery, Bluetooth) never take the primary cutout from a live event (see [popsUp]). Battery events:
- * they take the secondary cutout right behind the primary card, live event or not. With a live event on the pill they never
- * pop into the primary cutout over it; with none they pop into it for a moment when they arrive, then ordinary
- * notifications keep it and the battery event stays in the secondary cutout.
- */
+/** Which card owns the primary cutout and which goes to the secondary round cutout. */
 object IslandPriority {
-
     fun rank(mode: IslandMode): Int = when (mode) {
         IslandMode.IncomingCall -> 0
         IslandMode.Navigation -> 10
@@ -45,17 +27,12 @@ object IslandPriority {
         IslandMode.Empty -> 50
     }
 
-    /** A paused player ranks just below a playing one, so playing media gets the main cutout. */
     fun rank(n: IslandNotification): Int =
         rank(n.mode) + if (n.mode == IslandMode.Music && !n.mediaIsPlaying) 1 else 0
 
     /**
-     * Cards that fall back to the idle cutout after [com.agupta07505.smartisland.util.IslandTimings.STATIC_IDLE_TIMEOUT_MS]
-     * once nothing on the island is actively running: ordinary notifications, paused music, and
-     * paused stopwatch / timer / recorders, and paused downloads and uploads. Anything running (playing media, a ticking timer,
-     * navigation, downloads, calls ...) is NOT idled out by this rule, so it keeps ordinary cards on the island; the live
-     * idle timeout in IslandViewModel puts such a card away on its own timer unless the user opened it or it is a call.
-     * Resuming brings the card back.
+     * Cards that fall back to the idle cutout after [IslandTimings.STATIC_IDLE_TIMEOUT_MS] once nothing is actively
+     * running: notifications, paused music, stopwatch / timer / recorders and transfers.
      */
     fun canIdleOut(n: IslandNotification): Boolean = when (n.mode) {
         IslandMode.Notification -> true
@@ -69,9 +46,8 @@ object IslandPriority {
     }
 
     /**
-     * Short events that pop into the primary cutout for a moment when they arrive: ordinary notifications, battery and
-     * connection cards (Bluetooth, Wi-Fi, VPN). They pop up only when no live event is on the island ([popsUp] with the
-     * cards): over a live event they wait in the secondary cutout instead.
+     * Short events that pop into the primary cutout on arrival: ordinary notifications, battery and connection cards.
+     * Over a live event they wait in the secondary cutout.
      */
     fun popsUp(mode: IslandMode): Boolean = when (mode) {
         IslandMode.Notification, IslandMode.Battery, IslandMode.Bluetooth -> true
@@ -79,24 +55,20 @@ object IslandPriority {
     }
 
     /**
-     * [popsUp] for [card] given the cards on the island: no short event (notification, battery, Bluetooth) ever takes the
-     * primary cutout from a live event. While one is live the newcomer waits behind it (the secondary cutout shows it).
+     * [popsUp] for [card] given the cards on the island: no short event takes the primary cutout from a live event;
+     * the newcomer waits behind it.
      */
     fun popsUp(card: IslandNotification, cards: List<IslandNotification>): Boolean =
         popsUp(card.mode) && !hasLive(cards)
 
     /**
-     * A live event: a call, navigation, a live activity, a timer, stopwatch or recording, a hotspot, a flashlight, music
-     * or a transfer. Ordinary notifications and the system cards (battery, Bluetooth) are not.
+     * A live event: call, navigation, live activity, timer, stopwatch, recording, hotspot, flashlight, music or
+     * transfer. Ordinary notifications and system cards are not.
      */
     fun isLive(mode: IslandMode): Boolean = mode != IslandMode.Empty && rank(mode) < rank(IslandMode.Notification)
 
     fun hasLive(cards: List<IslandNotification>): Boolean = cards.any { isLive(it.mode) }
 
-    /**
-     * Where the battery events of [sorted] (already in priority order) sit: right behind the card in the primary cutout,
-     * live event or notification, so the first of them is in the secondary cutout.
-     */
     private fun placeBattery(sorted: List<IslandNotification>): List<IslandNotification> {
         val battery = sorted.filter { it.mode == IslandMode.Battery }
         if (battery.isEmpty()) return sorted
@@ -106,23 +78,18 @@ object IslandPriority {
     }
 
     /**
-     * Cards in display order. Equal ranks keep their arrival order, except ordinary notifications, which are
-     * newest first (by [IslandNotification.timeMillis]; equal times keep arrival order). The card with
-     * [popupKey], if any, goes first until its popup is over.
+     * Cards in display order: equal ranks keep arrival order, except notifications, which are newest first. The
+     * [popupKey] card goes first until its popup is over.
      */
     fun order(list: List<IslandNotification>, popupKey: String? = null): List<IslandNotification> {
         if (list.size < 2) return list
-        val sorted = placeBattery(newestNotificationsFirst(list.sortedBy { rank(it) })) // both sorts are stable
+        val sorted = placeBattery(newestNotificationsFirst(list.sortedBy { rank(it) }))  // both sorts are stable
         if (popupKey == null) return sorted
         val popup = sorted.firstOrNull { it.key == popupKey } ?: return sorted
-        if (!popsUp(popup, list)) return sorted // a short event over a live event never takes the primary cutout
+        if (!popsUp(popup, list)) return sorted
         return listOf(popup) + sorted.filter { it !== popup }
     }
 
-    /**
-     * Puts the ordinary notifications of [ordered] newest first, in the slots they already occupy, so the cards
-     * around them (battery, Bluetooth, which share their rank) keep their places.
-     */
     private fun newestNotificationsFirst(ordered: List<IslandNotification>): List<IslandNotification> {
         val newest = ordered.filter { it.mode == IslandMode.Notification }.sortedByDescending { it.timeMillis }
         if (newest.size < 2) return ordered

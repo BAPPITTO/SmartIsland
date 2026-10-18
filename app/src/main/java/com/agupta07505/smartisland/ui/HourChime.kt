@@ -8,7 +8,7 @@
 package com.agupta07505.smartisland.ui
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Easing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -36,25 +36,20 @@ import com.agupta07505.smartisland.data.SmartIslandSettings
 import com.agupta07505.smartisland.model.HourChime
 import com.agupta07505.smartisland.model.HourChimeLabels
 import com.agupta07505.smartisland.model.IdleSlots
+import com.agupta07505.smartisland.model.IdleSchedule
 import com.agupta07505.smartisland.model.IdleWidgetKind
 import com.agupta07505.smartisland.model.IdleWidgets
 import com.agupta07505.smartisland.model.PILL_CENTER_ZONE_SHARE
 import com.agupta07505.smartisland.model.hourChimeLabels
 import com.agupta07505.smartisland.util.AnimationSpeed
+import com.agupta07505.smartisland.util.SystemAnimScale
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
-/** How far a glyph travels while it ticks, as a share of the pill's height. */
 private const val CHIME_TRAVEL = 0.75f
 
-/**
- * The clock idle widget's hourly tick. On every full hour, whatever the pill shows (idle widgets, a live event, a notification), the pill's content
- * gives way for a moment to the hour in the left slot and the minutes in the right slot: the old hour ticks away downwards and the new one ticks in
- * from above, "59" ticks away upwards and "00" ticks in from below. Then the pill's own content comes back. Plays only while the pill is collapsed
- * and drawn (this layer is composed with it), the screen is on and the clock widget is switched on. The wide pill only: the small round circle has no
- * two slots. The slots are the pill's glyph slots (a third of the width each, the camera band between), so the numbers sit where the glyphs sit.
- */
+/** The clock idle widget's hourly tick. */
 @Composable
 internal fun HourChimeLayer(
     settings: SmartIslandSettings,
@@ -67,12 +62,19 @@ internal fun HourChimeLayer(
     canHold: Boolean = false
 ) {
     val context = LocalContext.current
-    val clockOn = remember(settings.idleWidgetIds) { IdleWidgetKind.Clock in IdleWidgets.parse(settings.idleWidgetIds) }
+    val schedulePrefs = settings.idleSchedulePrefs()
+    val scheduleContext = rememberIdleScheduleContext(schedulePrefs, track = settings.idleWidgetsEnabled)
+    val clockOn = remember(settings.idleWidgetIds) { IdleWidgetKind.Clock in IdleWidgets.parse(settings.idleWidgetIds) } &&
+        IdleSchedule.allows(schedulePrefs, scheduleContext, IdleWidgetKind.Clock)
     val enabled = settings.idleWidgetsEnabled && !suppressed && clockOn && (canHold || settings.width > IDLE_WIDGET_COMPACT_MAX_DP)
     val settingsNow = androidx.compose.runtime.rememberUpdatedState(settings)
     val screenOn = rememberScreenInteractive()
     val tick = remember { Animatable(0f) }
     var labels by remember { mutableStateOf<HourChimeLabels?>(null) }
+    // Battery Saver or "remove animations": the tick is a plain cross-fade (IdleSlots.ticksAnimate), decided when it starts.
+    val saverOn by rememberBatterySaverOn(track = enabled)
+    val animatesNow = androidx.compose.runtime.rememberUpdatedState(IdleSlots.ticksAnimate(saverOn, SystemAnimScale.animationsOff()))
+    var moves by remember { mutableStateOf(true) }
 
     LaunchedEffect(enabled, screenOn) {
         if (!enabled || !screenOn) return@LaunchedEffect
@@ -84,10 +86,14 @@ internal fun HourChimeLayer(
                 ui.withTickPill(canHold, { settingsNow.value.width > IDLE_WIDGET_COMPACT_MAX_DP }) {
                     val is24 = android.text.format.DateFormat.is24HourFormat(context)
                     labels = hourChimeLabels(HourChime.hourOf(target), is24)
+                    moves = animatesNow.value
                     tick.snapTo(0f)
                     ui.chimeShow.animateTo(1f, tween(animSpeed.durationMs(HourChime.FADE_IN_MS)))
                     delay(animSpeed.durationMs(HourChime.HOLD_BEFORE_MS).toLong())
-                    tick.animateTo(1f, tween(animSpeed.durationMs(HourChime.TICK_MS), easing = Easing { IdleSlots.heavyTickProgress(it) }))
+                    // The tick's clock runs linearly; each slot works out its own heavy tick, settle and stretch from
+                    // it (the minutes a beat late).
+                    val span = if (moves) IdleSlots.takeoverSpanMs(HourChime.TICK_MS) else IdleSlots.PLAIN_FADE_MS
+                    tick.animateTo(1f, tween(animSpeed.durationMs(span), easing = LinearEasing))
                     delay(animSpeed.durationMs(HourChime.HOLD_AFTER_MS).toLong())
                     ui.chimeShow.animateTo(0f, tween(animSpeed.durationMs(HourChime.FADE_OUT_MS)))
                     labels = null
@@ -117,10 +123,10 @@ internal fun HourChimeLayer(
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Hour: the old one leaves downwards, the new one comes in from above.
-        ChimeSlot(Modifier.weight(slot), shown.oldHour, shown.newHour, towardsDown = true, tick = tick, family = glyphFont, scale = glyphScale)
+        ChimeSlot(Modifier.weight(slot), shown.oldHour, shown.newHour, towardsDown = true, lagged = false, moves = moves, tick = tick, family = glyphFont, scale = glyphScale)
         Spacer(Modifier.weight(PILL_CENTER_ZONE_SHARE))
         // Minutes: "59" leaves upwards, "00" comes in from below.
-        ChimeSlot(Modifier.weight(slot), HourChime.MINUTES_BEFORE, HourChime.MINUTES_AFTER, towardsDown = false, tick = tick, family = glyphFont, scale = glyphScale)
+        ChimeSlot(Modifier.weight(slot), HourChime.MINUTES_BEFORE, HourChime.MINUTES_AFTER, towardsDown = false, lagged = true, moves = moves, tick = tick, family = glyphFont, scale = glyphScale)
     }
 }
 
@@ -130,21 +136,32 @@ private fun ChimeSlot(
     old: String,
     new: String,
     towardsDown: Boolean,
+    /** The minutes slot: it starts [IdleSlots.STAGGER_MS] after the hour. */
+    lagged: Boolean,
+    /** False: no move, a plain cross-fade ([IdleSlots.ticksAnimate]). */
+    moves: Boolean,
     tick: Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
     family: androidx.compose.ui.text.font.FontFamily? = null,
     scale: Float = 1f
 ) {
     val dir = if (towardsDown) 1f else -1f
+    // Progress runs a little past 1 in the settle (the glyph lands past its place and eases back); the stretch follows the snap's speed.
+    fun progress() = if (moves) IdleSlots.takeoverProgress(tick.value, HourChime.TICK_MS, lagged) else tick.value
+    fun stretch() = if (moves) IdleSlots.takeoverStretch(tick.value, HourChime.TICK_MS, lagged) else 0f
     Box(modifier = modifier.fillMaxHeight().clipToBounds(), contentAlignment = Alignment.Center) {
         ChimeGlyph(old, family, scale) {
-            val p = tick.value
-            translationY = dir * p * size.height * CHIME_TRAVEL
-            alpha = 1f - p.coerceIn(0f, 1f)
+            val p = progress()
+            val s = stretch()
+            translationY = if (moves) dir * p * size.height * CHIME_TRAVEL else 0f
+            scaleY = 1f + IdleSlots.STRETCH_SCALE * s
+            alpha = (1f - p.coerceIn(0f, 1f)) * (1f - IdleSlots.STRETCH_FADE * s)
         }
         ChimeGlyph(new, family, scale) {
-            val p = tick.value
-            translationY = -dir * (1f - p) * size.height * CHIME_TRAVEL
-            alpha = p.coerceIn(0f, 1f)
+            val p = progress()
+            val s = stretch()
+            translationY = if (moves) -dir * (1f - p) * size.height * CHIME_TRAVEL else 0f
+            scaleY = 1f + IdleSlots.STRETCH_SCALE * s
+            alpha = p.coerceIn(0f, 1f) * (1f - IdleSlots.STRETCH_FADE * s)
         }
     }
 }

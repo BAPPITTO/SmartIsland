@@ -18,11 +18,8 @@ import com.agupta07505.smartisland.model.StopwatchState
 import com.agupta07505.smartisland.receiver.StopwatchActionReceiver
 
 /**
- * The Stopwatch utility: a stopwatch the island runs itself, so it needs no clock app. It shows as the normal Stopwatch card
- * (collapsed cutout, expanded card with Lap / Pause / Reset) because it posts the same kind of card the listener builds from
- * a clock app's notification. Its buttons are broadcasts to [StopwatchActionReceiver].
- *
- * The state is saved, so the stopwatch survives the process being restarted ([restore] is called when the overlay service starts).
+ * A stopwatch the island runs itself, shown as the normal Stopwatch card. Its buttons are broadcasts to
+ * [StopwatchActionReceiver].
  */
 object InAppStopwatch {
     const val KEY = "smartisland.stopwatch"
@@ -47,7 +44,7 @@ object InAppStopwatch {
     /** True while a stopwatch exists (running or paused): the Stopwatch tile lights up. */
     val isActive: Boolean get() = state.active
 
-    /** Loads the saved stopwatch and shows its card again. Safe to call repeatedly. */
+    /** Safe to call repeatedly. */
     fun restore(context: Context) {
         val app = context.applicationContext
         val saved = StopwatchState.decode(prefs(app).getString(PREF_STATE, null))
@@ -56,7 +53,6 @@ object InAppStopwatch {
         post(app)
     }
 
-    /** The Stopwatch tile: start, pause or resume. */
     fun toggle(context: Context) = change(context) { it.toggle(System.currentTimeMillis()) }
 
     fun lap(context: Context) = change(context) { it.lap() }
@@ -68,7 +64,6 @@ object InAppStopwatch {
         runCatching { SmartIslandRepositories.notificationRepository(app).removeNotification(KEY) }
     }
 
-    /** Runs a button of the card (see the ACTION_* constants). */
     fun handle(context: Context, action: String?) {
         when (action) {
             ACTION_LAP -> lap(context)

@@ -8,9 +8,8 @@
 package com.agupta07505.smartisland.ui
 
 /**
- * Landscape expanded card top: the portrait-style [baseDp] plus one pill height and one gap, so the
- * collapsed pill beside the card never overlaps it. Kept on screen: never lower than what still
- * leaves the whole card (and one gap) visible, and never above [baseDp].
+ * Landscape expanded card top: the portrait-style [baseDp] plus one pill height and one gap, so the collapsed pill
+ * beside the card never overlaps it.
  */
 internal fun landscapeExpandedTopOffsetDp(
     baseDp: Float,
@@ -24,13 +23,19 @@ internal fun landscapeExpandedTopOffsetDp(
     return wanted.coerceAtMost(lowest)
 }
 
+/**
+ * Gap (dp) between the screen's top edge and the app shortcuts window in landscape, whatever the collapsed cutout was
+ * (with or without content).
+ */
+internal const val LANDSCAPE_LAUNCHER_TOP_GAP_DP = 4f
+
 /** Gap between the screen's top edge and the expanded card when the collapsed pill sits in a corner. */
 internal const val LANDSCAPE_EDGE_GAP_DP = 10f
 
 /**
- * True when the collapsed cutout group (pill plus companion circle, [groupStartDp]..[groupEndDp] from
- * the left screen edge) would touch the expanded card ([cardLeftDp]..[cardRightDp]) once [gapDp] of
- * breathing room is added on both sides.
+ * True when the collapsed cutout group (pill plus companion circle, [groupStartDp]..[groupEndDp] from the left screen
+ * edge) would touch the expanded card ([cardLeftDp]..[cardRightDp]) once [gapDp] of breathing room is added on both
+ * sides.
  */
 internal fun landscapePillOverlapsCard(
     groupStartDp: Float,

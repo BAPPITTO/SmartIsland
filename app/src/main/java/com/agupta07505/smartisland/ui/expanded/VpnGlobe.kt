@@ -27,8 +27,8 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.unit.dp
 
 /**
- * The VPN card's picture: a tilted wireframe globe in the accent colour, inside the same 46 dp tinted box the Bluetooth card
- * uses for its earbuds. Drawn as lines (no image file). The numbers are the approved preview's, in a 20-unit-radius space.
+ * The VPN card's picture: a tilted wireframe globe in the accent colour, in the same 46 dp tinted box the Bluetooth
+ * card uses for its earbuds. Drawn as lines in a 20-unit-radius space.
  */
 @Composable
 internal fun VpnGlobeBox(accent: Color, modifier: Modifier = Modifier, slashed: Boolean = false) {

@@ -7,18 +7,9 @@
 
 package com.agupta07505.smartisland.model
 
-/**
- * The LED footsteps tick of the idle widget slots (Settings > Idle widgets > Tick style).
- *
- * A slot's content never slides smoothly: it is drawn as a grid of LEDs and moves in whole LED rows. A change is a burst of
- * 1 to 9 short hops with a rest between them, like footsteps. The burst length comes from a repeating pattern the user types
- * ("1, 2, 3, 2, 5"): the first change takes one hop, the next two, then three, two, five, and round again. On every hop the old
- * content steps up (or down) and out while the new content, or the same content when only the beat is due, steps in behind it.
- *
- * Pure rules, so they can be unit tested; the drawing is ui/LedTickSlot.kt.
- */
+/** LED footsteps tick of the idle widget slots (Settings > Idle widgets > Tick style). */
 object LedTick {
-    /** Smooth is the original heavy tick; LED is the footsteps tick drawn on an LED grid. */
+    /** Smooth is the heavy tick; LED is the footsteps tick drawn on an LED grid. */
     const val STYLE_SMOOTH = "smooth"
     const val STYLE_LED = "led"
     val VALID_STYLES = setOf(STYLE_SMOOTH, STYLE_LED)
@@ -26,13 +17,13 @@ object LedTick {
     fun normalizeStyle(id: String?): String = id?.takeIf { it in VALID_STYLES } ?: STYLE_SMOOTH
 
     /** Ticks per change, repeated in turn. */
-    const val DEFAULT_PATTERN = "1, 2, 3, 2, 5"
+    const val DEFAULT_PATTERN = "4, 5, 4"
     const val MIN_HOPS = 1
     const val MAX_HOPS = 9
     const val MAX_PATTERN_LENGTH = 12
-    private val DEFAULT_PATTERN_LIST = listOf(1, 2, 3, 2, 5)
+    private val DEFAULT_PATTERN_LIST = listOf(4, 5, 4)
 
-    /** The hop counts typed in [text]: every number from 1 to 9, in order, at most [MAX_PATTERN_LENGTH]; the default when none is left. */
+    /** Hop counts typed in [text]: numbers 1 to 9 in order, at most [MAX_PATTERN_LENGTH]; the default when none is left. */
     fun parsePattern(text: String?): List<Int> {
         val found = (text ?: "").split(Regex("[^0-9]+"))
             .mapNotNull { it.toIntOrNull() }
@@ -41,10 +32,9 @@ object LedTick {
         return found.ifEmpty { DEFAULT_PATTERN_LIST }
     }
 
-    /** [text] written back the way the settings store it ("1, 2, 3"). */
     fun normalizePattern(text: String?): String = parsePattern(text).joinToString(", ")
 
-    /** Milliseconds from the start of one hop to the start of the next ("speed"), kept within range and to the 20 ms the slider moves in. */
+    /** Ms from the start of one hop to the next ("speed"), kept in range and to the slider's 20 ms steps. */
     const val MIN_PACE_MS = 160
     const val MAX_PACE_MS = 800
     const val DEFAULT_PACE_MS = 420
@@ -55,24 +45,22 @@ object LedTick {
         return MIN_PACE_MS + Math.round((clamped - MIN_PACE_MS).toFloat() / PACE_STEP_MS) * PACE_STEP_MS
     }
 
-    /** The LED rows of a slot's board: 7 rows of letters with one spare row above and below. A full travel is this many rows. */
+    /** LED rows of a slot's board: 7 rows of letters plus a spare row above and below. A full travel is this many rows. */
     const val ROWS = 9
 
-    /** How long one hop itself takes (the rest of the pace is the pause). */
+    /** Length of one hop; the rest of the pace is the pause. */
     const val HOP_MS = 80
 
-    /** The hop count of the [beat]-th change: the pattern repeats. */
     fun hopsAt(pattern: List<Int>, beat: Long): Int {
         if (pattern.isEmpty()) return DEFAULT_PATTERN_LIST[Math.floorMod(beat, DEFAULT_PATTERN_LIST.size.toLong()).toInt()]
         return pattern[Math.floorMod(beat, pattern.size.toLong()).toInt()]
     }
 
-    /** Length of a burst of [hops] hops at [paceMs]. */
     fun burstMs(hops: Int, paceMs: Int): Int = (hops.coerceAtLeast(1) - 1) * paceMs + HOP_MS
 
     /**
-     * How far the burst has travelled, 0..1, [tMs] after it started: hop i starts at i * pace and covers 1/hops of the travel with an
-     * ease-out, then rests until the next hop.
+     * Burst travel 0..1 at [tMs]: hop i starts at i * pace and covers 1/hops of the travel with an ease-out, then
+     * rests.
      */
     fun progress(tMs: Float, hops: Int, paceMs: Int): Float {
         val n = hops.coerceAtLeast(1)
@@ -88,12 +76,11 @@ object LedTick {
         return 1f
     }
 
-    /** The whole LED rows the old content has moved at [progress]. */
     fun rowOffset(progress: Float, rows: Int = ROWS): Int = Math.round(progress.coerceIn(0f, 1f) * rows)
 
     /**
-     * Which beat [nowMs] belongs to, so every slot that starts a burst around the same time takes the same pattern entry and the
-     * footsteps of the left and right slot agree.
+     * Beat that [nowMs] belongs to, so slots starting a burst around the same time take the same pattern entry and
+     * left and right agree.
      */
     fun beatIndex(nowMs: Long, periodMs: Long): Long {
         val p = periodMs.coerceAtLeast(1L)
@@ -110,26 +97,23 @@ object LedTick {
     fun normalizeColor(id: String?): String = id?.takeIf { it in VALID_COLORS } ?: COLOR_RED
 
     /**
-     * Footsteps: with the stagger on, the right slot (usually the value) starts its burst half a pace after the left one (usually the
-     * glyph), so a change reads left, right, left, right. Off = both start together.
+     * With the stagger on, the right slot (usually the value) starts half a pace after the left (usually the glyph),
+     * so a change reads left, right, left, right. Off = together.
      */
     const val STAGGER_SHARE = 0.5f
 
-    /** How long the slot waits before its burst: half a pace for the right slot when [stagger] is on, else none. */
     fun staggerMs(paceMs: Int, right: Boolean, stagger: Boolean): Long =
         if (stagger && right) Math.round(paceMs * STAGGER_SHARE).toLong() else 0L
 
-    /** The font of the LED text: empty = the built-in 5x7 dot font, else any island font id, which is drawn as dots. */
+    /** Font of the LED text: empty = built-in 5x7 dot font, else any island font id, drawn as dots. */
     const val FONT_BUILTIN = ""
 }
 
-/** What the drawing needs, read from the settings once. */
 data class LedTickConfig(
     val pattern: List<Int> = LedTick.parsePattern(LedTick.DEFAULT_PATTERN),
     val paceMs: Int = LedTick.DEFAULT_PACE_MS,
-    /** Empty = the built-in dot font, else an island font id (system, serif, a built-in or a custom font) drawn as dots. */
     val fontId: String = LedTick.FONT_BUILTIN,
     val colorId: String = LedTick.COLOR_RED,
-    /** The right slot steps half a pace after the left one (see [LedTick.staggerMs]). */
+    /** The right slot steps half a pace after the left (see [LedTick.staggerMs]). */
     val stagger: Boolean = true
 )

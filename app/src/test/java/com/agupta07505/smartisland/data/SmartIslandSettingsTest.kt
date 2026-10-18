@@ -166,7 +166,6 @@ class SmartIslandSettingsTest {
 
     @Test
     fun testSwipeActionModelAndSerialization() {
-        // Test SwipeAction.fromId
         assertEquals(com.agupta07505.smartisland.model.SwipeAction.DismissCurrent, com.agupta07505.smartisland.model.SwipeAction.fromId("DismissCurrent"))
         assertEquals(com.agupta07505.smartisland.model.SwipeAction.DismissAll, com.agupta07505.smartisland.model.SwipeAction.fromId("dismissall"))
         assertEquals(com.agupta07505.smartisland.model.SwipeAction.NextTrack, com.agupta07505.smartisland.model.SwipeAction.fromId("NextTrack"))
@@ -178,7 +177,6 @@ class SmartIslandSettingsTest {
         assertEquals(com.agupta07505.smartisland.model.SwipeAction.None, com.agupta07505.smartisland.model.SwipeAction.fromId(null))
         assertEquals(com.agupta07505.smartisland.model.SwipeAction.Expand, com.agupta07505.smartisland.model.SwipeAction.fromId("UnknownAction", default = com.agupta07505.smartisland.model.SwipeAction.Expand))
 
-        // Test disabled / custom swipe actions in JSON parsing
         val json = """
             {
                 "settings": {
@@ -239,7 +237,6 @@ class SmartIslandSettingsTest {
         assertEquals(24f, settings.cornerRadius)
         assertEquals(0.9f, settings.opacity)
         assertEquals(4278190080L, settings.pillColor)
-        // Check defaults are preserved for unspecified fields
         assertEquals(SmartIslandSettings.Default.batteryColor, settings.batteryColor)
         assertEquals(SmartIslandSettings.Default.shortcutPackages, settings.shortcutPackages)
     }
@@ -559,7 +556,6 @@ class SmartIslandSettingsTest {
 
         val all = SmartIslandSettings.Default.copy(hideAllOnLockScreen = true)
         assertEquals(true, all.isEventHiddenOnLockScreen("timer"))
-        assertEquals(true, all.isEventHiddenOnLockScreen("privacy_camera"))
     }
 
     @Test
@@ -716,5 +712,62 @@ class SmartIslandSettingsTest {
         val old = SmartIslandSettings.fromJson(SmartIslandSettings().toJson())
         assertEquals(false, old.fontMixEnabled)
         assertEquals("", old.fontMixMedium)
+    }
+
+    @Test
+    fun appFaceIdDefaultsOnWithItsOwnExpandedStyle() {
+        val d = SmartIslandSettings()
+        assertTrue(d.appFaceIdEnabled)
+        assertEquals("square_tick", d.appFaceIdStyle)
+    }
+
+    @Test
+    fun appFaceIdSettingsSurviveTheBackupIndependentlyOfTheLockScreenStyle() {
+        val restored = SmartIslandSettings.fromJson(
+            SmartIslandSettings(faceIdStyle = "cutout", appFaceIdStyle = "square", appFaceIdEnabled = false).toJson(appVersion = "7.0.0")
+        )
+        assertEquals("cutout", restored.faceIdStyle)
+        assertEquals("square", restored.appFaceIdStyle)
+        assertFalse(restored.appFaceIdEnabled)
+    }
+
+    @Test
+    fun fingerprintAnimationDefaultsOnAndSurvivesTheBackup() {
+        assertTrue(SmartIslandSettings().fingerprintAnimationEnabled)
+        val restored = SmartIslandSettings.fromJson(
+            SmartIslandSettings(fingerprintAnimationEnabled = false).toJson(appVersion = "7.0.0")
+        )
+        assertFalse(restored.fingerprintAnimationEnabled)
+    }
+
+    @Test
+    fun anOldBackupWithoutTheFingerprintSwitchLoadsItOn() {
+        val json = SmartIslandSettings().toJson(appVersion = "7.0.0").replace("fingerprintAnimationEnabled", "unknownKey")
+        assertTrue(SmartIslandSettings.fromJson(json).fingerprintAnimationEnabled)
+    }
+
+    @Test
+    fun anUnknownAppFaceIdStyleFallsBackToExpanded() {
+        val json = SmartIslandSettings(appFaceIdStyle = "cutout").toJson(appVersion = "7.0.0").replace("\"cutout\"", "\"bogus\"")
+        assertEquals("square_tick", SmartIslandSettings.fromJson(json).appFaceIdStyle)
+    }
+
+    @Test
+    fun faceIdStyleDefaultsToExpandedAndSurvivesTheBackup() {
+        assertEquals("square_tick", SmartIslandSettings().faceIdStyle)
+        val restored = SmartIslandSettings.fromJson(SmartIslandSettings(faceIdStyle = "cutout").toJson(appVersion = "7.0.0"))
+        assertEquals("cutout", restored.faceIdStyle)
+    }
+
+    @Test
+    fun theMixFaceIdStyleSurvivesTheBackup() {
+        val restored = SmartIslandSettings.fromJson(SmartIslandSettings(faceIdStyle = "square").toJson(appVersion = "7.0.0"))
+        assertEquals("square", restored.faceIdStyle)
+    }
+
+    @Test
+    fun anUnknownFaceIdStyleInABackupFallsBackToExpanded() {
+        val json = SmartIslandSettings(faceIdStyle = "cutout").toJson(appVersion = "7.0.0").replace("\"cutout\"", "\"bogus\"")
+        assertEquals("square_tick", SmartIslandSettings.fromJson(json).faceIdStyle)
     }
 }

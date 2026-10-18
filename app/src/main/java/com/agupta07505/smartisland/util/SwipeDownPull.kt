@@ -29,14 +29,14 @@ object SwipeDownPull {
     const val EXPANDED_STRETCH_Y = 0.015f
 
     /**
-     * How far (dp) the whole expanded island may travel down with a swipe down. It only leans a little
-     * rather than following the finger down the screen.
+     * How far (dp) the whole expanded island may travel down with a swipe down. It only leans a little rather than
+     * following the finger down the screen.
      */
     const val EXPANDED_DOWN_MAX_DP = 6f
 
     /**
-     * Downward travel (px) of the expanded island for a drag of [dragY] px: starts at a quarter of the finger's speed and
-     * settles towards [EXPANDED_DOWN_MAX_DP] (never past it). Zero for an upward or no drag.
+     * Downward travel (px) of the expanded island for a drag of [dragY] px: starts at a quarter of the finger's speed
+     * and settles towards [EXPANDED_DOWN_MAX_DP] (never past it).
      */
     fun expandedDownOffsetPx(dragY: Float, density: Float): Float {
         if (dragY <= 0f) return 0f
@@ -46,8 +46,8 @@ object SwipeDownPull {
 
     /**
      * 0 while the finger has not moved down past the tap [slopPx] (the stretch never starts inside the tap area, so a
-     * tap and the dead-zone shrink stay as they are); 1 at [thresholdPx], the point where a swipe down fires; past that
-     * it keeps growing slowly up to `1 + OVERSHOOT`. An upward drag is 0.
+     * tap and the dead-zone shrink stay as they are); 1 at [thresholdPx], the point where a swipe down fires; past
+     * that it keeps growing slowly up to `1 + OVERSHOOT`.
      */
     fun progress(dragY: Float, slopPx: Float, thresholdPx: Float): Float {
         if (dragY <= slopPx) return 0f
@@ -57,10 +57,8 @@ object SwipeDownPull {
     }
 
     /**
-     * The floating-window handle at the bottom of the expanded island: while it is pulled down the card gets a little narrower
-     * and a little taller (4.5 % / 10 % at full pull), squeezing its content with it. Only a visual answer to the finger.
-     * The pull line is 44 dp (was 28 dp), so the squeeze is scaled up by about the same factor to keep the card's squeeze
-     * in dp near what it was over the shorter pull.
+     * The floating-window handle at the bottom of the expanded island: while it is pulled down the card gets a little
+     * narrower and taller (4.5 % / 10 % at full pull), squeezing its content.
      */
     const val HANDLE_SQUEEZE_X = 0.045f
     const val HANDLE_STRETCH_Y = 0.10f
@@ -73,11 +71,10 @@ object SwipeDownPull {
     fun expandedScaleY(progress: Float): Float = 1f + EXPANDED_STRETCH_Y * progress
 
     /**
-     * The shell scales around its centre, so a taller shell would grow up as well as down. Moving it down by half of the
-     * added height keeps its top edge where it is: the stretch only reaches downward. [heightPx] is the unscaled height.
+     * The shell scales around its centre, so a taller shell would grow up as well as down. Moving it down by half of
+     * the added height keeps its top edge where it is: the stretch only reaches downward.
      */
     fun topAnchorShiftPx(scaleY: Float, heightPx: Float): Float = (scaleY - 1f) * heightPx / 2f
 
-    /** How much of the dead-zone shrink is still shown while the stretch grows (it fades out, never fights it). */
     fun deadShrinkWeight(progress: Float): Float = (1f - progress).coerceIn(0f, 1f)
 }

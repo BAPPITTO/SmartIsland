@@ -47,11 +47,8 @@ import androidx.compose.ui.unit.dp
 import com.agupta07505.smartisland.data.SmartIslandSettings
 import com.agupta07505.smartisland.ui.glass.Switch
 
-// ---------------------------------------------------------------------------------------------------------------------
 // Settings > Appearance: the liquid glass switch, Material You, and the Material colour picker for the app's accent.
-// ---------------------------------------------------------------------------------------------------------------------
 
-/** The Material design palette's 500 shades, in rainbow order, then the neutral ones. */
 private val MaterialAccentSwatches = listOf(
     0xFFF44336L to "Red",
     0xFFE91E63L to "Pink",
@@ -189,7 +186,6 @@ private fun AccentSwatch(color: Color, name: String, selected: Boolean, enabled:
     }
 }
 
-/** A rainbow slider for any hue the swatches do not cover. The colour is saved when the finger lifts. */
 @Composable
 private fun CustomHueSlider(accent: Long, enabled: Boolean, onAccentChange: (Long) -> Unit) {
     var hue by remember(accent) { mutableFloatStateOf(hueOf(accent)) }

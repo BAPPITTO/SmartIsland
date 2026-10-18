@@ -132,8 +132,8 @@ sealed interface SmartIslandCommand {
     /** The overlay started: import what the shade already holds (persistent cards and loud notifications) that the island misses. */
     data object SyncShade : SmartIslandCommand
     /**
-     * The island was expanded on a card from [packageName]: pull that app's other cards from the
-     * shade (including finished downloads) so the secondary cutout can show them.
+     * The island was expanded on a card from [packageName]: pull that app's other cards from the shade (including
+     * finished downloads) so the secondary cutout can show them.
      */
     data class ImportSameAppNotifications(val packageName: String) : SmartIslandCommand
 }

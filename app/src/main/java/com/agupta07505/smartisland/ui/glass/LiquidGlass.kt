@@ -24,12 +24,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 
-// ---------------------------------------------------------------------------------------------------------------------
-// Liquid glass for the app's own screens (not the island). Inspired by LiquidGlassKit's shader, which bends the background
-// through a glass slab and adds a Fresnel rim, a dispersion fringe and a glare streak. A Compose screen cannot refract what is
-// behind it, so the same cues are drawn instead: translucent panels over a soft colour backdrop, a rim that is bright where the
-// light hits and fades away from it, a faint cyan / magenta fringe on the two opposite corners, and a glare along the top edge.
-// ---------------------------------------------------------------------------------------------------------------------
+// Liquid glass for the app's own screens (not the island).
 
 /** True while the liquid glass theme is on. Read by the glass-aware Card / Switch and by the surfaces that draw a rim. */
 val LocalLiquidGlass = staticCompositionLocalOf { false }
@@ -42,14 +37,12 @@ val LocalGlassBackdropColors = staticCompositionLocalOf<GlassBackdropColors?> { 
 /** True when the glass theme is drawn in its dark variant (the rim and glare strengths differ). */
 val LocalGlassDark = staticCompositionLocalOf { false }
 
-/** Light colours of the glass edge: the lit corner leans cyan-white, the far corner magenta-white (the dispersion of the kit's shader). */
 private val FringeLit = Color(0xFFD6F1FF)
 private val FringeFar = Color(0xFFFFD9F4)
 
 /**
- * The edge of a glass panel, drawn over its content: a hairline rim (bright at the top left, nearly gone in the middle, a soft
- * second highlight at the bottom right) and a glare that fades out over the top of the panel. Nothing when [glass] is false.
- * Not a composable modifier (Compose lint forbids that): callers read [LocalLiquidGlass] and [LocalGlassDark] and pass them in.
+ * The edge of a glass panel, drawn over its content: a hairline rim (bright at the top left, nearly gone in the
+ * middle, a soft second highlight at the bottom right) and a glare that fades out over the top of the panel.
  */
 fun Modifier.glassEdge(shape: Shape, glass: Boolean, dark: Boolean): Modifier {
     if (!glass) return this
@@ -88,8 +81,8 @@ fun Modifier.glassEdge(shape: Shape, glass: Boolean, dark: Boolean): Modifier {
 }
 
 /**
- * The colour field behind every screen of the glass theme: the plain background colour with three large soft glows in the theme's
- * own accent colours, so the translucent panels above it have something to tint. Static, so it costs nothing while scrolling.
+ * The colour field behind every screen of the glass theme: the plain background colour with three large soft glows in
+ * the theme's own accent colours, so the translucent panels above it have something to tint.
  */
 @Composable
 fun LiquidGlassBackdrop(
@@ -130,8 +123,8 @@ fun LiquidGlassBackdrop(
 }
 
 /**
- * An opaque fill in the theme's own look: the glass backdrop on the glass theme, the plain background colour otherwise. Put under a
- * screen that slides over another one (a detail page, the predictive back gesture) so the screen below never shows through it.
+ * An opaque fill in the theme's own look: the glass backdrop on the glass theme, the plain background colour
+ * otherwise.
  */
 @Composable
 fun ThemedBackdrop(modifier: Modifier = Modifier) {

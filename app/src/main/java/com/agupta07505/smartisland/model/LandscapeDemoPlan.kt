@@ -11,19 +11,7 @@ import com.agupta07505.smartisland.data.LandscapeCamera
 import com.agupta07505.smartisland.data.OrientationState
 import com.agupta07505.smartisland.data.SmartIslandSettings
 
-/**
- * Landscape Lab: the matrix of landscape situations and the script played in each of them.
- *
- * One STAGE is one combination of the things that change how the landscape island is placed and how it moves:
- *  - [LabRotation]: normal landscape (camera on the left) or reverse landscape (camera on the right),
- *  - [LabIdle]: where the idle circle sits (camera cutout reported, no cutout reported, left, right, middle),
- *  - [LabPill]: where the collapsed pill with content sits (left, middle, right).
- * That is 2 x 5 x 3 = 30 stages. In every stage the same STEPS are played (entry, expand, second / third app with
- * both merge styles, sibling picker, call, popup, exit, interrupted exit, idle dot tap), so every condition is seen
- * in every layout position.
- *
- * Everything here is pure (no Android types besides the settings / orientation data classes) so it is unit tested.
- */
+/** Landscape Lab: the matrix of landscape situations and the script played in each. */
 enum class LabRotation(val label: String, val reversed: Boolean) {
     NORMAL("Normal landscape (camera left)", false),
     REVERSE("Reverse landscape (camera right)", true)
@@ -43,12 +31,11 @@ enum class LabPill(val label: String, val position: String) {
     RIGHT("Pill: right", SmartIslandSettings.LANDSCAPE_POSITION_RIGHT)
 }
 
-/** One combination to play. */
 data class LabStage(val rotation: LabRotation, val idle: LabIdle, val pill: LabPill) {
     val title: String get() = "${rotation.name.lowercase()} / ${idle.name.lowercase()} / ${pill.name.lowercase()}"
 }
 
-/** What the lab forces while it plays: the layout choices of one stage plus the merge style of the moment. */
+/** What the lab forces while it plays: the stage's layout choices plus the merge style of the moment. */
 data class LabOverride(
     val stage: LabStage,
     val mergeStyle: String = com.agupta07505.smartisland.util.MergeStyle.ID_SLIDE
@@ -70,7 +57,7 @@ data class LabOverride(
         idleTimeoutMs = LAB_IDLE_TIMEOUT_MS
     )
 
-    /** Display state with the stage's rotation and camera applied. Portrait is left alone (the lab is landscape only). */
+    /** Display state with the stage's rotation and camera applied; portrait is left alone. */
     fun applyTo(state: OrientationState): OrientationState {
         if (!state.isLandscape) return state
         val reversed = stage.rotation.reversed
@@ -97,11 +84,9 @@ data class LabOverride(
     }
 }
 
-/** Every stage, in a fixed order: rotation, then idle position, then pill position. */
 fun allLabStages(): List<LabStage> =
     LabRotation.entries.flatMap { r -> LabIdle.entries.flatMap { i -> LabPill.entries.map { p -> LabStage(r, i, p) } } }
 
-/** Stages that match the chosen filters (null = every value of that kind). */
 fun labStages(rotation: LabRotation?, idle: LabIdle?, pill: LabPill?): List<LabStage> =
     allLabStages().filter {
         (rotation == null || it.rotation == rotation) &&
@@ -109,7 +94,7 @@ fun labStages(rotation: LabRotation?, idle: LabIdle?, pill: LabPill?): List<LabS
             (pill == null || it.pill == pill)
     }
 
-/** Everything a step can ask for. The runner turns these into cards, ViewModel commands and settings changes. */
+/** Everything a step can ask for; the runner turns these into cards, ViewModel commands and settings changes. */
 sealed interface LabAction {
     data class Post(val card: LabCard, val autoExpand: Boolean = false) : LabAction
     data class Remove(val card: LabCard) : LabAction
@@ -123,25 +108,24 @@ sealed interface LabAction {
     data class Wait(val ms: Long) : LabAction
 }
 
-/** The sample cards the script uses. Apps differ on purpose: one app, one cutout. */
+/** Sample cards for the script; apps differ on purpose (one app, one cutout). */
 enum class LabCard {
     MUSIC, MESSAGE, DOWNLOAD,
     SIBLING_A, SIBLING_B, SIBLING_C,
     CALL, PLUG
 }
 
-/** One named step: what it shows, what is done, and how long it is looked at afterwards. */
 data class LabStep(val id: String, val title: String, val actions: List<LabAction>, val holdMs: Long, val quick: Boolean)
 
 private const val BUBBLE = com.agupta07505.smartisland.util.MergeStyle.ID_BUBBLE
 private const val SLIDE = com.agupta07505.smartisland.util.MergeStyle.ID_SLIDE
 
-/** Pill exit plays 360 ms (x animation speed); the interrupted exit brings the card back in the middle of it. */
+/** The pill exit plays 360 ms (x animation speed); the interrupted exit brings the card back in the middle of it. */
 const val LAB_INTERRUPT_AFTER_MS = 170L
 
 /**
- * The script. Each step starts from the state the previous one left, and the list begins and ends with nothing on the
- * island (idle circle only). [quick] steps are the short run: entry, expand, exit.
+ * The script. Each step starts from the state the previous one left; the list begins and ends with nothing on the
+ * island. [quick] steps are the short run: entry, expand, exit.
  */
 fun labSteps(): List<LabStep> = listOf(
     LabStep("idle", "Idle circle", listOf(LabAction.RemoveAll), 1400, quick = true),
@@ -204,12 +188,11 @@ fun labSteps(): List<LabStep> = listOf(
 
 fun labStepsFor(quick: Boolean): List<LabStep> = labSteps().filter { !quick || it.quick }
 
-/** Rough play time of one stage in ms (holds plus waits), for the progress text. */
 fun labStageDurationMs(quick: Boolean): Long = labStepsFor(quick).sumOf { step ->
     step.holdMs + step.actions.filterIsInstance<LabAction.Wait>().sumOf { it.ms }
 }
 
-/** The exit direction the pill is expected to take in [stage] for a screen [screenWidthDp] wide (what to watch for). */
+/** Exit direction the pill is expected to take in [stage] on a screen [screenWidthDp] wide (what to watch for). */
 fun expectedExitDirection(stage: LabStage, screenWidthDp: Float, pillWidthDp: Float, edgeInsetDp: Float): PillExitDirection {
     val cornerX = (screenWidthDp / 2f - edgeInsetDp - pillWidthDp / 2f).coerceAtLeast(0f)
     val reversed = stage.rotation.reversed

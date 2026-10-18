@@ -8,7 +8,7 @@
 package com.agupta07505.smartisland.ui
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Easing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -38,16 +38,33 @@ import com.agupta07505.smartisland.model.DayMoment
 import com.agupta07505.smartisland.model.DayMoments
 import com.agupta07505.smartisland.model.GlyphPose
 import com.agupta07505.smartisland.model.MomentGlyph
+import com.agupta07505.smartisland.model.MomentMotion
 import com.agupta07505.smartisland.model.IdleSlots
+import com.agupta07505.smartisland.model.IdleSchedule
 import com.agupta07505.smartisland.model.IdleWidgetKind
 import com.agupta07505.smartisland.model.IdleWidgets
 import com.agupta07505.smartisland.model.PILL_CENTER_ZONE_SHARE
 import com.agupta07505.smartisland.util.AnimationSpeed
+import com.agupta07505.smartisland.util.SystemAnimScale
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
-/** One glyph of the tick: the horizon sun (own drawing, see HorizonSun.kt), the full sun or the moon, posed by [poseOf] at the current tick. */
+private fun dayMomentProgress(clock: Float, moves: Boolean): Float =
+    if (moves) IdleSlots.takeoverProgress(clock, DayMoments.TICK_MS, lagged = false) else clock
+
+private fun landed(pose: GlyphPose, moment: DayMoment, clock: Float, moves: Boolean, incoming: Boolean): GlyphPose {
+    if (!moves) return pose
+    val travels = DayMoments.motion(moment) != MomentMotion.GrowFromPrevious
+    val stretch = if (travels) IdleSlots.takeoverStretch(clock, DayMoments.TICK_MS, lagged = false) else 0f
+    val past = if (incoming) (IdleSlots.takeoverProgress(clock, DayMoments.TICK_MS, lagged = false) - 1f).coerceAtLeast(0f) else 0f
+    return pose.copy(
+        scale = pose.scale * (1f + 2f * past),
+        alpha = pose.alpha * (1f - IdleSlots.STRETCH_FADE * stretch),
+        stretch = 1f + IdleSlots.STRETCH_SCALE * stretch
+    )
+}
+
 @Composable
 private fun MomentGlyphView(moment: DayMoment, glyphScale: Float, poseOf: () -> GlyphPose) {
     val size = Modifier.size((16f * glyphScale).dp)
@@ -55,7 +72,7 @@ private fun MomentGlyphView(moment: DayMoment, glyphScale: Float, poseOf: () -> 
         val pose = poseOf()
         translationY = pose.offsetShare * this.size.height
         scaleX = pose.scale
-        scaleY = pose.scale
+        scaleY = pose.scale * pose.stretch
         alpha = pose.alpha
     }
     when (DayMoments.glyph(moment)) {
@@ -66,13 +83,8 @@ private fun MomentGlyphView(moment: DayMoment, glyphScale: Float, poseOf: () -> 
 }
 
 /**
- * The Day moments widget: at the phone's local 6:00, 12:00, 17:30 and 23:00 the pill's content gives way for a moment to one glyph in the left
- * slot. It first shows the previous moment's glyph (the moon before sunrise, the sunrise before the afternoon sun, ...) for a brief moment; then the
- * new glyph ticks in and the old one ticks away, with the heavy clock tick (a slow, suspended pull-back, then the snap). Sunrise: the sun comes up from
- * the bottom edge. Afternoon: the full sun grows out of the sunrise glyph. Sunset: the sun sinks into the bottom edge. Midnight: the moon grows out of the
- * sunset glyph (see [DayMoments.incomingPose] / [DayMoments.outgoingPose]). Then the pill's own content comes back. Same conditions as the hour tick: the
- * widget and the idle widgets are on and not held off, the screen is on, the pill is the wide one. When a moment falls on a full hour that the
- * hour tick also plays on, it waits for the hour tick to finish.
+ * The Day moments widget: at the phone's local 6:00, 12:00, 17:30 and 23:00 the pill's content gives way for a moment
+ * to one glyph in the left slot.
  */
 @Composable
 internal fun DayMomentLayer(
@@ -85,13 +97,19 @@ internal fun DayMomentLayer(
     canHold: Boolean = false
 ) {
     val kinds = remember(settings.idleWidgetIds) { IdleWidgets.parse(settings.idleWidgetIds) }
-    val momentsOn = IdleWidgetKind.DayMoments in kinds
-    val clockOn = IdleWidgetKind.Clock in kinds
+    val schedulePrefs = settings.idleSchedulePrefs()
+    val scheduleContext = rememberIdleScheduleContext(schedulePrefs, track = settings.idleWidgetsEnabled)
+    val momentsOn = IdleWidgetKind.DayMoments in kinds && IdleSchedule.allows(schedulePrefs, scheduleContext, IdleWidgetKind.DayMoments)
+    val clockOn = IdleWidgetKind.Clock in kinds && IdleSchedule.allows(schedulePrefs, scheduleContext, IdleWidgetKind.Clock)
     val enabled = settings.idleWidgetsEnabled && !suppressed && momentsOn && (canHold || settings.width > IDLE_WIDGET_COMPACT_MAX_DP)
     val settingsNow = androidx.compose.runtime.rememberUpdatedState(settings)
     val screenOn = rememberScreenInteractive()
     val tick = remember { Animatable(0f) }
     var shown by remember { mutableStateOf<DayMoment?>(null) }
+    // Battery Saver or "remove animations": the tick is a plain cross-fade (IdleSlots.ticksAnimate), decided when it starts.
+    val saverOn by rememberBatterySaverOn(track = enabled)
+    val animatesNow = androidx.compose.runtime.rememberUpdatedState(IdleSlots.ticksAnimate(saverOn, SystemAnimScale.animationsOff()))
+    var moves by remember { mutableStateOf(true) }
 
     LaunchedEffect(enabled, screenOn) {
         if (!enabled || !screenOn) return@LaunchedEffect
@@ -104,12 +122,15 @@ internal fun DayMomentLayer(
                     // 6:00, 12:00 and 23:00 are full hours: the hour tick has the pill first.
                     if (clockOn && next.minute == 0) delay(DayMoments.AFTER_HOUR_TICK_MS)
                     while (ui.chimeShow.value > 0.001f) delay(100)
+                    moves = animatesNow.value
                     shown = next
                     tick.snapTo(0f)
                     ui.chimeShow.animateTo(1f, tween(animSpeed.durationMs(DayMoments.FADE_IN_MS)))
                     // The previous glyph rests for a moment, then the heavy tick swaps it for the new one.
                     delay(animSpeed.durationMs(DayMoments.HOLD_BEFORE_MS).toLong())
-                    tick.animateTo(1f, tween(animSpeed.durationMs(DayMoments.TICK_MS), easing = Easing { IdleSlots.heavyTickProgress(it) }))
+                    // The tick's clock runs linearly; the glyph works out its heavy tick, settle and stretch from it.
+                    val span = if (moves) IdleSlots.takeoverSpanMs(DayMoments.TICK_MS) else IdleSlots.PLAIN_FADE_MS
+                    tick.animateTo(1f, tween(animSpeed.durationMs(span), easing = LinearEasing))
                     delay(animSpeed.durationMs(DayMoments.HOLD_AFTER_MS).toLong())
                     ui.chimeShow.animateTo(0f, tween(animSpeed.durationMs(DayMoments.FADE_OUT_MS)))
                     shown = null
@@ -137,9 +158,15 @@ internal fun DayMomentLayer(
         // The slot clips, so a sun rising from or sinking into the bottom edge is cut off by it like a horizon.
         Box(modifier = Modifier.weight(slot).fillMaxHeight().clipToBounds(), contentAlignment = Alignment.Center) {
             // The previous moment's glyph goes away: sinking down (sunrise, sunset) or swelling into the new one (afternoon, midnight) ...
-            MomentGlyphView(DayMoments.previous(moment), glyphScale) { DayMoments.outgoingPose(moment, tick.value) }
+            MomentGlyphView(DayMoments.previous(moment), glyphScale) {
+                val p = dayMomentProgress(tick.value, moves)
+                landed(DayMoments.outgoingPose(moment, p), moment, tick.value, moves, incoming = false)
+            }
             // ... and the new one comes up from behind the horizon, grows out of the old one, or settles in over the sinking sun.
-            MomentGlyphView(moment, glyphScale) { DayMoments.incomingPose(moment, tick.value) }
+            MomentGlyphView(moment, glyphScale) {
+                val p = dayMomentProgress(tick.value, moves)
+                landed(DayMoments.incomingPose(moment, p), moment, tick.value, moves, incoming = true)
+            }
         }
         Spacer(Modifier.weight(PILL_CENTER_ZONE_SHARE))
         Spacer(Modifier.weight(slot))

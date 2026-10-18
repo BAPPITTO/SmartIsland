@@ -16,16 +16,6 @@ import com.agupta07505.smartisland.model.DndModes
 import com.agupta07505.smartisland.model.ModeKind
 import com.agupta07505.smartisland.model.ModeStatus
 
-/**
- * Reads which Do Not Disturb mode is on.
- *
- *  - Any phone: the interruption filter says whether Do Not Disturb is on and how strict it is (priority only, alarms only, total silence).
- *  - Android 15 and later, with Do Not Disturb access granted to the app: the modes (automatic zen rules) that are active right now are asked
- *    for by id ([NotificationManager.getAutomaticZenRuleState]), so Bedtime, Driving and the phone maker's own modes show with their own name and
- *    icon. A mode can be on while the interruption filter stays "all" (a mode that only changes the display), so the modes are asked first.
- *  - Without that access, or on an older Android, the phone cannot tell which mode it is and the plain Do Not Disturb is shown.
- * Every call into the system is guarded: a refused or failing call falls back to the next, simpler answer.
- */
 object DndModeReader {
     fun hasPolicyAccess(context: Context): Boolean =
         runCatching { notificationManager(context)?.isNotificationPolicyAccessGranted == true }.getOrDefault(false)

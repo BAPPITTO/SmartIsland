@@ -36,10 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalDensity
 import kotlin.math.abs
 
-/**
- * The expanded card's host. Fades out while collapsing and is laid out at its final width the whole time. For the modes
- * in CardPrewarm it is also composed while collapsed, so the tap does not have to compose it.
- */
+/** The expanded card's host. Fades out while collapsing and is laid out at its final width the whole time. */
 @Composable
 internal fun ExpandedCardHost(
     expanded: Boolean,
@@ -69,10 +66,8 @@ internal fun ExpandedCardHost(
     ui: IslandInteractionState,
     animSpeed: com.agupta07505.smartisland.util.AnimationSpeed
 ) {
-    // A swipe that put another card in the island. The old card stays where the finger left it
-    // (see islandMainGestures) and the new one comes in from the opposite side. If no card arrives in time, the
-    // gesture handler eases the old one back instead.
-    // Island closed (or the card faded out) in the middle of a swipe: forget every sideways move, so the next open starts centred.
+    // A swipe that put another card in the island. The old card stays where the finger left it and the new one comes
+    // in from the opposite side.
     LaunchedEffect(expanded, layout.expandedShown) {
         if (!expanded && !layout.expandedShown) ui.resetCard()
     }
@@ -91,27 +86,22 @@ internal fun ExpandedCardHost(
             ) { ui.dragOffset = value }
         }
     }
-    // A swipe that put another card in the island: the old card stays where the finger left it and the new one comes in
-    // from the opposite side. If no card arrives in time, the gesture handler eases the old one back instead.
     val shownKey = activeNotification?.key
     val shownKeyNow by rememberUpdatedState(shownKey)
-    // The outgoing card of a swipe stays on screen and leaves with the incoming one, as one strip. It is not composed a
-    // second time: while a swipe is under way the card is drawn through a recorded graphics layer, and when the new card arrives
-    // the layer that holds the old card's last frame is parked and drawn by the ghost node below. Two layers alternate, so the
-    // frame before the switch is never overwritten.
+    // The outgoing card of a swipe stays on screen and leaves with the incoming one, as one strip.
     val layerA = rememberGraphicsLayer()
     val layerB = rememberGraphicsLayer()
-    // Plain holders, read and written in draw / layout: [0] = layer drawn last (-1 = the last frame was not recorded), [1] = layer parked with the outgoing card (-1 =
-    // none), [2] and [3] = width and height (px) of the card as last drawn.
+    // Plain holders, read and written in draw / layout: [0] = layer drawn last (-1 = the last frame was not
+    // recorded), [1] = layer parked with the outgoing card (-1 = none), [2] and [3] = width and height (px) of the
+    // card as last drawn.
     val rec = remember { intArrayOf(-1, -1, 0, 0) }
     // The card the pager drew last (layout phase): the pager can show the new card before [shownKey] changes, so parking goes by this.
     val drawnKey = remember { arrayOfNulls<String>(1) }
-    // The key of the card each of the two recorded layers holds, so only a layer that holds the swiped card is ever parked (model/SwipeGhost.kt).
+    // The key of the card each of the two recorded layers holds, so only a layer that holds the swiped card is ever
+    // parked (model/SwipeGhost.kt).
     val recKey = remember { arrayOfNulls<String>(2) }
     var ghostOn by remember { mutableStateOf(false) }
     // The new card is composed one frame before its swap is set up; the ghost covers that frame.
-    // State only: whether the pager has already drawn the new card is decided at draw time (drawnKey is a plain value written in layout),
-    // where the ghost draws the parked old card only once the switch was detected (rec[1] >= 0).
     val waitingNow = ui.pendingCardEnterSign != 0 && ui.pendingCardFromKey != null
     LaunchedEffect(shownKey) {
         val sign = ui.pendingCardEnterSign
@@ -120,9 +110,7 @@ internal fun ExpandedCardHost(
             rec[1] = -1
             return@LaunchedEffect
         }
-        // The island leans with the finger and the card stays inside it (see islandPillSurface). On the lift the island springs
-        // back to the middle while the old card (the parked layer) leaves in the swipe's direction and the new card comes in from the
-        // opposite side, all on ONE spring (cardPop 0 -> 1), no fade. The two cards are one card apart the whole time, so no gap opens.
+        // The island leans with the finger and the card stays inside it.
         val leanFrom = ui.cardDragX
         val useGhost = rec[1] >= 0 && rec[2] > 0
         if (!useGhost) rec[1] = -1
@@ -138,31 +126,27 @@ internal fun ExpandedCardHost(
             ui.pendingCardFromKey = null
             ui.cardPop.animateTo(1f, swipeEaseBackSpring())
         } finally {
-            // Also when the effect is cancelled half way (a second swipe, the card re-keyed, the host leaving): nothing of this swap may be
-            // left behind for the next one (a card stuck off to the side, a lean that never ends, a parked layer).
-            // (A second swipe that already lifted has set the snap flag for ITS swap: that one is not ours to clear.)
+            // Also when the effect is cancelled half way (a second swipe, the card re-keyed, the host leaving):
+            // nothing of this swap may be left behind for the next one (a card stuck off to the side, a lean that
+            // never ends, a parked layer).
             if (ui.pendingCardEnterSign == 0) ui.cardSwipeSnap = false
             ghostOn = false
             rec[1] = -1
             kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) { ui.cleanSwapState() }
         }
     }
-    // Expanded content layer; it fades out while collapsing.
-    // For the modes in CardPrewarm the card is also composed and measured while the island is
-    // collapsed (PrewarmedCard places it only while it is shown), so the tap does not have to compose it and the
-    // height the spring chases is already the real one. `cardLive` is the old condition for "the card is on screen".
+    // For the modes in CardPrewarm the card is also composed and measured while the island is collapsed
+    // (PrewarmedCard places it only while it is shown), so the tap does not have to compose it and the height the
+    // spring chases is already the real one.
     val cardLive = expanded || layout.expandedShown
     val sideBarsFadePx = LocalDensity.current.density * SIDE_BARS_FADE_DP
-    // Card heights outlive the card's composition (it is rebuilt after every close), so what was measured while collapsed or on
-    // an earlier visit is still there on the next open and swipe. A different card width (rotation) makes them wrong: start over.
+    // Card heights outlive the card's composition (it is rebuilt after every close), so what was measured while
+    // collapsed or on an earlier visit is still there on the next open and swipe.
     val heightCache = remember(layout.expandedWidth) { com.agupta07505.smartisland.ui.expanded.CardHeightCache() }
-    // The card fades out while the island closes. If the list changes in that time (tapping a notification opens its app, which
-    // removes the card), the fading card must not turn into the next one: it would flash open for a moment. So while the close
-    // runs, the list and page of the last frame the island was open are kept. Plain holder: [0] = list, [1] = page.
+    // The card fades out while the island closes.
     val openSnapshot = remember { arrayOfNulls<Any>(2) }
-    // Only a list that has a card in it is kept: when the card goes (its app came to the front and hides it, it was cleared) the list
-    // can be empty for a frame or two while the island is still open. Keeping that list would leave nothing to fade out, so the island
-    // would close as an empty gray card of the old size. The last list that had a card stays, and the close fades that card instead.
+    // Only a list that has a card in it is kept: when the card goes (its app came to the front and hides it, it was
+    // cleared) the list can be empty for a frame or two while the island is still open.
     if (expanded && notifications.isNotEmpty()) {
         openSnapshot[0] = notifications
         openSnapshot[1] = selectedIndex
@@ -181,8 +165,8 @@ internal fun ExpandedCardHost(
     }
     val cardLiveNow by rememberUpdatedState(cardLive)
     // Collapsed again (card faded out) or a different card became the active one while collapsed: start the waiting
-    // card from scratch, so a reply box, a long message or an open picture of the last visit is forgotten,
-    // and the new card is measured at its own page.
+    // card from scratch, so a reply box, a long message or an open picture of the last visit is forgotten, and the
+    // new card is measured at its own page.
     var cardEpoch by remember { mutableIntStateOf(0) }
     // Plain holders (not state): [0] = the card was on screen since the last restart, [1] = key it was composed for.
     val liveSeen = remember { BooleanArray(1) }
@@ -198,8 +182,9 @@ internal fun ExpandedCardHost(
         }
         composedKey[0] = key
     }
-    // The media card is not composed while collapsed (see CardPrewarm), but what it needs from the session (artwork, colour, the
-    // blurred background) is loaded here in the background, so the tap finds it ready and the pill does not stall on it.
+    // The media card is not composed while collapsed, but what it needs from the session (artwork, colour, the
+    // blurred background) is loaded here in the background, so the tap finds it ready and the pill does not stall on
+    // it.
     val warmContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
     val warmMedia = activeNotification?.takeIf { it.mode == com.agupta07505.smartisland.model.IslandMode.Music && it.mediaToken != null }
     val warmMediaSettings = remember(settings) { settings.forMedia() }
@@ -220,11 +205,11 @@ internal fun ExpandedCardHost(
             modifier = Modifier
                 // The card is laid out at its final width the whole time and the growing shell clips it, so the text
                 // does not re-wrap and the measured heights, which the height spring chases, hold still during the
-                // growth. At rest the width is the same.
+                // growth.
                 .requiredWidth(layout.expandedWidth)
-                // Laid out at its natural height whatever the shell's animated height is (the shell clips it), like the width above:
-                // the shell's height spring then only re-runs the shell's layout and draw, not the card's measure. Top-aligned, so a
-                // shell that is briefly shorter only cuts the card's bottom.
+                // Laid out at its natural height whatever the shell's animated height is (the shell clips it), like
+                // the width above: the shell's height spring then only re-runs the shell's layout and draw, not the
+                // card's measure.
                 .wrapContentHeight(align = androidx.compose.ui.Alignment.Top, unbounded = true)
                 .graphicsLayer {
                     scaleX = layout.contentScale
@@ -244,8 +229,9 @@ internal fun ExpandedCardHost(
                     // Records the card only while a swipe can need its last frame (a drag, or a swipe waiting for its card).
                     val switched = ui.pendingCardEnterSign != 0 && ui.pendingCardFromKey != null &&
                         (ui.pendingCardFromKey != shownKeyNow || (drawnKey[0] != null && drawnKey[0] != ui.pendingCardFromKey))
-                    // Only until the switch has been parked (a drag, or a swipe waiting for its card). Once the outgoing layer is parked the new card
-                    // slides in drawn directly, not recorded into the other layer.
+                    // Only until the switch has been parked (a drag, or a swipe waiting for its card). Once the
+                    // outgoing layer is parked the new card slides in drawn directly, not recorded into the other
+                    // layer.
                     val recording = ui.cardDragX != 0f || ui.pendingCardEnterSign != 0
                     if (!recording) {
                         // Nothing recorded this frame: a layer left from an earlier swipe must not be parked later.
@@ -263,8 +249,9 @@ internal fun ExpandedCardHost(
                         val target = if (idx == 0) layerA else layerB
                         target.record { this@drawWithContent.drawContent() }
                         recKey[idx] = drawnKey[0] ?: shownKeyNow
-                        // The pager can draw the new card before shownKey changes: until the swap is set up (the effect clears the pending
-                        // sign) the new card is recorded but not drawn, and the parked old card stands in for it (the ghost below).
+                        // The pager can draw the new card before shownKey changes: until the swap is set up (the
+                        // effect clears the pending sign) the new card is recorded but not drawn, and the parked old
+                        // card stands in for it (the ghost below).
                         val pendingFrom = ui.pendingCardFromKey
                         val holdBack = ui.pendingCardEnterSign != 0 && pendingFrom != null &&
                             (pendingFrom != shownKeyNow || (drawnKey[0] != null && drawnKey[0] != pendingFrom))
@@ -355,8 +342,6 @@ internal fun ExpandedCardHost(
     }
 }
 
-/** Sideways drag (dp) at which the side bars are fully faded out. */
 private const val SIDE_BARS_FADE_DP = 14f
 
-/** Swap progress at which the side bars start fading back in. */
 private const val SIDE_BARS_BACK_FROM = 0.85f

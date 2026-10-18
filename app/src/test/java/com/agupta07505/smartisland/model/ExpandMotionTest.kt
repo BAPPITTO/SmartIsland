@@ -23,7 +23,7 @@ class ExpandMotionTest {
         val delay = ExpandMotion.cardInDelayMs(lk, lz)
         val end = delay + ExpandMotion.cardInMs(lk, lz)
         assertTrue("delay was $delay ms", delay in 20..45)
-        // The shell is 90 % grown at about 193 ms; the old fade ended at 350 ms.
+        // The shell is 90 % grown at about 193 ms.
         assertTrue("end was $end ms", end in 170..215)
         assertTrue(end < 350)
     }

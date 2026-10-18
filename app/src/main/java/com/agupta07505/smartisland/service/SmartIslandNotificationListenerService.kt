@@ -68,7 +68,7 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class SmartIslandNotificationListenerService : NotificationListenerService() {
-    // Keys we have canceled ourselves to make island-only. Keeps island copy alive.
+    // Keys the listener cancelled itself to make them island-only; their island copy stays alive.
     private val suppressedKeys = ConcurrentHashMap<String, Long>()
     @Volatile private var currentSettings = SmartIslandSettings.Default
     private val coroutineExceptionHandler = CoroutineExceptionHandler { _, error ->
@@ -87,7 +87,6 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
     @Volatile private var lastSoundPlayedTimeMs = 0L
     @Volatile private var lastAutoExpandTimeMs = 0L
 
-    /** Presses a custom-view button when the island fires the PendingIntent made for it. */
     private val viewButtonReceiver = object : android.content.BroadcastReceiver() {
         override fun onReceive(context: android.content.Context, intent: android.content.Intent) {
             com.agupta07505.smartisland.util.NotificationViewInspector.click(intent.data)
@@ -111,8 +110,8 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
                 var wasEnabled: Boolean? = null
                 repository.settings.collect { settings ->
                     currentSettings = settings
-                    // The island was switched on while the listener is already connected (the first start: the listener connects as
-                    // soon as the access is granted, long before the island is enabled): import the shade now.
+                    // The island was switched on while the listener is already connected (it connects as soon as access is granted,
+                    // long before the island is enabled): import the shade now.
                     if (settings.enabled && wasEnabled == false && isSystemConnected) {
                         serviceScope.launch {
                             runSuspendCatchingLogged(TAG, "Shade sync after enabling failed") {
@@ -211,10 +210,6 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
         }
     }
 
-    /**
-     * Follows the media sessions so a track change shows in the island at once instead of when the app
-     * re-posts its notification (1 to 3 s later). It only updates a Music card that already exists.
-     */
     private var mediaWatcher: com.agupta07505.smartisland.util.MediaSessionWatcher? = null
 
     private fun startMediaWatcher() {
@@ -238,14 +233,8 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
     }
 
     private var voipMonitor: com.agupta07505.smartisland.util.VoipCallMonitor? = null
-    /** Call cards the VoIP detector promoted; removed when the call audio ends. */
     private val voipPromotedKeys = ConcurrentHashMap.newKeySet<String>()
 
-    /**
-     * Newest post / removal per key, in callback order. A call card is only posted from a snapshot that is
-     * still the newest one, so a late "ringing" handler cannot overwrite the ongoing call and a slow VoIP
-     * reconcile cannot bring a finished call's card back.
-     */
     private val callPostGuard = com.agupta07505.smartisland.util.StalePostGuard()
 
     private fun startVoipMonitor() {
@@ -257,11 +246,6 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
         ).also { it.start() }
     }
 
-    /**
-     * Brings the island in line with the VoIP audio state: promotes the app's call notification
-     * (its own mute / speaker / hang-up buttons) to a call card, falls back to a button-less
-     * "call in progress" card when no notification qualifies, and clears both when the call ends.
-     */
     private fun reconcileVoipCall() {
         serviceScope.launch {
             runSuspendCatchingLogged(TAG, "VoIP reconcile failed") {
@@ -350,30 +334,19 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
         voipPromotedKeys.clear()
     }
 
-    /** Elapsed-time clock per recorder notification key (see [RecordingClock]). */
     private val recordingStates = ConcurrentHashMap<String, RecordingClock.State>()
 
-    /**
-     * Last clock per app and card type, running or frozen. Some clock apps cancel the stopwatch notification and
-     * post a new paused one (on Pause, and again when their screen is left), so the per-key state is gone; this
-     * keeps the time the stopwatch had. A frozen entry stays frozen however long the app is open.
-     */
     private val lastClocks = ConcurrentHashMap<String, RecordingClock.State>()
 
-    /** Last end time of a running timer per app. */
     private val lastTimerTargets = ConcurrentHashMap<String, Long>()
 
-    /** Remaining time frozen at a timer's pause per app. */
     private val lastTimerFrozen = ConcurrentHashMap<String, Long>()
 
-    /** Time printed at the last paused post per app. */
     private val lastTimerShown = ConcurrentHashMap<String, Long>()
     private var recordingWatchdog: Job? = null
     private var transferExpiryJob: Job? = null
-    /** Cards a reply was just sent from: an app removal inside this window keeps the card (the echo re-posts the key). */
     private val replyGraceUntil = ConcurrentHashMap<String, Long>()
 
-    /** Drops download / upload cards the app stopped updating (see [com.agupta07505.smartisland.util.TransferExpiry]). */
     private fun startTransferExpirySweep() {
         if (transferExpiryJob?.isActive == true) return
         transferExpiryJob = serviceScope.launch {
@@ -393,11 +366,6 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
         }
     }
 
-    /**
-     * Drops recorder cards whose notification is gone or already says "saved". The recorder's
-     * removal callback can be missed (it may be posted under another key, or swallowed by the
-     * shade-suppression window), and a lingering card keeps a timer running after saving.
-     */
     private fun startRecordingWatchdog() {
         if (recordingWatchdog?.isActive == true) return
         recordingWatchdog = serviceScope.launch {
@@ -465,11 +433,6 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
 
     private val pendingRemovals = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.Job>()
 
-    /**
-     * Notification key -> postTime of the post the island already showed as a card. A card that has left the island (a finished
-     * download expires after a moment, the user dismissed it, it timed out) while the system copy stays in the shade must not come
-     * back through the quiet shade imports every time the island opens; only a new post of the same notification (new postTime) may.
-     */
     private val shownPostTimes = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
     private fun noteShown(sbn: StatusBarNotification) {
@@ -480,11 +443,9 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
     private fun alreadyShown(sbn: StatusBarNotification): Boolean = shownPostTimes[sbn.key] == sbn.postTime
     private val pendingSuppressionJobs = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.Job>()
 
-    // ── Notification count (idle widget) ─────────────────────────────────────────────────────
     private var countRefreshJob: Job? = null
     private val appLabels = ConcurrentHashMap<String, String>()
 
-    /** Rebuilds the count widget's list (the shade plus the island's cards) a moment after the last change, so a burst of posts costs one read. */
     private fun scheduleCountRefresh() {
         countRefreshJob?.cancel()
         countRefreshJob = serviceScope.launch {
@@ -546,19 +507,7 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
         callPostGuard.notePosted(sbn.key, sbn.postTime)
         tracePost(sbn, rankingMap)
 
-        // ── Group summary handling ────────────────────────────────────────────────────────────
-        // Apps like WhatsApp post two kinds of notifications per conversation:
-        //   1. Child notifications  (individual messages) — these are cancelled via the block below
-        //   2. A group SUMMARY notification (FLAG_GROUP_SUMMARY) — this is what causes WhatsApp to
-        //      still appear in the system shade even after all children have been cancelled.
-        //
-        // `shouldSuppressFromIsland` correctly returns true for group summaries (so they're never
-        // added to the island), but that also prevents the cancellation block below from running,
-        // leaving the summary untouched in the system shade.
-        //
-        // Fix: intercept group summaries for third-party apps and cancel them from the system shade
-        // immediately, BEFORE falling through to the normal island-or-ignore logic.
-        // A call (WhatsApp's CallStyle post carries this flag too) is not a summary: let it through.
+        // Apps like WhatsApp post two kinds of notifications per conversation.
         val isGroupSummary = (notification.flags and android.app.Notification.FLAG_GROUP_SUMMARY) != 0 &&
             !com.agupta07505.smartisland.util.NotificationFilter.isCallNotification(notification)
         if (isGroupSummary) {
@@ -571,19 +520,15 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
                 )
             ) {
                 android.util.Log.d(TAG, "Cancelling group summary from system shade: ${sbn.key} pkg=${sbn.packageName}")
-                suppressSystemNotification(sbn.key) // adds to suppressedKeys + cancels with retry
+                suppressSystemNotification(sbn.key)
             }
-            // Group summaries are never added to the island — stop processing here.
             traceStage(sbn, "DROPPED", "stage=group-summary shadeCancel=${currentSettings.hideFromNotificationShade}")
             pendingRemovals.remove(sbn.key)?.cancel()
             return@runCatchingLogged
         }
 
-        // ── Regular notification: suppress from system shade if it belongs in the island ──────
-        // We do this synchronously — before the coroutine is even scheduled — so the notification
-        // never appears in the system shade. cancelNotification() is used exclusively;
-        // snoozeNotification() is deliberately avoided because it moves to a "snoozed" shade
-        // section instead of removing the notification entirely.
+        // Suppress from the shade synchronously, before the coroutine is scheduled, so the notification never appears
+        // there.
         try {
             if (currentSettings.enabled &&
                 currentSettings.hideFromNotificationShade &&
@@ -606,7 +551,6 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
             android.util.Log.w(TAG, "Immediate suppress exception", e)
         }
 
-        // Cancel any pending removal job for this key to keep island copy
         pendingRemovals.remove(sbn.key)?.cancel()
 
         // SystemUI ends a screen recording by re-posting the SAME key as the "saved" notification
@@ -636,9 +580,8 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
     }
 
     /**
-     * Use the reason-aware overload so we can distinguish between:
-     *  - REASON_LISTENER_CANCEL: we suppressed it ourselves → keep island copy, keep suppressedKeys
-     *  - Any other reason (user dismissed, app canceled, etc.) → remove from island and suppressedKeys
+     * Reason-aware overload: REASON_LISTENER_CANCEL (our own suppression) keeps the island copy and suppressedKeys;
+     * any other reason removes the card and the key.
      */
     override fun onNotificationRemoved(sbn: StatusBarNotification, rankingMap: RankingMap?, reason: Int) {
         runCatchingLogged(TAG, "onNotificationRemoved callback failed") {
@@ -665,13 +608,11 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
                 val isRecentInitialSuppression = (now - lastSuppressedTime) < INITIAL_SUPPRESSION_WINDOW_MS
 
                 if (reason == REASON_LISTENER_CANCEL && isRecentInitialSuppression) {
-                    // Smart Island just suppressed this notification from system shade < 1.5s ago.
-                    // Keep the island copy alive during initial suppression.
+                    // Suppressed from the shade less than 1.5 s ago: keep the island copy during the initial suppression.
                     android.util.Log.d(TAG, "Recent listener-cancel (<1.5s), keeping island: ${sbn.key}")
                     return@runSuspendCatchingLogged
                 }
 
-                // Removed by posting app, user, framework timeout, or after initial suppression window.
                 android.util.Log.d(TAG, "Genuinely removed, cleaning up: ${sbn.key}")
                 traceStage(sbn, "ISLAND-REMOVED", "reason=$reason(${removalReasonName(reason)})")
                 com.agupta07505.smartisland.util.NotificationTrace.forget(sbn.key)
@@ -687,11 +628,6 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
         }
     }
 
-    /**
-     * The recorder's notification keeps its key when the recording stops: the ongoing "recording" post is replaced by a
-     * "saved" post (not ongoing, no longer a recording), and no removal is reported. Without this the old recording card
-     * (and its chip) stayed on the island. Runs on every post, before the filters, so a filtered "saved" post still ends it.
-     */
     private fun endSupersededRecordingCard(sbn: StatusBarNotification) {
         val held = notificationRepository.notifications.value
             .firstOrNull { it.key == sbn.key && it.mode == IslandMode.ScreenRecording } ?: return
@@ -782,13 +718,6 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
         }
     }
 
-    /**
-     * Brings what already sits in the shade into the island: persistent live cards and loud notifications, quietly (no popup,
-     * no auto-expand). It runs when the listener connects, and again when the island is switched on or the overlay starts
-     * afterwards ([onlyMissing] = true then: cards the island already holds are left alone). Before, it ran only at connect, so
-     * a first start with the island still off, or an overlay that came up after the listener, left the island empty until the
-     * next new event.
-     */
     private suspend fun initialShadeSync(trigger: String, onlyMissing: Boolean) {
         val settings = repository.settings.first()
         currentSettings = settings
@@ -835,15 +764,14 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
         }
         sweepStaleShadeCards()
         // The very first pass can run before the media sessions and their cards are ready (a process the system just
-        // started): whatever persistent card (media, timer, call ...) is in the shade but still missing from the island is
-        // imported again a little later, so the island does not stay empty until the next event.
+        // started): whatever persistent card (media, timer, call ...) is in the shade but still missing from the
+        // island is imported again a little later, so the island does not stay empty until the next event.
         for (waitMs in INITIAL_RESYNC_DELAYS_MS) {
             delay(waitMs)
             resyncMissingPersistentCards()
         }
     }
 
-    /** Imports shade notifications (persistent modes and loud notifications) that the island does not hold yet (quiet, like the first import). */
     private fun resyncMissingPersistentCards() {
         val settings = currentSettings
         if (!settings.enabled) return
@@ -855,8 +783,7 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
             .filterNot { shouldSuppressFromIsland(it) }
             .filter { sbn ->
                 val mode = sbn.notification.toIslandMode(sbn, settings.liveActivitiesEnabled, settings.navigationEnabled, settings.deviceType)
-                // The same rule as the first pass: persistent live cards and loud notifications. The first pass can see an empty or
-                // half-ready shade right after the connect, and loud notifications would be missed for good.
+                // The same rule as the first pass: persistent live cards and loud notifications.
                 isPersistentIslandMode(mode) || (mode == IslandMode.Notification && !isSilentNotification(sbn))
             }
             .sortedBy { it.postTime }
@@ -868,11 +795,6 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
         missing.forEach { handleNotificationPosted(it, settings, isInitialSync = true) }
     }
 
-    /**
-     * After a (re)connect the shade is the truth for the modes that live in it (timer, stopwatch, recorders, navigation,
-     * music): a card of those modes whose notification ended while the listener was unbound never got its removal
-     * callback and would stay forever (see [com.agupta07505.smartisland.util.StaleCardSweep]).
-     */
     private fun sweepStaleShadeCards() {
         val activeKeys = runCatchingLogged(TAG, "Stale card sweep could not read the shade") {
             activeNotifications?.mapTo(HashSet()) { it.key }
@@ -982,7 +904,6 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
 
     private var lastLoggedSettingsSignature: String? = null
 
-    /** Logs the settings that decide whether a notification reaches the island, whenever one of them changes. */
     private fun logRelevantSettings(s: SmartIslandSettings) {
         if (!com.agupta07505.smartisland.util.AppLogRecorder.isRecording) return
         val signature = "enabled=${s.enabled} hideFromShade=${s.hideFromNotificationShade}" +
@@ -1002,11 +923,6 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
         if (rMap.getRanking(sbn.key, ranking)) ranking.importance else null
     }.getOrNull()
 
-    /**
-     * Diagnostic trace, step 1: every post the listener receives, with the filter rule that would
-     * drop it (or "passed") and the settings that matter. Messengers and call-like posts are always
-     * logged; other posts are rate limited so a progress bar cannot fill the buffer.
-     */
     private fun tracePost(sbn: StatusBarNotification, rankingMap: RankingMap?) {
         if (!com.agupta07505.smartisland.util.AppLogRecorder.isRecording) return
         runCatching {
@@ -1033,7 +949,6 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
         }
     }
 
-    /** Diagnostic trace for later pipeline stages (dropped, throttled, posted, removed). */
     private fun traceStage(sbn: StatusBarNotification, stage: String, detail: String = "") {
         if (!com.agupta07505.smartisland.util.AppLogRecorder.isRecording) return
         runCatching {
@@ -1071,7 +986,6 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
         )
         android.util.Log.d(TAG, "handleNotificationPosted: mode=$mode key=${sbn.key} title=${extras.getCharSequence(Notification.EXTRA_TITLE)}")
 
-        // Check intelligent anti-spam notification cooldown
         // Quiet imports of what is already in the shade are not new alerts, so they neither count
         // towards the spam threshold nor get buffered.
         val cooldownText = "${extras.getCharSequence(Notification.EXTRA_TITLE)} ${extras.getCharSequence(Notification.EXTRA_TEXT)}".lowercase()
@@ -1093,10 +1007,8 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
             shouldIslandOnly &&
             shouldHideFromShade(notification, mode, sbn.packageName)
         if (removedFromShade) {
-            // Ensure the notification is removed from the system shade.
-            // - If posted via onNotificationPosted, the synchronous cancel already ran; this
-            //   triggers the async retry loop inside suppressSystemNotification for reliability.
-            // - If arriving via onListenerConnected, this is the first (and only) suppress call.
+            // Ensure the shade copy is gone: after onNotificationPosted the sync cancel already ran and this starts the async retry loop;
+            // from onListenerConnected it is the only suppress call.
             suppressSystemNotification(sbn.key)
         }
 
@@ -1223,8 +1135,7 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
         }
         val isNowConnecting = connectingText != null
 
-        // Recorder and stopwatch cards: keep a pause-aware clock instead of trusting
-        // `Notification.when`, so a paused card keeps its frozen time.
+        // Recorder and stopwatch cards keep a pause-aware clock instead of trusting `Notification.when`.
         val isRecorder = mode == IslandMode.ScreenRecording || mode == IslandMode.AudioRecording
         val isStopwatch = mode == IslandMode.Stopwatch
         val recordingState = if (isRecorder || isStopwatch) {
@@ -1512,7 +1423,7 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
                 } else {
                     val remSec = com.agupta07505.smartisland.util.TimerStopwatchParser.parseTimerRemainingSeconds(notification)
                     // A stock / third-party clock's own deadline is exact to the millisecond; rounding it to seconds
-                    // first (as before) made the island run up to half a second off the shade.
+                    // would put the island up to half a second off the shade.
                     val exactDeadline = if (isShadeFixCard) {
                         com.agupta07505.smartisland.util.TimerStopwatchParser.parseTimerDeadlineExact(notification)
                     } else {
@@ -1554,8 +1465,8 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
             else -> sbn.postTime
         }
 
-        // A media card's title and artist come from the live session when it has them: a re-post that was built from the
-        // previous track must not put the old title back over the one the session reported a moment ago.
+        // A media card's title and artist come from the live session when it has them: a re-post that was built from
+        // the previous track must not put the old title back over the one the session reported a moment ago.
         val notifTitle = mediaInfo?.title?.takeIf { it.isNotBlank() }
             ?: extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
             ?: extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString()
@@ -1621,8 +1532,9 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
                     " replacedOldCards=$replaced"
             )
         }
-        // The system delivering the very same post again (a group update, a re-delivery after the card had left the island)
-        // is not a new alert: the card may come back quietly, but it must not open the island by itself a second time.
+        // The system delivering the very same post again (a group update, a re-delivery after the card had left the
+        // island) is not a new alert: the card may come back quietly, but it must not open the island by itself a
+        // second time.
         val repostOfShownPost = !isInitialSync && alreadyShown(sbn)
         if (repostOfShownPost) {
             traceStage(sbn, "NO-AUTO-EXPAND", "stage=repost-of-shown-post mode=$mode postTime=${sbn.postTime} (already shown once, no second auto-expand)")
@@ -1763,10 +1675,8 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
             }
         }
 
-        // The island only makes a sound when it replaces the system notification. While the
-        // shade copy stays, the system plays its own sound and a second one would double it.
-        // A recorder posts a notification when it starts and another ("saved", "stopped") when it ends;
-        // neither gets a sound, otherwise stopping a recording rings twice.
+        // The island only makes a sound when it replaces the system notification. While the shade copy stays, the
+        // system plays its own sound and a second one would double it.
         val isRecordingEvent = mode == IslandMode.ScreenRecording || mode == IslandMode.AudioRecording ||
             isRecordingNotification(sbn, notification)
         if (!isInitialSync && removedFromShade && isNewNotif && (mode == IslandMode.Notification || shouldIslandOnly) &&
@@ -1776,8 +1686,6 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
         }
 
         // Every ordinary notification keeps its own card, keyed by the system notification key.
-        // (Dropping an app's earlier cards here would lose notifications that are
-        // still in the shade and leave the same-app secondary cutout with nothing to show.)
 
         if (mode == IslandMode.Music) {
             val existing = notificationRepository.notifications.value
@@ -1873,7 +1781,6 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
         return dndHidesNotificationList()
     }
 
-    /** True when the active DND policy hides notifications from the shade; unreadable counts as "shown". */
     private fun dndHidesNotificationList(): Boolean {
         // The "hide from the shade" effect only exists from Android 9 (API 28); before that DND
         // never removes notifications from the shade, so nothing is hidden.
@@ -1896,7 +1803,6 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
                 (getSystemService(android.content.Context.NOTIFICATION_SERVICE) as? NotificationManager)?.currentInterruptionFilter
             } ?: INTERRUPTION_FILTER_ALL
 
-        // If filter is ALL or UNKNOWN, Do Not Disturb is OFF
         if (filter == INTERRUPTION_FILTER_ALL || filter == INTERRUPTION_FILTER_UNKNOWN) {
             return false
         }
@@ -1919,7 +1825,6 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
         if (rMap != null) {
             val ranking = Ranking()
             if (rMap.getRanking(sbn.key, ranking)) {
-                // matchesInterruptionFilter() returns true if allowed by DND policy, false if blocked
                 return !ranking.matchesInterruptionFilter()
             }
         }
@@ -1939,8 +1844,8 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
     }
 
     /**
-     * True when the system lists the notification as "Silent": no sound, no heads-up
-     * (importance below DEFAULT). Unknown ranking counts as not silent.
+     * True when the system lists the notification as "Silent": no sound, no heads-up (importance below DEFAULT).
+     * Unknown ranking counts as not silent.
      */
     internal fun isSilentNotification(sbn: StatusBarNotification, rankingMap: RankingMap? = null): Boolean {
         val rMap = rankingMap ?: runCatchingLogged(TAG, "Failed to get current ranking") { currentRanking }
@@ -1952,11 +1857,6 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
             importance < NotificationManager.IMPORTANCE_DEFAULT
     }
 
-    /**
-     * Swipe-to-switch-event support: brings loud (non-silent) standard notifications that are in the
-     * system shade but not yet in the island into the island. They are added quietly, with no popup,
-     * sound or auto-expand, and silent / ongoing / group-summary / filtered notifications are left alone.
-     */
     private fun importShadeNotifications() {
         val settings = currentSettings
         if (!settings.enabled) return
@@ -1982,11 +1882,6 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
             .forEach { handleNotificationPosted(it, settings, isInitialSync = true) }
     }
 
-    /**
-     * Same-app secondary cutout: when the island expands on a card from [pkg], the app's other
-     * cards that sit in the shade but not in the island (a finished download expires from the
-     * island after a moment, the shade keeps it) are added quietly, with no popup or auto-expand.
-     */
     private fun importSameAppNotifications(pkg: String) {
         val settings = currentSettings
         if (!settings.enabled || pkg == packageName) return
@@ -2019,10 +1914,7 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
         filterOverride: Int? = null
     ): Boolean = suppressionReasonFor(sbn, rankingMap, filterOverride) != null
 
-    /**
-     * The rule that keeps [sbn] off the island, or null when it may be shown. [shouldSuppressFromIsland]
-     * is defined by this; the diagnostic log prints the name.
-     */
+    /** The rule that keeps [sbn] off the island, or null when it may be shown; the diagnostic log prints its name. */
     internal fun suppressionReasonFor(
         sbn: StatusBarNotification,
         rankingMap: RankingMap? = null,
@@ -2033,9 +1925,8 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
             return "do-not-disturb"
         }
         val pm = runCatching { packageManager }.getOrNull() ?: return null
-        // An event switched off in every displayable profile must stay in the normal shade:
-        // neither shown in the island nor cancelled. (A switch that is off in only one
-        // orientation is handled by the ViewModel, and shouldHideFromShade keeps the system copy.)
+        // An event switched off in every displayable profile must stay in the normal shade: neither shown in the
+        // island nor cancelled.
         val disabled = currentSettings.disabledEvents
         if (disabled.isNotEmpty()) {
             val mode = sbn.notification.toIslandMode(
@@ -2059,7 +1950,6 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
         )
     }
 
-    /** The switchable event a posted notification belongs to (uploads and downloads differ). */
     private fun listenerEventFor(notification: Notification, mode: IslandMode, packageName: String): com.agupta07505.smartisland.model.IslandEvent? =
         com.agupta07505.smartisland.model.IslandEvent.forListenerMode(
             mode,
@@ -2070,10 +1960,6 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
             }
         )
 
-    /**
-     * Island-only notifications are pulled out of the shade, except when the user switched that
-     * event off in some orientation: then the system copy stays so it never disappears entirely.
-     */
     private fun shouldHideFromShade(notification: Notification, mode: IslandMode, packageName: String): Boolean {
         if (!shouldBeIslandOnly(notification, mode)) return false
         val event = listenerEventFor(notification, mode, packageName) ?: return true
@@ -2082,28 +1968,16 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
 
     internal fun shouldBeIslandOnly(notification: Notification, mode: IslandMode): Boolean {
         if (mode == IslandMode.IncomingCall) {
-            if (!isIncomingCall(notification)) return false // ongoing call stays in system
+            if (!isIncomingCall(notification)) return false
         }
         if (mode == IslandMode.Music || mode == IslandMode.Navigation || mode == IslandMode.Timer || mode == IslandMode.Stopwatch ||
             mode == IslandMode.ScreenRecording || mode == IslandMode.AudioRecording
         ) {
             return false // Media, Navigation, Timer, Stopwatch and recorder notifications must NOT be cancelled from system shade (their buttons live there)
         }
-        // All others: island-only
         return true
     }
 
-    /**
-     * Suppress a notification from the system shade so it only appears in the island.
-     *
-     * Uses ONLY cancelNotification() — snoozeNotification() is deliberately avoided
-     * because it moves the notification to a "snoozed" section in the system shade
-     * rather than removing it, which causes notifications to appear in both the
-     * system shade AND the island.
-     *
-     * Retries up to 3 times with increasing delays for reliability on devices where
-     * the first cancel attempt may not take effect immediately.
-     */
     private fun suppressSystemNotification(key: String) {
         if (!currentSettings.enabled || !currentSettings.hideFromNotificationShade) return
         val activeSbn = runCatchingLogged(TAG, "Failed to get active notifications for key lookup") {
@@ -2117,15 +1991,12 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
 
         markSuppressed(key)
 
-        // Cancel any pending suppression retry job for this key
         pendingSuppressionJobs.remove(key)?.cancel()
 
-        // Synchronous attempt for fastest possible suppression (if not throttled)
         if (!isRecentlySuppressed) {
             runCatchingLogged(TAG, "sync cancel failed") { cancelNotification(key) }
         }
 
-        // Asynchronous retry with delays for reliability
         val job = mainScope.launch {
             runSuspendCatchingLogged(TAG, "Notification suppression retries failed") {
                 repeat(3) { attempt ->
@@ -2155,14 +2026,8 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
         pendingSuppressionJobs[key] = job
     }
 
-    /** Late-picture jobs, one per card key (a newer post of the same key replaces the job). */
     private val latePictureJobs = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.Job>()
 
-    /**
-     * The card is already on the island without its picture. Ask for the picture again, this time with Shizuku's fallbacks, on
-     * [com.agupta07505.smartisland.util.PictureRetryPlan.DELAYS_MS], and patch the card when one turns up. Stops when the card is
-     * gone, when a newer post / a removal / a dismissal of the key was seen, or when the schedule is used up.
-     */
     private fun scheduleLatePicture(sbn: StatusBarNotification, notification: Notification, notifText: String) {
         val key = sbn.key
         latePictureJobs.remove(key)?.cancel()
@@ -2200,7 +2065,6 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
         notificationRepository.removeNotification(key)
     }
 
-    /** True for a screen / audio recorder's own notification, running or already finished. */
     private fun isRecordingNotification(sbn: StatusBarNotification, notification: Notification): Boolean {
         val extras = notification.extras
         val text = "${extras?.getCharSequence(Notification.EXTRA_TITLE)} ${extras?.getCharSequence(Notification.EXTRA_TEXT)} " +
@@ -2210,7 +2074,6 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
             com.agupta07505.smartisland.util.OemDeviceRules.isAudioRecording(sbn.packageName, text)
     }
 
-    /** Recorder cards go the moment the recorder's notification goes; everything else waits a beat. */
     private fun removalDelayMs(key: String): Long {
         val card = notificationRepository.notifications.value.firstOrNull { it.key == key }
         return if (card?.mode == IslandMode.ScreenRecording || card?.mode == IslandMode.AudioRecording) 0L else 350L
@@ -2231,7 +2094,7 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
             var soundUri: Uri? = null
             var audioAttributes: AudioAttributes? = null
 
-            // 1. Check Notification Channel (Android 8.0+, API 26+)
+            // Notification channel (API 26+).
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val ranking = Ranking()
                 val hasRanking = currentRanking?.getRanking(sbn.key, ranking) == true
@@ -2244,7 +2107,6 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
                     }
                     val chSound = channel.sound
                     if (chSound == null || chSound == Uri.EMPTY || chSound.toString().isEmpty()) {
-                        // Channel is explicitly configured without sound (Silent)
                         return
                     }
                     soundUri = chSound
@@ -2252,7 +2114,7 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
                 }
             }
 
-            // 2. Fallback to notification payload if channel was not present
+            // Fall back to the notification payload when the channel has no sound.
             if (soundUri == null) {
                 @Suppress("DEPRECATION")
                 val notifSound = notification.sound
@@ -2271,7 +2133,7 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
                 return
             }
 
-            // 3. Resolve and play the exact notification sound
+            // Play the exact notification sound.
             var ringtone: Ringtone? = runCatching {
                 RingtoneManager.getRingtone(applicationContext, soundUri)
             }.getOrNull()
@@ -2329,7 +2191,6 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
 
     private val iconCache = android.util.LruCache<String, Bitmap>(50)
 
-    /** Reads the pictures and stickers a notification shows in the shade (see [NotificationMediaReader]). */
     private val mediaReader by lazy { com.agupta07505.smartisland.util.NotificationMediaReader(applicationContext) }
 
     private fun loadAppIconBitmap(packageName: String): Bitmap? {
@@ -2340,7 +2201,6 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
         }
     }
 
-    /** Small (monochrome) status-bar icons of music apps, by package; the island tints them like the shade does. */
     private val smallIconCache = android.util.LruCache<String, Bitmap>(30)
 
     private fun Notification.loadSmallIconBitmap(packageName: String): Bitmap? {
@@ -2400,16 +2260,10 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
             ?: matches.firstOrNull()
     }
 
-    /**
-     * Small icon bitmaps of media buttons, kept per app and icon. A player like Spotify re-posts its notification about three
-     * times a second (position ticks); loading all five button icons each time, with the failures logged as stack traces by the
-     * system, was pure waste. A failed load is remembered too (null), so it is not retried on every post.
-     */
     private val actionIconCache = object : LinkedHashMap<String, Bitmap?>(32, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Bitmap?>?): Boolean = size > 48
     }
 
-    /** The notification button's icon as a small bitmap, or null when the app gives none. */
     private fun loadActionIcon(action: Notification.Action, packageName: String): Bitmap? {
         val icon = action.getIcon() ?: return null
         val key = "$packageName|$icon"
@@ -2525,9 +2379,7 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
     }
 
     companion object {
-        /** Most notification posts remembered by [shownPostTimes] before the list starts over. */
         private const val SHOWN_POSTS_MAX = 400
-        /** The count widget's list is rebuilt this long (ms) after the last notification change. */
         private const val COUNT_REFRESH_DEBOUNCE_MS = 150L
         @Volatile
         var isSystemConnected: Boolean = false
@@ -2544,7 +2396,6 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
         private const val SOUND_DEBOUNCE_MS = 1200L
         private const val AUTO_EXPAND_DEBOUNCE_MS = 1500L
 
-        /** Delays (ms) of the extra shade imports after the listener connected (see resyncMissingPersistentCards). */
         private val INITIAL_RESYNC_DELAYS_MS = longArrayOf(1_500L, 3_500L)
     }
 }

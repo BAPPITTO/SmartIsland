@@ -8,11 +8,9 @@
 package com.agupta07505.smartisland.util
 
 /**
- * Runs the ways of delivering one PendingIntent in order and reports whether any of them went through.
- * No Android types, so it is unit-testable.
+ * Runs the ways of delivering one PendingIntent in order and reports whether any went through. No Android types.
  *
- * A clock app replaces its button intents when it re-posts its notification, so a card that still holds an old one
- * throws on send. The caller has to know that, otherwise a button press that did nothing looks like it worked.
+ * A clock app replaces its button intents when it re-posts, so a stale one throws on send and the caller must see that.
  */
 object SendAttempts {
     /** True as soon as one attempt returns without throwing; later attempts are not run. */

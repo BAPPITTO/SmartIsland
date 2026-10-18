@@ -11,12 +11,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 
-/**
- * Diagnostic only, and only while the in-app log records: finds what blocks the main thread. A background thread asks the
- * main thread every [CHECK_INTERVAL_MS] to answer; when it has not answered for [STALL_MS] it writes the main thread's
- * current stack to the log (once per stall, and again when the stall ends with its total length). That stack names the
- * code that is running while the screen freezes ("Choreographer: Skipped N frames").
- */
+/** Diagnostic only, and only while the in-app log records. */
 object MainThreadWatchdog {
     private const val CHECK_INTERVAL_MS = 50L
     private const val STALL_MS = 250L

@@ -28,10 +28,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
 /**
- * Which row a search result asked the screen to bring into view. [jumpTo] sets the row key and
- * bumps [token]; every [searchAnchor] with that key then scrolls itself into view and flashes.
- * The key is cleared by [clear] (the home screen does this a few seconds after each jump), so a
- * row never flashes again when the user comes back to the screen later.
+ * Which row a search result asked the screen to bring into view. [jumpTo] sets the row key and bumps [token]; every
+ * [searchAnchor] with that key then scrolls itself into view and flashes.
  */
 class SearchFocusState {
     var key: String? by mutableStateOf(null)
@@ -55,9 +53,8 @@ val LocalSearchFocus = compositionLocalOf<SearchFocusState?> { null }
 const val SEARCH_FOCUS_ARMED_MS = 4000L
 
 /**
- * Marks a row as a search target. When a search result with the same [key] is chosen the row is
- * scrolled into view (inside a plain `verticalScroll` parent) and flashes briefly. A null [key],
- * or no [LocalSearchFocus] provider (previews, tests), leaves the modifier untouched.
+ * Marks a row as a search target. When a search result with the same [key] is chosen the row is scrolled into view
+ * (inside a plain `verticalScroll` parent) and flashes briefly.
  */
 @OptIn(ExperimentalFoundationApi::class)
 fun Modifier.searchAnchor(key: String?): Modifier = composed {

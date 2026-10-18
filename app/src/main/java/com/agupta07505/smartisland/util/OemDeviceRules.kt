@@ -315,8 +315,8 @@ object OemDeviceRules {
     )
 
     /**
-     * Voice / audio recorder apps (Google Recorder, Samsung Voice Recorder, OEM sound recorders ...).
-     * Screen-recorder packages and screen-recording wording always win, so this never claims them.
+     * Voice / audio recorder apps (Google Recorder, Samsung Voice Recorder, OEM sound recorders ...). Screen-recorder
+     * packages and screen-recording wording always win, so this never claims them.
      */
     fun isAudioRecording(packageName: String, titleText: String): Boolean {
         val pkg = packageName.lowercase()
@@ -435,7 +435,6 @@ object OemDeviceRules {
                 intents.add(Intent().setComponent(ComponentName("com.zte.heartyservice", "com.zte.heartyservice.autorun.AppAutoRunManager")))
             }
             else -> {
-                // Generic fallback
             }
         }
 

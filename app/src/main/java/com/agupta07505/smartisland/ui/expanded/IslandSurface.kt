@@ -29,46 +29,42 @@ internal val SPLIT_ISLAND_GAP = 14.dp
 internal val SPLIT_CARD_MIN_WIDTH = 240.dp
 
 /**
- * How much of the dark scrim over card artwork / backdrops to keep. The scrim runs up to 85% black
- * and hid the gradient completely; with the gradient on it is much lighter.
+ * How much of the dark scrim over card artwork / backdrops to keep: it runs up to 85% black and hid the gradient, so
+ * it is lighter with the gradient on.
  */
 internal fun cardScrimScale(settings: SmartIslandSettings): Float =
     if (settings.expandedGradientEnabled) 0.3f else 1f
 
 /**
- * The colour an expanded island is drawn in: the pill colour from the settings in the dark look, the palette's pale surface in the
- * light look. (The collapsed pill always keeps the pill colour; it has to match the camera cutout.)
+ * The colour an expanded island is drawn in: the pill colour from the settings in the dark look, the palette's pale
+ * surface in the light look.
  */
 internal fun expandedSurfaceColor(settings: SmartIslandSettings, palette: IslandPalette): Color =
     if (palette.isLight) palette.surface else Color(settings.pillColor)
 
-/** How far the gradient colour reaches into the light surface; a full-strength blue slab would take the pale look away. */
 private const val LIGHT_GRADIENT_REACH = 0.65f
 
-/** The share of the gradient strength that already shows at the top left corner. */
 private const val GRADIENT_NEAR_SHARE = 0.35f
 
 /**
- * Brush for an expanded island: the pill colour blends toward the gradient colour from the top
- * left to the bottom right. Strength 1 ends on the gradient colour itself. Null when the
- * gradient option is off, so callers fall back to the flat pill colour.
+ * Brush for an expanded island: the pill colour blends toward the gradient colour from top left to bottom right;
+ * strength 1 ends on the gradient colour. Null when the gradient is off.
  */
 internal fun expandedGradientBrush(settings: SmartIslandSettings, palette: IslandPalette = IslandPalette.Dark): Brush? {
     if (!settings.expandedGradientEnabled) return null
     val start = expandedSurfaceColor(settings, palette)
     val gradientColor = Color(settings.expandedGradientColor)
     val strength = settings.expandedGradientStrength.coerceIn(0f, 1f) * (if (palette.isLight) LIGHT_GRADIENT_REACH else 1f)
-    // The far corner takes the full strength; the near corner already carries a third of it, so the colour is spread over the
-    // whole card and every step of the slider shows, instead of only a tint at one corner.
+    // The far corner takes the full strength; the near corner already carries a third of it, so the colour is spread
+    // over the whole card and every step of the slider shows, instead of only a tint at one corner.
     val from = androidx.compose.ui.graphics.lerp(start, gradientColor, strength * GRADIENT_NEAR_SHARE)
     val to = androidx.compose.ui.graphics.lerp(start, gradientColor, strength)
     return Brush.linearGradient(listOf(from, to))
 }
 
 /**
- * Draws one island surface (shadow, rounded clip, pill colour at [alpha]) behind this element.
- * Used when the expanded view is two separate islands, because the overlay's own single island
- * surface is switched off then.
+ * Draws one island surface (shadow, rounded clip, pill colour at [alpha]) behind this element, for the two-island
+ * layout where the overlay's single surface is off.
  */
 internal fun Modifier.islandSurface(
     settings: SmartIslandSettings,
@@ -76,7 +72,6 @@ internal fun Modifier.islandSurface(
     shape: Shape = RoundedCornerShape(SPLIT_ISLAND_CORNER),
     /** When set (landscape split), the shadow is drawn at this 0..1 share of its strength, read at draw time; null = a plain shadow. */
     shadowStrength: (() -> Float)? = null,
-    /** The look of the island; the dark one is the original. */
     palette: IslandPalette = IslandPalette.Dark
 ): Modifier {
     val shadowed = if (settings.enableShadow && settings.shadowElevation > 0f && shadowStrength != null) {

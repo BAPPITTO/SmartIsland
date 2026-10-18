@@ -54,8 +54,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Pick the font of the island's text. Each row shows its own name in its own font. Under the built-in fonts the
- * user can add a font from a .ttf or .otf file; added fonts can be removed again.
+ * Pick the font of the island's text. Each row shows its own name in its own font. Under the built-in fonts the user
+ * can add a font from a .ttf or .otf file; added fonts can be removed again.
  */
 @Composable
 internal fun IslandFontPicker(

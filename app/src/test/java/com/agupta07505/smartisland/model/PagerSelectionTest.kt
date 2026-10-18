@@ -33,20 +33,19 @@ class PagerSelectionTest {
 
     private fun recorder() = card("rec", "rec.app", IslandMode.ScreenRecording)
 
-    /** The list the island shows, as the view model orders it. */
     private fun shown(vararg cards: IslandNotification) = IslandPriority.order(cards.toList())
 
-    /** The index the open island keeps for the card it shows when the list changes (the view model keeps the selection by key). */
     private fun indexOfKey(list: List<IslandNotification>, key: String) = list.indexOfFirst { it.key == key }
 
-    // --- the page / index mapping across a list shift ---
+    // the page / index mapping across a list shift
 
     @Test
     fun aRecorderThatStartsIsInsertedAtPageZeroAndShiftsEveryPage() {
         val before = shown(card("a", "app.a", time = 3), card("b", "app.b", time = 2), card("c", "app.c", time = 1))
         val after = shown(card("a", "app.a", time = 3), card("b", "app.b", time = 2), card("c", "app.c", time = 1), recorder())
         assertEquals("rec", after.first().key)
-        // The owner is on "a". Before: page 0. After: the recorder took page 0 and "a" is on page 1 (the pager, still on page 0, would show the recorder).
+        // The owner is on "a". Before: page 0. After: the recorder took page 0 and "a" is on page 1 (the pager, still
+        // on page 0, would show the recorder).
         assertEquals(0, appGroupPageOf(before, indexOfKey(before, "a")))
         assertEquals(1, appGroupPageOf(after, indexOfKey(after, "a")))
         assertTrue(PagerSelection.shapeChanged(PagerSelection.pageGroups(before, 0), PagerSelection.pageGroups(after, indexOfKey(after, "a"))))
@@ -119,7 +118,7 @@ class PagerSelectionTest {
         assertFalse(PagerSelection.shapeChanged(null, listOf("app:a")))
     }
 
-    // --- the jump ---
+    // the jump
 
     @Test
     fun noJumpWhenThePagerAlreadyShowsTheShownCardsPage() {
@@ -133,7 +132,7 @@ class PagerSelectionTest {
         assertNull(PagerSelection.jumpTarget(currentPage = 0, selectedPage = 0, pageCount = 0))
     }
 
-    // --- the write-back rule ---
+    // the write-back rule
 
     @Test
     fun aPageThatAFingerDraggedToIsWrittenBack() {
@@ -158,8 +157,6 @@ class PagerSelectionTest {
         assertTrue(PagerSelection.dragStillValid(shapeChangedDuringDrag = false))
         assertFalse(PagerSelection.dragStillValid(shapeChangedDuringDrag = true))
     }
-
-    // --- the log line ---
 
     @Test
     fun theLogLineNamesTheCardBeforeAndAfterAndWhereThePagerWas() {

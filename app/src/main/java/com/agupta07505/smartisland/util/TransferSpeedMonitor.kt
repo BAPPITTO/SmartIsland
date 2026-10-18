@@ -25,9 +25,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Pure state machine behind the network-speed fallback: it turns a stream of "bytes per second"
- * samples into IDLE / DOWNLOAD / UPLOAD with hysteresis, so a short burst never flashes a card and
- * a brief stall never drops one.
+ * Pure state machine behind the network-speed fallback: it turns a stream of "bytes per second" samples into IDLE /
+ * DOWNLOAD / UPLOAD with hysteresis, so a short burst never flashes a card and a brief stall never drops one.
  */
 class SpeedTracker(
     private val startBytesPerSec: Long = START_BPS,
@@ -101,16 +100,8 @@ class SpeedTracker(
 }
 
 /**
- * Last-resort download/upload detection for transfers that show no usable notification (the app's
- * notification channel is blocked, or the app shows none). It samples the device-wide network
- * counters once a second while the screen is on and, when the traffic is heavy and steady, posts an
- * *estimated* transfer card. Android gives apps no per-app live traffic, so the card cannot say
- * which app is transferring; it says how fast.
- *
- * It stays quiet when a real transfer card exists (that card already explains the traffic), while
- * media is playing (streaming looks like a download), while the hotspot card is up (other devices'
- * traffic), and while the screen is off. With a VPN up the counters see every byte twice (tunnel
- * and underlying network), so speeds are halved.
+ * Last-resort download/upload detection for transfers that show no usable notification (the app's notification
+ * channel is blocked, or the app shows none).
  */
 class TransferSpeedMonitor(
     private val context: Context,

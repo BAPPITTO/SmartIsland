@@ -7,21 +7,7 @@
 
 package com.agupta07505.smartisland.model
 
-/**
- * Portrait: there is no separate idle pill. The collapsed cutout is a camera-hole pill with its glyphs on the
- * left and right (and the privacy dots at the far right); the middle of it is empty. That empty middle band is the
- * idle control, the portrait twin of the landscape idle dot:
- *  - collapsed with cards: a tap in the band puts every card away (the two-step close with step 1 skipped);
- *  - expanded: a tap in the band, which is the top of the expanded island where the pill sits, closes the island with
- *    the secondary cutout's merge, then puts the cards away;
- *  - no cards, stored ones waiting: a tap anywhere on the idle cutout reveals them (unchanged).
- * A tap on a glyph (left / right of the band) keeps its normal job: it expands that event (collapsed) or is the
- * expanded card's own tap.
- *
- * Collapsed, the island's own tap gesture asks [pillCenterTapHit] (px, relative to the shell, which is the pill). Expanded,
- * the card's own click would take the tap, so a transparent target of the same size ([PILL_CENTER_ZONE_SHARE] of the pill's
- * width, the pill's height, top centre of the shell) sits above the card (`PortraitPillCenterTarget`); it draws nothing.
- */
+/** Portrait has no separate idle pill. */
 const val PILL_CENTER_ZONE_SHARE = 0.34f
 
 /** True when a touch at ([xPx], [yPx]) in a shell [shellWidthPx] wide lands in the glyph-free centre band of the pill. */
@@ -41,11 +27,14 @@ fun pillCenterTapHit(
 /** The camera hole in dp: centre X from the screen centre, top edge from the screen top. */
 data class CutoutArea(val centreXDp: Float, val topDp: Float, val widthDp: Float, val heightDp: Float)
 
-/** Smallest touch target (dp) over the camera cutout: a real hole is often smaller than a finger. */
+/** Smallest touch target (dp) over the camera cutout; a real hole is often smaller than a finger. */
 const val CUTOUT_TARGET_MIN_WIDTH_DP = 40f
 const val CUTOUT_TARGET_MIN_HEIGHT_DP = 28f
 
-/** The camera cutout grown to at least the minimum touch target, around its own centre (the top never goes above the screen). */
+/**
+ * The camera cutout grown to at least the minimum touch target around its own centre (the top never goes above the
+ * screen).
+ */
 fun cutoutTouchTarget(area: CutoutArea): CutoutArea {
     val w = maxOf(area.widthDp, CUTOUT_TARGET_MIN_WIDTH_DP)
     val h = maxOf(area.heightDp, CUTOUT_TARGET_MIN_HEIGHT_DP)
@@ -57,9 +46,8 @@ fun cutoutTouchTarget(area: CutoutArea): CutoutArea {
 const val CUTOUT_OVERLAP_MIN_DP = 1f
 
 /**
- * True when the collapsed pill's glyph-free centre band overlaps the camera cutout by at least [minOverlapDp] on both axes. All values
- * are dp in screen space: X as the centre measured from the screen centre, Y as the top edge measured from the screen top.
- * Null cutout (nothing detected, nothing set by hand) never overlaps.
+ * True when the pill's centre band overlaps the camera cutout by at least [minOverlapDp] on both axes (screen-space
+ * dp). A null cutout never overlaps.
  */
 fun centreBandOverlapsCutout(
     bandCentreXDp: Float,
@@ -79,17 +67,7 @@ fun centreBandOverlapsCutout(
     return horizontal >= minOverlapDp && vertical >= minOverlapDp
 }
 
-/**
- * Collapsed pill: does a long press open the Open Apps shortcut (the quick-launch grid)? It replaces the old tap on the empty island.
- *  - the pill's centre band overlaps the camera cutout: only a long press on a glyph (outside the band) opens it; the band keeps the normal
- *    long-press action;
- *  - no overlap: a long press anywhere on the collapsed cutout opens it.
- * Notch mode behaves as "overlapping": the pill is the notch, so its glyphs open the apps and its middle keeps the normal long press.
- * Landscape: the collapsed pill (a card or the widget pill on the island, [pillHasContent]) always opens the Open Apps shortcut (no overlap
- * rule: the pill is not on the camera there). The idle cutout (no content) is not this pill: a long press on it only runs the normal
- * long-press action (hide / show the pill), like the idle circle.
- * Off when the shortcut launcher is switched off (the normal long-press action runs then).
- */
+/** Collapsed pill: does a long press open the Open Apps shortcut (the quick-launch grid)? */
 fun longPressOpensApps(
     isLandscape: Boolean,
     notchMode: Boolean,
@@ -108,8 +86,8 @@ fun portraitCenterTapIsIdleControl(isLandscape: Boolean, notchMode: Boolean, has
     !isLandscape && hasCards
 
 /**
- * Where the transparent close target of the expanded island sits, in dp, measured from the top centre of the overlay window.
- * [offsetXDp] is null when the target should follow the pill's own sideways offset (the old behaviour).
+ * Where the transparent close target of the expanded island sits, in dp from the top centre of the overlay window.
+ * [offsetXDp] is null when the target follows the pill's own sideways offset.
  */
 data class ExpandedCloseZone(
     val widthDp: Float,
@@ -118,13 +96,7 @@ data class ExpandedCloseZone(
     val topDp: Float
 )
 
-/**
- * The close target for an expanded island in portrait. On a phone with a camera cutout (`CameraCutoutDetector`) the target is
- * the cutout itself: its detected width and height, centred on the hole, starting at the hole's top edge. The width never
- * exceeds the pill's centre band ([PILL_CENTER_ZONE_SHARE]), so the target never covers the glyphs. [windowTopDp] is the overlay window's own top (the
- * window is moved down by the pill's Y offset), so the cutout's screen position is converted to window space. Without a
- * hardware cutout the target is the centre band of the pill, as before.
- */
+/** Close target of the expanded island in portrait. */
 fun expandedCloseZone(
     hasHardwareCutout: Boolean,
     cutoutWidthDp: Float,
@@ -139,8 +111,8 @@ fun expandedCloseZone(
         return ExpandedCloseZone(pillWidthDp * PILL_CENTER_ZONE_SHARE, pillHeightDp, null, 0f)
     }
     return ExpandedCloseZone(
-        // Never wider than the pill's glyph-free centre band: the detected width is the hole plus padding and is raised to the
-        // pill's minimum width (76 dp), so on its own it reached over the glyphs left and right of the band.
+        // The detected width is the hole plus padding, raised to the pill's minimum width (76 dp), so on its own it
+        // reached over the glyphs beside the band.
         widthDp = minOf(cutoutWidthDp, pillWidthDp * PILL_CENTER_ZONE_SHARE),
         heightDp = cutoutHeightDp,
         offsetXDp = cutoutXOffsetDp,

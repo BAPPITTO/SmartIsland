@@ -61,17 +61,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 /**
- * All touch handling on the island shell itself: tap, hold, drag with finger-follow, the pill swipe actions (collapsed)
- * and the swipe-up / down / sideways actions (expanded). Pickers and the expanded text own their own vertical drags.
+ * All touch handling on the island shell itself: tap, hold, drag with finger-follow, the pill swipe actions
+ * (collapsed) and the swipe-up / down / sideways actions (expanded).
  */
-/**
- * How far (dp) around the tiny privacy dots a tap still counts as a tap on them. Small on the left, where the pill's
- * other glyphs sit only a few dp away; wider towards the pill's edge and up and down, where nothing else is.
- */
-private const val PRIVACY_DOT_TAP_SLOP_LEFT_DP = 3f
-private const val PRIVACY_DOT_TAP_SLOP_RIGHT_DP = 8f
-private const val PRIVACY_DOT_TAP_SLOP_Y_DP = 12f
-
 internal fun Modifier.islandMainGestures(
     settings: SmartIslandSettings,
     isInputActive: Boolean,
@@ -111,8 +103,7 @@ internal fun Modifier.islandMainGestures(
                 // This touch is a tap only while the finger stays within the slop (peak distance, on both axes).
                 val tapGuard = TapGuard(tapSlop)
                 // Collapsed pill swipes fire when the finger lifts, and only if still past the threshold (a swipe
-                // pulled back towards the start cancels). The expanded island keeps its plain threshold on lift,
-                // so its arming (disarm fraction 1) only drives the tick that says "lifting now fires".
+                // pulled back towards the start cancels).
                 val pillThresholdPx = sensitivity.scaled(PILL_SWIPE_THRESHOLD_DP) * displayMetrics.density
                 // The collapsed pill never locks: its own lock is never started, and the expanded island's lock does not reach it.
                 val pillArming = SwipeArming(sensitivity, pillThresholdPx).also { it.lockWhen = { false } }
@@ -131,37 +122,36 @@ internal fun Modifier.islandMainGestures(
                 // Sibling picker open when the touch began, and where in the island it landed.
                 val pickerOpenAtStart = cb.currentSiblingPickerOpen
                 val readingTextAtStart = cb.currentReadingExpandedText
-                // The quick-launch window (an open island with no cards) swipes between its own pages, so any drag in it is the
-                // launcher's: swipe up / down switch Apps and Utilities, left / right switch Apps and Recents.
+                // The quick-launch window (an open island with no cards) swipes between its own pages, so any drag in
+                // it is the launcher's: swipe up / down switch Apps and Utilities, left / right switch Apps and
+                // Recents.
                 val launcherAtStart = wasExpandedAtStart && cb.currentSettings.enableAppShortcuts &&
                     cb.currentNotifications.isEmpty()
-                // Reader-scroll tap guard: a touch that begins on a reader text that is still flinging (or only just stopped), or
-                // that sees the reader move under the finger, is never a tap, so stopping a fling cannot open the notification.
+                // Reader-scroll tap guard: a touch that begins on a reader text that is still flinging (or only just
+                // stopped), or that sees the reader move under the finger, is never a tap, so stopping a fling cannot
+                // open the notification.
                 val readerTracker = ui.readerScroll
                 val readerStartedOnScroll = wasExpandedAtStart && readerTracker.touchStartsOnScroll(android.os.SystemClock.uptimeMillis())
                 val readerMovesAtDown = readerTracker.moveCount
-                // Preview, reader or an open picture: the island's normal swipe actions are off there. Only swipe down (one step
-                // deeper) and swipe up (one step back) work, so the reader's text does not swallow those drags (it still
-                // scrolls: a drag it consumes is its own).
+                // Preview, reader or an open picture: the island's normal swipe actions are off there.
                 val stepsActive = wasExpandedAtStart && cb.currentSettings.enableSwipeActions &&
                     cb.currentCardDepth != CardDepth.First
                 // Only a swipe that showed itself as armed (the tick played) locks swiping when it is pulled back; a side
                 // set to "None" or a swipe that would do nothing was never armed for the user.
                 expandedArming.lockWhen = { dir -> expandedSwipeFires(dir, stepsActive, cb) }
-                // Landscape image selector: no tap (the island's own, the one that opens the app) and no swipe action registers
-                // there; a tap on one of its pictures belongs to the picture, and swipe up (one step back) is the only gesture.
+                // Landscape image selector: no tap (the island's own, the one that opens the app) and no swipe action
+                // registers there; a tap on one of its pictures belongs to the picture, and swipe up (one step back)
+                // is the only gesture.
                 val selectorLocked = wasExpandedAtStart && cb.currentCardDepth == CardDepth.Selector
-                // On a plain expanded card the card follows the finger sideways (not under the sibling picker,
-                // not in the preview / reader / picture steps, which have their own swipes).
-                // The whole island leans (SwipeSideways); the largest lean is what the stretch is measured against.
+                // On a plain expanded card the card follows the finger sideways (not under the sibling picker, not in
+                // the preview / reader / picture steps, which have their own swipes).
                 val cardMaxSlidePx = com.agupta07505.smartisland.util.SwipeSideways.maxLeanPx(displayMetrics.density)
                 ui.cardSlideMaxPx = cardMaxSlidePx
                 val cardFollows = wasExpandedAtStart && cb.currentSettings.enableSwipeActions && !stepsActive &&
                     !pickerOpenAtStart
                 val downYDp = down.position.y / displayMetrics.density
                 val downXFraction = if (size.width > 0) down.position.x / size.width else 0f
-                // The touch landed on the open sibling picker (rows or header). Its taps belong to the picker, so the island's
-                // own tap (open the notification) never runs for it; only a drag that began on the header is an island swipe.
+                // The touch landed on the open sibling picker (rows or header).
                 val pickerTouchAtStart = wasExpandedAtStart && siblingPickerOwnsTouch(
                     pickerOpenAtStart, isLandscape, downXFraction, pickerLeftFraction.value, pickerOnLeft.value
                 )
@@ -175,8 +165,9 @@ internal fun Modifier.islandMainGestures(
                 var isHoldRegistered = false
                 var dragAccumulatorY = 0f
                 var dragAccumulatorX = 0f
-                // Axis lock: once the finger passes the tap slop, the longer axis owns the rest of this touch and the other axis is
-                // ignored, so a swipe up / down never picks up sideways movement (and the other way round).
+                // Axis lock: once the finger passes the tap slop, the longer axis owns the rest of this touch and the
+                // other axis is ignored, so a swipe up / down never picks up sideways movement (and the other way
+                // round).
                 val axisLock = AxisLock(tapSlop)
                 var rawDragX = 0f
                 var rawDragY = 0f
@@ -187,21 +178,23 @@ internal fun Modifier.islandMainGestures(
                 var childScrolled = false
                 // The island closed while this touch (which began on the expanded card) was still down.
                 var closedUnderFinger = false
-                // A vertical drag opens (or closes) a card step WITH the finger. 0 = not started, 1 = a step deeper is
-                // open under the finger, -1 = a step back is, 2 = nothing to open here (the plain swipe rules apply on lift).
+                // A vertical drag opens (or closes) a card step WITH the finger. 0 = not started, 1 = a step deeper
+                // is open under the finger, -1 = a step back is, 2 = nothing to open here (the plain swipe rules
+                // apply on lift).
                 var stepMode = 0
                 // One buzz per step drag: at the far end of the drag, or at the lift if the step finished without reaching it.
                 val stepHaptic = com.agupta07505.smartisland.model.StepDragHaptic()
                 val stepRangePx = StepDrag.RANGE_DP * displayMetrics.density
-                // Smoothing: the finger sets the target progress, a per-frame ease (only while a step drag is open) moves the shown
-                // progress and height toward it. The lift decides by the target (the finger), then settles from the shown value.
+                // Smoothing: the finger sets the target progress, a per-frame ease (only while a step drag is open)
+                // moves the shown progress and height toward it.
                 var stepTarget = 0f
                 var stepSmoothJob: kotlinx.coroutines.Job? = null
 
                 val holdJob = scope.launch {
                     kotlinx.coroutines.delay(HOLD_GESTURE_THRESHOLD_MS)
                     isHoldRegistered = true
-                    // The hold buzz is skipped when this long press opens the app shortcuts (quiet launcher); every other hold still buzzes.
+                    // The hold buzz is skipped when this long press opens the app shortcuts (quiet launcher); every
+                    // other hold still buzzes.
                     var holdBuzzed = false
                     var openedApps = false
                     fun holdBuzz() {
@@ -237,7 +230,6 @@ internal fun Modifier.islandMainGestures(
                             if (longPress != SwipeAction.None) {
                                 // Blocks any swipe action for the rest of this touch.
                                 pillGestureTriggered = true
-                                // No context: the hold above already vibrated.
                                 runner.runLongPress(longPress)
                             }
                         }
@@ -321,10 +313,8 @@ internal fun Modifier.islandMainGestures(
                                     ui.stepDrag.reset()
                                 }
                             } else if (stepVertical && dragAccumulatorY > swipeDownThreshold) {
-                                // Deeper step: one step further in (the last step stays where it is, it never collapses).
                                 if (cb.currentOnCardDeeper()) IslandHaptics.play(context, hapticStrength, HapticKind.Swipe)
                             } else if (stepVertical && dragAccumulatorY < swipeUpThreshold) {
-                                // One step back; never dismisses.
                                 if (cb.currentOnCardBack()) IslandHaptics.play(context, hapticStrength, HapticKind.Swipe)
                             } else if (stepsActive && isHorizontalSwipe) {
                                 // Sideways swipes do nothing in these steps, and are not mistaken for a tap either.
@@ -359,8 +349,8 @@ internal fun Modifier.islandMainGestures(
                                 }
                             } else if (!tapGuard.exceeded && !pickerTouchAtStart && !selectorLocked &&
                                 readerTapAccepted(readerStartedOnScroll, readerMovesAtDown, readerTracker.moveCount)) {
-                                // A tap: the finger never left the tap area, and it did not just stop a scrolling reader. A drag that went further but fired nothing (a short
-                                // sideways drag, a diagonal, a side set to None) is the dead zone and does nothing.
+                                // A tap: the finger never left the tap area, and it did not just stop a scrolling
+                                // reader.
                                 if (!isHoldRegistered) {
                                     if (currentNotification != null) {
                                         cb.currentOnOpenNotification(currentNotification)
@@ -370,7 +360,6 @@ internal fun Modifier.islandMainGestures(
                                 }
                             }
                         } else {
-                            // Collapsed state (In-Pill Gestures)
                             if (!pillGestureTriggered) {
                                 val isPillSwipeEnabled = cb.currentSettings.enablePillSwipeActions || idleWidgetSwipe()
                                 val fireDirection = if (isPillSwipeEnabled) pillArming.direction else null
@@ -382,9 +371,9 @@ internal fun Modifier.islandMainGestures(
                                     // Pulled back towards the start, too diagonal, or simply moved too far for a tap: no gesture,
                                     // and not a tap either (the dead zone: a drag under the swipe threshold does not expand the pill).
                                 } else {
-                                    // Tap on collapsed pill: expands or reveals
                                     if (!isHoldRegistered) {
-                                        // What a tap does on an idle widget pill (glyph slot, value slot, middle band), see model/WidgetIsland.kt.
+                                        // What a tap does on an idle widget pill (glyph slot, value slot, middle
+                                        // band), see model/WidgetIsland.kt.
                                         val widgetTap = if (cb.currentNotifications.isEmpty()) {
                                             idleWidgetTapAction(
                                                 widgetOnPill = ui.idleWidgetCycle != null && ui.idleFrameNow != null,
@@ -395,29 +384,18 @@ internal fun Modifier.islandMainGestures(
                                         } else {
                                             WidgetTapAction.None
                                         }
-                                        // A tap on a privacy dot opens the system's "which apps use this" screen instead.
-                                        // (Not while the pill is auto-hidden: that tap only reveals it.)
-                                        val dotKind = if (settings.autoHidePill && ui.isAutoHidden) null else ui.privacyDots?.kindAt(
-                                            x = ui.gestureOrigin.x + down.position.x,
-                                            y = ui.gestureOrigin.y + down.position.y,
-                                            slopLeftPx = PRIVACY_DOT_TAP_SLOP_LEFT_DP * displayMetrics.density,
-                                            slopRightPx = PRIVACY_DOT_TAP_SLOP_RIGHT_DP * displayMetrics.density,
-                                            slopYPx = PRIVACY_DOT_TAP_SLOP_Y_DP * displayMetrics.density
-                                        )
-                                        if (dotKind != null) {
-                                            IslandHaptics.play(context, HapticStrength.fromId(cb.currentSettings.hapticStrength), HapticKind.Swipe)
-                                            context.showPrivacyUsage(dotKind)
-                                        } else if (settings.autoHidePill && ui.isAutoHidden) {
+                                        if (settings.autoHidePill && ui.isAutoHidden) {
                                             ui.isAutoHidden = false
                                             ui.touch()
                                         } else if (widgetTap == WidgetTapAction.GlyphTap && ui.onWidgetGlyphTap != null) {
-                                            // Idle widget pill, glyph slot: opens the semi-expanded widget island, or closes it when it is open.
+                                            // Idle widget pill, glyph slot: opens the semi-expanded widget island, or
+                                            // closes it when it is open.
                                             ui.onWidgetGlyphTap?.invoke()
                                         } else if (widgetTap == WidgetTapAction.ValueTap && ui.onWidgetValueTap != null) {
-                                            // Idle widget pill, value slot: the same for now, with its own hook. The middle band shows the stored cards (next branch).
+                                            // Idle widget pill, value slot: same as the glyph slot, with its own
+                                            // hook. The middle band shows the stored cards (next branch).
                                             ui.onWidgetValueTap?.invoke()
                                         } else if (cb.currentNotifications.isEmpty() && cb.currentHasIdleStoredCards) {
-                                            // Idle cutout: reveal the cards the idle timeout put away
                                             cb.currentOnRevealIdleCards()
                                         } else if (portraitCenterTapIsIdleControl(isLandscape, settings.enableNotchMode, cb.currentNotifications.isNotEmpty()) &&
                                             pillCenterTapHit(
@@ -429,7 +407,6 @@ internal fun Modifier.islandMainGestures(
                                             // The empty middle of the collapsed pill puts every card away (a glyph still expands).
                                             cb.currentOnIdleDotTap()
                                         } else if (isLandscape && !settings.enableNotchMode && cb.currentNotifications.isEmpty()) {
-                                            // Landscape idle cutout: show / hide the empty pill.
                                             cb.currentOnIdleDotTap()
                                         } else if (cb.currentNotifications.isNotEmpty()) {
                                             // (An empty island does not open the shortcuts on a tap: that is a long press.)
@@ -481,8 +458,9 @@ internal fun Modifier.islandMainGestures(
                             dragAccumulatorY += axisLock.filterY(dragAmountY)
                             dragAccumulatorX += axisLock.filterX(dragAmountX)
                             tapGuard.update(dragAccumulatorX, dragAccumulatorY)
-                            // A card step follows the finger: the first clear vertical drag opens the step (deeper on a drag down, back on a
-                            // drag up), the drag distance runs its progress, and the lift decides below. Not under the sibling picker.
+                            // A card step follows the finger: the first clear vertical drag opens the step (deeper on
+                            // a drag down, back on a drag up), the drag distance runs its progress, and the lift
+                            // decides below.
                             if (wasExpandedAtStart && cb.currentSettings.enableSwipeActions && !pickerOpenAtStart && stepMode == 0 &&
                                 !ui.swipeLock.isLocked(android.os.SystemClock.uptimeMillis()) &&
                                 sensitivity.isVertical(dragAccumulatorX, dragAccumulatorY) && abs(dragAccumulatorY) > tapSlop
@@ -547,9 +525,8 @@ internal fun Modifier.islandMainGestures(
                                 holdJob.cancel()
                             }
                             if (wasExpandedAtStart) {
-                                // While a card step follows the finger, lifting commits or cancels by the step's own progress (40 % of
-                                // its range), not by the swipe threshold. The arming tick, the pull-back lock and the dead-zone shrink would all
-                                // describe a lift that does not happen that way, so they stay off.
+                                // While a card step follows the finger, lifting commits or cancels by the step's own
+                                // progress (40 % of its range), not by the swipe threshold.
                                 if (cb.currentSettings.enableSwipeActions && !stepFollowsFinger(stepMode) &&
                                     expandedArming.update(dragAccumulatorX, dragAccumulatorY, android.os.SystemClock.uptimeMillis())
                                 ) {
@@ -575,13 +552,14 @@ internal fun Modifier.islandMainGestures(
                                         IslandHaptics.play(context, HapticStrength.fromId(cb.currentSettings.hapticStrength), HapticKind.Merge)
                                     }
                                 }
-                                // The island leans sideways with the finger, only on a side that has an action (a side set to "None"
-                                // does nothing, so the island does not move there). Vertical drags do not lean it. The card stays inside.
+                                // The island leans sideways with the finger, only on a side that has an action (a
+                                // side set to "None" does nothing, so the island does not move there).
                                 ui.cardDragX = if (cardFollows && sensitivity.isHorizontal(dragAccumulatorX, dragAccumulatorY)) {
                                     val sideAction = expandedSideAction(cb.currentSettings, dragAccumulatorX)
                                     when {
                                         sideAction == SwipeAction.None || swipeIsNoOp(sideAction, cb.currentNotifications, cb.currentSelectedIndex) -> 0f
-                                        // A swipe that will bring another card leans fully; one that leaves the card only gives a little (rubber band).
+                                        // A swipe that will bring another card leans fully; one that leaves the card
+                                        // only gives a little (rubber band).
                                         swipeChangesCard(sideAction) &&
                                             predictCardChange(sideAction, cb.currentNotifications, cb.currentSelectedIndex) != SwipeCardOutcome.Stays -> {
                                             // The neighbouring cards are measured now, not after the idle delay (see NeighbourHeightProbe).
@@ -595,11 +573,6 @@ internal fun Modifier.islandMainGestures(
                                     }
                                 } else 0f
                                 // A swipe down only leans the island a little; a swipe up follows the finger.
-                                // A step (swipe down for the next mode, swipe up to go back, the preview / reader / picture) changes
-                                // the island's height with the finger and never moves the island itself, so a swipe up while a step is open
-                                // (also one that follows a swipe down without lifting) leaves the island where it is.
-                                // Also nothing to follow when a swipe up would do nothing (swipes off, the action set to None, or an action
-                                // that has no effect right now): the island stays put.
                                 val swipeUpAvailable = cb.currentSettings.enableSwipeActions &&
                                     SwipeAction.fromId(cb.currentSettings.swipeUpAction, SwipeAction.DismissCurrent).let {
                                         it != SwipeAction.None && !swipeIsNoOp(it, cb.currentNotifications, cb.currentSelectedIndex)
@@ -612,25 +585,23 @@ internal fun Modifier.islandMainGestures(
                                     dragAccumulatorY.coerceAtLeast(-DRAG_MAX_OFFSET_DP * displayMetrics.density)
                                 }
                             } else {
-                                // Eased into their limits (no hard stop under the finger).
                                 ui.pillDragOffsetX = softFollow(dragAccumulatorX, 0.35f, 24f * displayMetrics.density)
                                 ui.dragOffset = softFollow(
                                     dragAccumulatorY, 0.35f, SwipeFeel.PILL_LEAN_Y_MAX_DP * displayMetrics.density
                                 )
 
-                                // Content follows the finger (sideways swipes only).
                                 val pillHorizontal = sensitivity.isHorizontal(dragAccumulatorX, dragAccumulatorY)
                                 ui.pillContentDragX = if (pillHorizontal) {
                                     softFollow(dragAccumulatorX, PILL_CONTENT_FOLLOW, maxSlidePx)
                                 } else 0f
-                                // A swipe on the pill keeps the secondary cutout's auto-merge timer (and the
-                                // auto-hide timer) restarting while the finger moves, at most every PILL_SWIPE_TOUCH_GAP_MS
-                                // (each touch() restarts the countdown coroutines, so it is not done on every move event).
+                                // A swipe on the pill keeps the secondary cutout's auto-merge timer (and the auto-
+                                // hide timer) restarting while the finger moves, at most every
+                                // PILL_SWIPE_TOUCH_GAP_MS (each touch() restarts the countdown coroutines, so it is
+                                // not done on every move event).
                                 if (pillHorizontal && System.currentTimeMillis() - ui.userInteractionTimestamp >= PILL_SWIPE_TOUCH_GAP_MS) {
                                     ui.touch()
                                 }
 
-                                // Armed = lifting now fires. Nothing runs until the finger lifts.
                                 if (abs(dragAccumulatorX) >= pillThresholdPx || abs(dragAccumulatorY) >= pillThresholdPx) {
                                     crossedOnce = true
                                 }
@@ -694,7 +665,6 @@ internal fun Modifier.islandMainGestures(
                 // The drag is over: the neighbour probe goes back to its idle timing.
                 ui.stepDrag.swipeNeighbour = 0
                 // The incoming card (if the swipe changed it) takes over the content; otherwise it eases back.
-                // One animation brings the shell, lean, content and pull back together (one spring, one state write set per frame).
                 easeBackPillMotion(ui, scope)
                 // Expanded card: the incoming card (if the swipe changed it) takes over from where the finger left it;
                 // otherwise (cancelled, or an action that keeps the card) it eases back.
@@ -711,15 +681,10 @@ internal fun Modifier.islandMainGestures(
         }
 }
 
-/** The spring a swipe's drag returns to rest with: no overshoot, a third of the old snap (see [SwipeFeel.EASE_BACK_STIFFNESS]). */
+/** The spring a swipe's drag returns to rest with: no overshoot (see [SwipeFeel.EASE_BACK_STIFFNESS]). */
 internal fun <T> swipeEaseBackSpring(): androidx.compose.animation.core.SpringSpec<T> =
     spring(dampingRatio = SwipeFeel.RETURN_DAMPING_RATIO, stiffness = SwipeFeel.EASE_BACK_STIFFNESS)
 
-/**
- * Lets go of the collapsed pill's drag: shell sideways, lean, content slide (unless a new card is about to take it over) and the
- * swipe-down pull all return on ONE spring (a fraction 1 -> 0 of where each was), so they stay in step and cost one coroutine and
- * one set of state writes per frame instead of four. [IslandInteractionState.pillReleaseJob] lets a new touch cancel it.
- */
 private fun easeBackPillMotion(ui: IslandInteractionState, scope: CoroutineScope) {
     val content0 = if (ui.pendingEnterSign == 0) ui.pillContentDragX else 0f
     val shell0 = ui.pillDragOffsetX
@@ -742,14 +707,10 @@ private fun easeBackPillMotion(ui: IslandInteractionState, scope: CoroutineScope
     }
 }
 
-/** The spring every swipe's temporary state (arm swell, dead-zone shrink) lets go with: no overshoot, same speed as before. */
+/** The spring every swipe's temporary state (arm swell, dead-zone shrink) lets go with: no overshoot. */
 internal fun <T> swipeCalmSpring(): androidx.compose.animation.core.SpringSpec<T> =
     spring(dampingRatio = SwipeFeel.RETURN_DAMPING_RATIO, stiffness = SwipeFeel.RETURN_STIFFNESS)
 
-/**
- * True when lifting the finger now would run an expanded-island swipe in [direction]: the direction has an action and
- * that action would do something. Mirrors the tick rule in the move loop, except that no direction (null) fires nothing.
- */
 private fun expandedSwipeFires(direction: PillSwipeDirection?, stepsActive: Boolean, cb: IslandCallbacks): Boolean {
     if (direction == null) return false
     // Preview, reader and picture steps: only swipe up and down mean something.
@@ -765,12 +726,6 @@ private fun expandedSwipeFires(direction: PillSwipeDirection?, stepsActive: Bool
     }
 }
 
-/**
- * Runs the collapsed-pill action for [direction] when the finger lifts. When the action puts another card in the pill,
- * the content stays where the finger left it and the new card slides in from the opposite side (see
- * [CollapsedContentLayer]); if no card arrives within [CARD_ENTER_WAIT_MS] (a single card, a track skip), the content
- * eases back instead.
- */
 private fun commitPillSwipe(
     direction: PillSwipeDirection,
     dragX: Float,
@@ -790,8 +745,7 @@ private fun commitPillSwipe(
         PillSwipeDirection.Down -> com.agupta07505.smartisland.model.FIXED_PILL_SWIPE_DOWN_ACTION
     }
     val sideways = direction == PillSwipeDirection.Left || direction == PillSwipeDirection.Right
-    // Idle widgets on the pill with no card: left = the next widget, right = the previous one. Another widget slides in from the far side
-    // (the same entry a swiped card uses); with only one widget the content springs straight back.
+    // Idle widgets on the pill with no card: left = the next widget, right = the previous one.
     if (sideways && cb.currentNotifications.isEmpty() && ui.idleWidgetCycle != null) {
         val changed = ui.idleWidgetCycle?.invoke(direction == PillSwipeDirection.Left) == true
         if (changed) ui.pendingEnterSign = if (dragX < 0f) 1 else -1
@@ -807,7 +761,8 @@ private fun commitPillSwipe(
         }
         return
     }
-    // Up and down (and a sideways swipe on a pill that has cards) keep the pill swipe actions, which are off when only the widgets asked for the swipe.
+    // Up and down (and a sideways swipe on a pill that has cards) keep the pill swipe actions, which are off when
+    // only the widgets asked for the swipe.
     if (!settings.enablePillSwipeActions) return
     if (sideways && swipeChangesCard(action)) {
         ui.lastCardSwipeMs = System.currentTimeMillis()
@@ -827,12 +782,9 @@ private fun commitPillSwipe(
     runner.run(action, cb.currentNotifications.getOrNull(cb.currentSelectedIndex))
 }
 
-
 /**
- * True = the expanded card's swipe slides the new card in from the side (heavier);
- * false = the new card replaces the old one at once and the switch squash plays (lighter).
- * The outgoing card stays on screen as a recorded layer (ExpandedCardHost) so no second card is composed.
- * It does not leave as a strip with the new card; it fades out in place and the new card fades in after the lift.
+ * True = the expanded card's swipe slides the new card in from the side (heavier); false = the new card replaces the
+ * old one at once and the switch squash plays (lighter).
  */
 internal const val EXPANDED_SWIPE_SLIDES_IN = true
 
@@ -845,11 +797,6 @@ internal const val SWIPE_SWITCH_BOUNCE_SKIP_MS = 600L
 private fun expandedSideAction(settings: com.agupta07505.smartisland.data.SmartIslandSettings, dragX: Float): SwipeAction =
     SwipeAction.fromId(if (dragX < 0f) settings.swipeLeftAction else settings.swipeRightAction, SwipeAction.None)
 
-/**
- * Runs the expanded left / right swipe action. When it puts another card in the island, the old card stays where the
- * finger left it and the new one comes in from the opposite side (see [ExpandedCardHost]); if no card arrives within
- * [CARD_ENTER_WAIT_MS] the card eases back instead.
- */
 private fun commitExpandedSwipe(
     action: SwipeAction,
     dragX: Float,
@@ -864,9 +811,7 @@ private fun commitExpandedSwipe(
     if (swipeIsNoOp(action, cards, index)) return
     val outcome = if (swipeChangesCard(action)) predictCardChange(action, cards, index) else SwipeCardOutcome.Stays
     if (outcome != SwipeCardOutcome.Stays && !EXPANDED_SWIPE_SLIDES_IN) {
-        // Instant swap. No slide-in and no waiting job: the card goes to the middle, the new card simply
-        // appears (the pager jumps instead of scrolling, so it does not animate a whole page), and the switch squash plays
-        // because lastCardSwipeMs is left alone. The island's height follows with its own single spring.
+        // Instant swap.
         ui.cardBackJob?.cancel()
         ui.cardWaitJob?.cancel()
         ui.pendingCardEnterSign = 0
@@ -901,7 +846,6 @@ private fun commitExpandedSwipe(
     runner.run(action, notification)
 }
 
-/** The expanded card glides back to the middle (cancelled swipe, an action that keeps the card, or no new card came). */
 private fun easeCardBack(ui: IslandInteractionState, scope: CoroutineScope) {
     val start = ui.cardDragX
     ui.cardBackJob?.cancel()

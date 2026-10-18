@@ -38,8 +38,8 @@ import com.agupta07505.smartisland.util.MergeStyle
 import kotlinx.coroutines.launch
 
 /**
- * Layout tab: how fast the island opens, closes and settles. Follows the Portrait / Landscape
- * switch above it, so each orientation keeps its own speed.
+ * Layout tab: how fast the island opens, closes and settles. Follows the Portrait / Landscape switch above it, so
+ * each orientation keeps its own speed.
  */
 @Composable
 fun AnimationSpeedSection(
@@ -117,8 +117,8 @@ fun AnimationSpeedSection(
 }
 
 /**
- * Layout tab: how the small round cutout joins the main one when it merges. Follows the Portrait /
- * Landscape switch above it, so each orientation keeps its own choice.
+ * Layout tab: how the small round cutout joins the main one when it merges. Follows the Portrait / Landscape switch
+ * above it, so each orientation keeps its own choice.
  */
 @Composable
 fun MergeStyleSection(

@@ -26,8 +26,8 @@ data class VoipNotificationFacts(
 )
 
 /**
- * Shared "a VoIP call is live" flag. [VoipCallMonitor] writes it from the audio mode, and
- * `toIslandMode` reads it so an ongoing call notification is shown as a call card.
+ * Shared "a VoIP call is live" flag. [VoipCallMonitor] writes it from the audio mode, and `toIslandMode` reads it so
+ * an ongoing call notification is shown as a call card.
  */
 object VoipCallSignal {
     @Volatile var active: Boolean = false
@@ -80,7 +80,6 @@ object VoipCallDetector {
         "llamada", "appel", "anruf", "通话", "通話", "звонок"
     )
 
-    /** ASCII words match as whole words ("end" must not match "send"); other scripts match as substrings. */
     private fun containsWord(text: String, word: String): Boolean {
         if (word.any { it.code > 127 }) return text.contains(word)
         return Regex("(?<![\\p{L}])" + Regex.escape(word) + "(?![\\p{L}])").containsMatchIn(text)
@@ -100,7 +99,6 @@ object VoipCallDetector {
         }
     }
 
-    /** True when a speaker button's label offers to switch BACK, meaning speaker is on right now. */
     fun isSpeakerOnLabel(title: String): Boolean = matches(title.lowercase(), SPEAKER_ACTIVE_WORDS)
 
     fun textLooksLikeCall(text: String): Boolean = matches(text.lowercase(), CALL_TEXT_WORDS)
@@ -133,10 +131,8 @@ object VoipCallDetector {
             " buttons=${f.actionTitles.joinToString(prefix = "[", postfix = "]") { "'$it'" }}"
     }
 
-    /** Whether a notification is the call notification of a running VoIP call. */
     fun isVoipCall(f: VoipNotificationFacts): Boolean = score(f) >= THRESHOLD
 
-    /** The best call notification among [candidates] (key to facts), or null when none qualifies. */
     fun pickBest(candidates: List<Pair<String, VoipNotificationFacts>>): String? =
         candidates
             .map { (key, facts) -> key to score(facts) }

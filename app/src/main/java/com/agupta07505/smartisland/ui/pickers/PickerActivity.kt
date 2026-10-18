@@ -34,14 +34,12 @@ import kotlinx.coroutines.flow.first
 
 /**
  * The window the island opens for its pickers (the pinned apps picker and the "add a utility" picker): a see-through
- * activity in its own task that holds only the dialog, so choosing never brings the app's settings screen up. The island
- * stays on top of it, so what is picked shows in the island while it is being picked. Closing the dialog closes the window.
+ * activity in its own task that holds only the dialog, so choosing never brings the app's settings screen up.
  */
 @AndroidEntryPoint
 class PickerActivity : ComponentActivity() {
     @Inject lateinit var settingsRepository: SmartIslandSettingsRepository
 
-    /** Which picker is showing; a second request while the window is open swaps it (see [onNewIntent]). */
     private var kind by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -114,9 +112,8 @@ class PickerActivity : ComponentActivity() {
 }
 
 /**
- * The "add a utility" picker in its window: the add dialog opens on the first empty cell of the Utilities grid (the same cell the
- * settings editor picks). With every cell taken there is nothing to add to: a short message and the window closes.
- * The cell is chosen once, when the picker opens; the layout changing underneath (a widget finishing) never moves it.
+ * The "add a utility" picker in its window: the add dialog opens on the first empty cell of the Utilities grid (the
+ * same cell the settings editor picks).
  */
 @Composable
 internal fun UtilityPickerHost(

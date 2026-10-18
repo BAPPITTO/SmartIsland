@@ -32,9 +32,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.getValue
 
 /**
- * The separate round tap target for the idle dot (a capsule in portrait, where it is as wide as the idle pill). Draws nothing while [alpha] is ~0 or
- * [dot] is null. [topShiftDp] is the current top padding of the island box; the dot's own top is
- * measured from the screen top.
+ * The separate round tap target for the idle dot (a capsule in portrait, where it is as wide as the idle pill). Draws
+ * nothing while [alpha] is ~0 or [dot] is null.
  */
 @Composable
 internal fun LandscapeIdleDotView(
@@ -74,9 +73,7 @@ internal fun LandscapeIdleDotView(
 /**
  * Portrait, island expanded: the glyph-free centre band of the pill, at the top of the expanded island, as a
  * transparent tap target drawn above the card (the card's own click would otherwise take the tap and open the
- * notification). A tap closes the island with the secondary cutout's merge and then puts the cards away; a long press runs
- * the long-press action. It draws nothing, never animates, and only takes taps and holds: swipes that start on it still
- * reach the island. Collapsed, the same band is handled by the island's own gesture ([pillCenterTapHit]).
+ * notification).
  */
 @Composable
 internal fun PortraitPillCenterTarget(
@@ -101,9 +98,8 @@ internal fun PortraitPillCenterTarget(
 }
 
 /**
- * Where the expanded island's close target sits: on the camera cutout the device reports ([com.agupta07505.smartisland.util.CameraCutoutDetector]),
- * or on the pill's centre band when there is none. Detected once per configuration (rotation), not per frame.
- * Own composable so the very large overlay function does not grow.
+ * Where the expanded island's close target sits: on the camera cutout the device reports
+ * ([com.agupta07505.smartisland.util.CameraCutoutDetector]), or on the pill's centre band when there is none.
  */
 @Composable
 internal fun rememberExpandedCloseZone(
@@ -135,7 +131,6 @@ internal fun rememberExpandedCloseZone(
     }
 }
 
-/** The camera hole as best known (see [com.agupta07505.smartisland.util.CameraCutoutDetector.areaFor]); detected once per configuration. */
 @Composable
 internal fun rememberCameraCutoutArea(
     settings: com.agupta07505.smartisland.data.SmartIslandSettings,
@@ -153,9 +148,8 @@ internal fun rememberCameraCutoutArea(
 }
 
 /**
- * Portrait, island collapsed, centre band NOT overlapping the camera cutout: a transparent long-press target over the camera cutout
- * (hide / show the pill, or the configured long-press action). Taps on it do nothing. Drawn only where the cutout is outside the pill,
- * so it never covers the pill's own gestures.
+ * Portrait, island collapsed, centre band NOT overlapping the camera cutout: a transparent long-press target over the
+ * camera cutout (hide / show the pill, or the configured long-press action).
  */
 @Composable
 internal fun CutoutLongPressTarget(

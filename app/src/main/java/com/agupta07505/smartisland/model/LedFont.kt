@@ -20,18 +20,17 @@ class LedGrid(val cols: Int, val rows: Int, val bits: BooleanArray) {
     }
 }
 
-/** What a slot shows on the LED board: a text or one of the small dot icons. */
 sealed interface LedFace {
     data class Text(val text: String) : LedFace
     data class Icon(val icon: LedIcon) : LedFace
 }
 
-/** The 7x7 dot icons the LED slots use in place of the Material glyphs. */
+/** Dot icons the LED slots use instead of the Material glyphs: 7x7, weather icons 9x9 to fill the board's height. */
 enum class LedIcon { Clock, Sun, Moon, Cloud, Rain, Snow, Bolt, Battery, BatteryLow, BatteryFull, Alarm, ArrowUp, ArrowDown, Calendar, Wind }
 
 /**
- * The built-in LED font: 5 by 7 dots per letter with one empty column between letters, plus the 7 by 7 dot icons. It is drawn by this
- * app (no font file), so it carries no licence of its own. Any other font is turned into dots by ui/LedRaster.kt.
+ * Built-in LED font: 5x7 dots per letter, plus 7x7 icons and 9x9 weather icons. Drawn by the app (no font file);
+ * other fonts become dots in ui/LedRaster.kt.
  */
 object LedFont {
     const val GLYPH_COLS = 5
@@ -82,17 +81,19 @@ object LedFont {
         '%' to "11001110010001000100010001001110011",
         '/' to "00001000100001000100010000100010000",
         '+' to "00000001000010011111001000010000000",
-        '°' to "01100100101001001100000000000000000"
+        '°' to "01100100101001001100000000000000000",
+        // Feels like is drawn as "~19°".
+        '~' to "00000000000100010101000100000000000"
     )
 
     private val ICONS: Map<LedIcon, List<String>> = mapOf(
         LedIcon.Clock to listOf("0011100", "0100010", "1001001", "1001101", "1000001", "0100010", "0011100"),
-        LedIcon.Sun to listOf("0001000", "0100010", "0011100", "1011101", "0011100", "0100010", "0001000"),
-        LedIcon.Moon to listOf("0011100", "0111000", "1110000", "1110000", "1110000", "0111001", "0011110"),
-        LedIcon.Cloud to listOf("0000000", "0011000", "0100110", "1000001", "1000001", "0111110", "0000000"),
-        LedIcon.Rain to listOf("0011100", "0100010", "1000001", "0111110", "0101010", "0000000", "0101010"),
-        LedIcon.Snow to listOf("0001000", "0101010", "0011100", "1111111", "0011100", "0101010", "0001000"),
-        LedIcon.Bolt to listOf("0000110", "0001100", "0011000", "0111110", "0001100", "0011000", "0010000"),
+        LedIcon.Sun to listOf("000010000", "010000010", "000111000", "001111100", "101111101", "001111100", "000111000", "010000010", "000010000"),
+        LedIcon.Moon to listOf("000111100", "001111110", "011111000", "011110000", "011110000", "011110000", "011111000", "001111110", "000111100"),
+        LedIcon.Cloud to listOf("000000000", "000011100", "000111110", "001111111", "011111111", "111111111", "111111111", "011111110", "000000000"),
+        LedIcon.Rain to listOf("000011100", "000111110", "011111111", "111111111", "011111110", "000000000", "001001001", "010010010", "100100100"),
+        LedIcon.Snow to listOf("000010000", "010010010", "001010100", "000111000", "111111111", "000111000", "001010100", "010010010", "000010000"),
+        LedIcon.Bolt to listOf("000011111", "000111110", "001111100", "011111000", "011111110", "000011100", "000111000", "000110000", "001100000"),
         LedIcon.Battery to listOf("0000000", "1111110", "1111011", "1111011", "1111011", "1111110", "0000000"),
         LedIcon.BatteryLow to listOf("0000000", "1111110", "1100011", "1100011", "1100011", "1111110", "0000000"),
         LedIcon.BatteryFull to listOf("0000000", "1111110", "1111111", "1111111", "1111111", "1111110", "0000000"),
@@ -103,7 +104,7 @@ object LedFont {
         LedIcon.Wind to listOf("0001110", "0010001", "0000001", "1111110", "0000000", "0111110", "0000001")
     )
 
-    /** [text] in the built-in dot font, 7 rows tall. Lower case is drawn as capitals; a character the font lacks is drawn as a space. */
+    /** [text] in the built-in 7-row dot font. Lower case is drawn as capitals; a missing character becomes a space. */
     fun text(text: String): LedGrid {
         if (text.isEmpty()) return LedGrid(1, GLYPH_ROWS, BooleanArray(GLYPH_ROWS))
         val cols = text.length * (GLYPH_COLS + GAP) - GAP
@@ -117,21 +118,26 @@ object LedFont {
         return LedGrid(cols, GLYPH_ROWS, bits)
     }
 
-    /** The 7 by 7 dots of [icon]. */
+    /** Weather icons are [WEATHER_SIZE] by [WEATHER_SIZE] dots; every other icon is 7x7. */
+    const val WEATHER_SIZE = 9
+
     fun icon(icon: LedIcon): LedGrid {
         val rows = ICONS.getValue(icon)
-        val bits = BooleanArray(7 * 7)
-        rows.forEachIndexed { y, row -> row.forEachIndexed { x, c -> if (c == '1') bits[y * 7 + x] = true } }
-        return LedGrid(7, 7, bits)
+        val size = rows.size
+        val bits = BooleanArray(size * size)
+        rows.forEachIndexed { y, row -> row.forEachIndexed { x, c -> if (c == '1') bits[y * size + x] = true } }
+        return LedGrid(size, size, bits)
     }
 
-    /** True when the built-in font has a glyph for [c] (lower case counts as its capital). */
     fun has(c: Char): Boolean = GLYPHS.containsKey(c.uppercaseChar())
 }
 
-/** Puts grids on a board and moves them a whole number of LED rows. */
+/** Puts grids on a board and moves them whole LED rows. */
 object LedFrames {
-    /** [grid] centred on a board of [boardCols] by [boardRows] and moved down by [shiftY] rows (negative = up); rows that leave are gone. */
+    /**
+     * [grid] centred on a [boardCols] x [boardRows] board and moved down by [shiftY] rows (negative = up); rows that
+     * leave are gone.
+     */
     fun place(grid: LedGrid, boardCols: Int, boardRows: Int, shiftY: Int): BooleanArray {
         val out = BooleanArray(boardCols * boardRows)
         val ox = (boardCols - grid.cols) / 2
@@ -149,8 +155,8 @@ object LedFrames {
     }
 
     /**
-     * One frame of a burst: [from] has moved [rowsOffset] rows up (or down when [towardsDown]) and [to] follows it in from the other
-     * side, so after [LedTick.ROWS] rows only [to] is left. [from] and [to] may be the same grid (the beat of an unchanged slot).
+     * One burst frame: [from] moved [rowsOffset] rows up (down when [towardsDown]) with [to] following; after
+     * [LedTick.ROWS] rows only [to] is left. May be the same grid.
      */
     fun frame(from: LedGrid, to: LedGrid, towardsDown: Boolean, rowsOffset: Int, boardCols: Int, boardRows: Int = LedTick.ROWS): BooleanArray {
         val dir = if (towardsDown) 1 else -1
@@ -163,13 +169,12 @@ object LedFrames {
 }
 
 /**
- * The fading afterglow of an LED board: a lit LED is at full brightness at once and dies away over about [FADE_MS] once it goes dark,
- * so moving text leaves a short trail like a real board.
+ * Fading afterglow of an LED board: a lit LED is full brightness at once and dies away over about [FADE_MS] once
+ * dark, so moving text leaves a short trail.
  */
 class LedGlow(val cols: Int, val rows: Int = LedTick.ROWS) {
     val level = FloatArray(cols * rows)
 
-    /** Moves the glow on by [dtMs] with [frame] lit. */
     fun step(frame: BooleanArray, dtMs: Float) {
         val keep = Math.exp((-dtMs.coerceAtLeast(0f) / FADE_MS).toDouble()).toFloat()
         for (i in level.indices) {
@@ -178,12 +183,23 @@ class LedGlow(val cols: Int, val rows: Int = LedTick.ROWS) {
         }
     }
 
-    /** Shows [frame] with no trail (the board at rest). */
+    /**
+     * Sets every LED to a mix of two frames with no travel ([from] at 1 - [mix], [to] at [mix]): the cross-fade used
+     * when footsteps may not move (Battery Saver, "remove animations").
+     */
+    fun blend(from: BooleanArray, to: BooleanArray, mix: Float) {
+        val m = mix.coerceIn(0f, 1f)
+        for (i in level.indices) {
+            val a = if (i < from.size && from[i]) 1f else 0f
+            val b = if (i < to.size && to[i]) 1f else 0f
+            level[i] = a * (1f - m) + b * m
+        }
+    }
+
     fun settle(frame: BooleanArray) {
         for (i in level.indices) level[i] = if (i < frame.size && frame[i]) 1f else 0f
     }
 
-    /** True while some LED still glows without being lit. */
     fun fading(frame: BooleanArray): Boolean {
         for (i in level.indices) {
             val lit = i < frame.size && frame[i]

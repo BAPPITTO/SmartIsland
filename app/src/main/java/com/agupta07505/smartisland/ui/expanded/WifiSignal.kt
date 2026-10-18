@@ -32,9 +32,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
-/**
- * The Wi-Fi card's picture, in the same 46 dp tinted box as the VPN globe and the Bluetooth earbuds. See [WifiArcs] for the drawing.
- */
+/** The Wi-Fi card's picture, in the same 46 dp tinted box as the VPN globe and the Bluetooth earbuds. See [WifiArcs]. */
 @Composable
 internal fun WifiSignalBox(accent: Color, modifier: Modifier = Modifier, lost: Boolean = false) {
     val shape = RoundedCornerShape(14.dp)
@@ -51,9 +49,8 @@ internal fun WifiSignalBox(accent: Color, modifier: Modifier = Modifier, lost: B
 }
 
 /**
- * A dot and three arcs drawn as lines, scaled to whatever size it is given (the expanded card's box uses 32 dp, the collapsed pill 20 dp).
- * Connected, the arcs count up (1, 2, 3, 1, 2, 3, ...) in a loop, and the loop stands still on all three arcs when the system's
- * animations are off; [lost], all three arcs stand still with a slash through them (no animation, no timer).
+ * A dot and three arcs drawn as lines, scaled to whatever size it is given (the expanded card's box uses 32 dp, the
+ * collapsed pill 20 dp).
  */
 @Composable
 internal fun WifiArcs(accent: Color, modifier: Modifier = Modifier, lost: Boolean = false) {
@@ -104,7 +101,6 @@ internal fun WifiArcs(accent: Color, modifier: Modifier = Modifier, lost: Boolea
     }
 }
 
-/** 1, 2, 3, then straight back to 1: 1 - 2 - 3 - 1 - 2 - 3 ... */
 private val WIFI_LEVEL_CYCLE = intArrayOf(1, 2, 3)
 private const val WIFI_STEP_MS = 600L
 private const val WIFI_FADE_MS = 240

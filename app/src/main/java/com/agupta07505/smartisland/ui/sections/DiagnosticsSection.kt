@@ -45,8 +45,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
 /**
- * Diagnostic log: switch recording on, reproduce the problem (a WhatsApp or VoIP call that the
- * island did not pick up), then export the report and send it in.
+ * Diagnostic log: switch recording on, reproduce the problem (a WhatsApp or VoIP call that the island did not pick
+ * up), then export the report and send it in.
  */
 @Composable
 fun DiagnosticsSection(
@@ -80,6 +80,7 @@ fun DiagnosticsSection(
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        FaceUnlockSection(settings, repository)
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)

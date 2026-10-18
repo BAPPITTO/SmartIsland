@@ -84,7 +84,6 @@ class SmartIslandOverlayService : AccessibilityService() {
     private val isTouchableRegionSupported = MutableStateFlow(false)
     @Volatile private var destroyed = false
     private var isWindowExpanded: Boolean = false
-    /** The window is full size for the semi-expanded idle widget island (open, and while it shrinks back). */
     private var widgetWindowOpen: Boolean = false
     private var widgetWindowJob: kotlinx.coroutines.Job? = null
     private var collapseJob: kotlinx.coroutines.Job? = null
@@ -119,8 +118,9 @@ class SmartIslandOverlayService : AccessibilityService() {
     }
 
     private var connectivityMonitor: com.agupta07505.smartisland.util.ConnectivityEventMonitor? = null
+    private var wiredDeviceMonitor: com.agupta07505.smartisland.util.WiredDeviceEventMonitor? = null
     private var transferSpeedMonitor: com.agupta07505.smartisland.util.TransferSpeedMonitor? = null
-    private var privacyMonitor: com.agupta07505.smartisland.util.PrivacyIndicatorMonitor? = null
+    private var faceUnlockWatcher: com.agupta07505.smartisland.util.FaceUnlockWatcher? = null
 
     private val serviceScope = kotlinx.coroutines.CoroutineScope(
         SupervisorJob() +
@@ -130,7 +130,131 @@ class SmartIslandOverlayService : AccessibilityService() {
             }
     )
 
-    // Monitor screen state and unlock events to show/hide the island accordingly
+    // Face ID scan: driven by screen events, the unlock broadcast and the system log
+    private val faceUnlockCoordinator = com.agupta07505.smartisland.util.FaceUnlockCoordinator(
+        object : com.agupta07505.smartisland.util.FaceUnlockCoordinator.Output {
+            override fun startScan() = startScan(com.agupta07505.smartisland.util.FaceIdController.REAL_WAIT_MS)
+            override fun startScan(waitMs: Int) {
+                com.agupta07505.smartisland.util.AppLogRecorder.i("FaceUnlock", "scan started (gives the system up to ${waitMs} ms to answer)")
+                com.agupta07505.smartisland.util.FaceIdController.startForUnlock(
+                    com.agupta07505.smartisland.util.FaceIdController.styleOf(viewModel.settings.value.faceIdStyle),
+                    waitMs
+                )
+            }
+            override fun startAppScan() {
+                com.agupta07505.smartisland.util.AppLogRecorder.i("FaceUnlock", "app scan started (app Face ID style)")
+                com.agupta07505.smartisland.util.FaceIdController.startForApp(
+                    com.agupta07505.smartisland.util.FaceIdController.styleOf(viewModel.settings.value.appFaceIdStyle)
+                )
+            }
+            override fun startAppScanEarly() {
+                com.agupta07505.smartisland.util.AppLogRecorder.i("FaceUnlock", "app scan started early (blinking waits for the real scan)")
+                com.agupta07505.smartisland.util.FaceIdController.startForApp(
+                    com.agupta07505.smartisland.util.FaceIdController.styleOf(viewModel.settings.value.appFaceIdStyle),
+                    anchored = false
+                )
+            }
+            override fun anchor() = com.agupta07505.smartisland.util.FaceIdController.anchor()
+            override fun accept() {
+                com.agupta07505.smartisland.util.AppLogRecorder.i("FaceUnlock", "face accepted: tick plays")
+                com.agupta07505.smartisland.util.FaceIdController.accept()
+            }
+            override fun reject() {
+                com.agupta07505.smartisland.util.AppLogRecorder.i("FaceUnlock", "scan ended without a match: no-face ending plays")
+                com.agupta07505.smartisland.util.FaceIdController.reject()
+            }
+            override fun fingerprint() {
+                com.agupta07505.smartisland.util.AppLogRecorder.i("FaceUnlock", "fingerprint unlock: fingerprint animation plays")
+                com.agupta07505.smartisland.util.FaceIdController.fingerprint()
+            }
+            override fun startFingerprintScan() {
+                com.agupta07505.smartisland.util.AppLogRecorder.i("FaceUnlock", "fingerprint unlock from the dark screen: fingerprint animation plays")
+                com.agupta07505.smartisland.util.FaceIdController.startFingerprint(
+                    com.agupta07505.smartisland.util.FaceIdController.styleOf(viewModel.settings.value.faceIdStyle)
+                )
+            }
+            override fun startAppFingerprintScan() {
+                com.agupta07505.smartisland.util.AppLogRecorder.i("FaceUnlock", "fingerprint unlock in an app prompt: fingerprint animation plays")
+                com.agupta07505.smartisland.util.FaceIdController.startFingerprint(
+                    com.agupta07505.smartisland.util.FaceIdController.styleOf(viewModel.settings.value.appFaceIdStyle)
+                )
+            }
+            override fun cancel() {
+                com.agupta07505.smartisland.util.AppLogRecorder.i("FaceUnlock", "scan cancelled")
+                com.agupta07505.smartisland.util.FaceIdController.cancel()
+            }
+            override fun stop() {
+                com.agupta07505.smartisland.util.AppLogRecorder.i("FaceUnlock", "scan stopped")
+                com.agupta07505.smartisland.util.FaceIdController.stop()
+            }
+
+            override fun isScanning(): Boolean = com.agupta07505.smartisland.util.FaceIdController.state.value.active
+            override fun later(delayMs: Long, block: () -> Unit) {
+                serviceScope.launch {
+                    kotlinx.coroutines.delay(delayMs)
+                    block()
+                }
+            }
+            override fun note(text: String) {
+                com.agupta07505.smartisland.util.AppLogRecorder.i("FaceUnlock", text)
+            }
+        }
+    )
+
+    private fun handleMiuiAppLock(event: com.agupta07505.smartisland.util.MiuiAppLockEvent) {
+        val now = android.os.SystemClock.elapsedRealtime()
+        when (event) {
+            com.agupta07505.smartisland.util.MiuiAppLockEvent.PromptShown,
+            com.agupta07505.smartisland.util.MiuiAppLockEvent.ScanStart -> {
+                val power = getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+                val keyguard = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+                faceUnlockCoordinator.syncState(
+                    screenOn = power?.isInteractive != false,
+                    locked = keyguard?.isKeyguardLocked == true
+                )
+                if (event == com.agupta07505.smartisland.util.MiuiAppLockEvent.PromptShown) {
+                    faceUnlockCoordinator.onAppLockRequired()
+                } else {
+                    faceUnlockCoordinator.onLog(
+                        com.agupta07505.smartisland.util.FaceUnlockLogEvent.Start,
+                        now,
+                        strong = true,
+                        fromApp = true
+                    )
+                }
+            }
+            com.agupta07505.smartisland.util.MiuiAppLockEvent.FaceMatched -> faceUnlockCoordinator.onAppUnlocked(now)
+            com.agupta07505.smartisland.util.MiuiAppLockEvent.FingerprintMatched ->
+                faceUnlockCoordinator.onUnlockType(com.agupta07505.smartisland.util.UnlockType.Fingerprint, now)
+        }
+    }
+
+    private fun configureFaceUnlock(effective: com.agupta07505.smartisland.data.SmartIslandSettings) {
+        val on = effective.enabled &&
+            effective.isEventEnabled(com.agupta07505.smartisland.model.IslandEvent.FACE_UNLOCK.id)
+        val shizuku = com.agupta07505.smartisland.util.ShizukuManager.hasPermission()
+        val logAvailable = on && shizuku
+        // app scans show up only in the system log, so they need Shizuku
+        val appOn = effective.enabled && effective.appFaceIdEnabled && shizuku
+        faceUnlockCoordinator.configure(
+            enabled = on,
+            mode = com.agupta07505.smartisland.util.FaceUnlockMode.fromId(effective.faceUnlockMode),
+            logAvailable = logAvailable,
+            appEnabled = appOn,
+            fingerprintEnabled = effective.fingerprintAnimationEnabled
+        )
+        val watcher = faceUnlockWatcher
+        if ((logAvailable || appOn) && watcher != null) watcher.start() else watcher?.stop()
+        val summary = "lockScreen=$on appFaceId=${effective.appFaceIdEnabled} fingerprint=${effective.fingerprintAnimationEnabled} shizuku=$shizuku appOn=$appOn " +
+            "watcherRunning=${watcher?.running == true} mode=${effective.faceUnlockMode}"
+        if (summary != lastFaceUnlockConfig) {
+            lastFaceUnlockConfig = summary
+            com.agupta07505.smartisland.util.AppLogRecorder.i("FaceUnlock", "config: $summary")
+        }
+    }
+
+    private var lastFaceUnlockConfig: String? = null
+
     private val screenStateReceiver = object : android.content.BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             runCatchingLogged(TAG, "Screen-state callback failed") {
@@ -140,7 +264,13 @@ class SmartIslandOverlayService : AccessibilityService() {
                     Intent.ACTION_SCREEN_ON -> {
                         overlayOwners.resume()
                         isLockScreenActive = keyguardManager?.isKeyguardLocked == true
-                        privacyMonitor?.onLockStateChanged()
+                        com.agupta07505.smartisland.util.AppLogRecorder.i(
+                            "FaceUnlock",
+                            "screen-on broadcast received: locked=$isLockScreenActive"
+                        )
+                        // Shizuku may have come up since the last check.
+                        configureFaceUnlock(viewModel.displaySettings.value)
+                        faceUnlockCoordinator.onScreenOn(isLockScreenActive, android.os.SystemClock.elapsedRealtime())
                         updateWindowLayoutParams(
                             isWindowExpanded,
                             viewModel.displaySettings.value
@@ -153,7 +283,9 @@ class SmartIslandOverlayService : AccessibilityService() {
                         shadeOpen = false
                         viewModel.setShadeOpen(false)
                         isLockScreenActive = true
-                        privacyMonitor?.onLockStateChanged()
+                        // HyperOS can deliver this late, after the screen has woken again
+                        val stillOn = (getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager)?.isInteractive == true
+                        if (!stillOn) faceUnlockCoordinator.onScreenOff()
                         updateWindowLayoutParams(
                             isWindowExpanded,
                             viewModel.displaySettings.value
@@ -161,7 +293,7 @@ class SmartIslandOverlayService : AccessibilityService() {
                     }
                     Intent.ACTION_USER_PRESENT -> {
                         isLockScreenActive = false
-                        privacyMonitor?.onLockStateChanged()
+                        faceUnlockCoordinator.onUserPresent(android.os.SystemClock.elapsedRealtime())
                         updateWindowLayoutParams(
                             isWindowExpanded,
                             viewModel.displaySettings.value
@@ -173,15 +305,11 @@ class SmartIslandOverlayService : AccessibilityService() {
     }
 
     // Fallback sync: check if keyguard locked state changed on window changes.
-    // Wrapped: an uncaught throw here makes Android auto-disable the
-    // AccessibilityService, which is exactly the "turns off by itself" symptom.
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         runCatchingLogged(TAG, "onAccessibilityEvent failed") {
             if (destroyed || !::viewModel.isInitialized) return@runCatchingLogged
-            // Content-change events arrive in the hundreds per second while any app draws (a playing
-            // video or music app, a scrolling list, this island's own animation). Each one would cost a keyguard
-            // binder call on the main thread. They are only a fallback for the lock state, checked at most once
-            // per KEYGUARD_POLL_MS; nothing else here looks at them.
+            // Content-change events arrive in the hundreds per second while any app draws (a playing video or music
+            // app, a scrolling list, this island's own animation).
             val eventType = event?.eventType
             val nowMs = android.os.SystemClock.elapsedRealtime()
             if (eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED &&
@@ -195,7 +323,6 @@ class SmartIslandOverlayService : AccessibilityService() {
             if (isLockScreenActive != locked) {
                 isLockScreenActive = locked
                 if (locked) viewModel.closeWidgetIsland(snap = true)
-                privacyMonitor?.onLockStateChanged()
                 updateWindowLayoutParams(isWindowExpanded, viewModel.displaySettings.value)
             }
 
@@ -220,7 +347,8 @@ class SmartIslandOverlayService : AccessibilityService() {
                     openedPackage != "com.android.systemui" &&
                     !isInputMethodPackage(openedPackage)
                 ) {
-                    // Another app's window came up (an app switch, a back that landed in another screen, a dialog): the widget island closes.
+                    // Another app's window came up (an app switch, a back that landed in another screen, a dialog):
+                    // the widget island closes.
                     viewModel.closeWidgetIsland(snap = false, graceMs = WIDGET_ISLAND_EVENT_GRACE_MS)
                     // A recorder's Save/Stop opened its app: go back so the user stays where they were.
                     if (com.agupta07505.smartisland.util.SilentActionGuard.consume(openedPackage)) {
@@ -242,12 +370,6 @@ class SmartIslandOverlayService : AccessibilityService() {
         }
     }
 
-    /**
-     * Reads the app the user is in from the accessibility windows (the focused, else active, application window, never this
-     * app, SystemUI or a keyboard) and tells the view model, which hides that app's live cards (see util/ForegroundApp.kt).
-     * No such window (a transition, the shade) keeps the last app, except on the lock screen, where there is none.
-     * Returns false when the window list could not be read, so the caller can fall back to the opened window's package.
-     */
     private fun refreshForegroundApp(
         locked: Boolean,
         windowList: List<android.view.accessibility.AccessibilityWindowInfo>
@@ -268,15 +390,16 @@ class SmartIslandOverlayService : AccessibilityService() {
             pkg == packageName || pkg == com.agupta07505.smartisland.util.ShadeDetector.SYSTEM_UI || isInputMethodPackage(pkg)
         }
         var picked = com.agupta07505.smartisland.util.ForegroundApp.pick(appWindows, ignoredPackage)
-        // Some apps (ChatGPT, Authenticator) hide their window from the accessibility window list, so there is no application
-        // window at all and no window event with their package. Ask the usage stats which app last came to the front instead.
+        // Some apps (ChatGPT, Authenticator) hide their window from the accessibility window list, so there is no
+        // application window at all and no window event with their package.
         var fromUsage = false
         if (picked == null && !locked && appWindows.none { it.isApplicationType }) {
             picked = usageForeground.current(ignoredPackage)
             fromUsage = picked != null
         }
-        // The app window the user is in exists but its root (so its package) cannot be read yet: the caller falls back to the
-        // package of the window event, instead of keeping the previous app (which left an exempt app not recognised).
+        // The app window the user is in exists but its root (so its package) cannot be read yet: the caller falls
+        // back to the package of the window event, instead of keeping the previous app (which left an exempt app not
+        // recognised).
         if (picked == null && !locked &&
             appWindows.any { it.isApplicationType && it.packageName.isNullOrEmpty() && (it.isFocused || it.isActive) }
         ) return false
@@ -299,7 +422,6 @@ class SmartIslandOverlayService : AccessibilityService() {
         return true
     }
 
-    // ---- Cheap window refreshes -------------------------------------------------------------------
     private var lastKeyguardPollMs = 0L
     private var lastWindowRefreshMs = 0L
     private var windowRefreshPending = false
@@ -313,14 +435,8 @@ class SmartIslandOverlayService : AccessibilityService() {
         }
     }
 
-    /**
-     * Accessibility window id -> package. `AccessibilityWindowInfo.root` is a synchronous call into the window's own app
-     * (it can wait for a busy video or game for a long time, on our main thread); a window's package never changes, so it
-     * is asked once per window.
-     */
     private val windowPackageCache = HashMap<Int, String>()
 
-    /** Foreground app from the usage stats, for apps that hide their window from the accessibility window list. */
     private val usageForeground by lazy { com.agupta07505.smartisland.util.UsageForegroundSource(applicationContext) }
 
     private fun windowPackage(w: android.view.accessibility.AccessibilityWindowInfo): String? {
@@ -331,12 +447,6 @@ class SmartIslandOverlayService : AccessibilityService() {
         return pkg
     }
 
-    /**
-     * Shade and foreground-app refresh, at most once per WINDOW_REFRESH_MIN_MS. A burst of window events (our own window
-     * resizing, an app opening) runs the first one at once and ONE trailing scan for the rest. Returns true when the
-     * window list decides the foreground app (a skipped event is covered by the trailing scan, so the caller must not
-     * fall back to the opened window's package).
-     */
     private fun refreshWindowsThrottled(locked: Boolean): Boolean {
         val now = android.os.SystemClock.elapsedRealtime()
         val since = now - lastWindowRefreshMs
@@ -352,12 +462,6 @@ class SmartIslandOverlayService : AccessibilityService() {
         return true
     }
 
-    /**
-     * Window focus and the window's root can lag the "window changed" event by a few hundred ms (slow app start, quick
-     * back-and-forth between apps). A scan taken inside that gap names the app the user just left, and nothing else
-     * triggers another scan, so that app's live cards (media included) stayed hidden for good. Every event-driven scan is
-     * therefore re-checked a little later; a re-check that changes nothing costs one window read.
-     */
     private val settleScanRunnable = Runnable {
         if (destroyed || !::viewModel.isInitialized) return@Runnable
         runCatchingLogged(TAG, "Settle window scan failed") {
@@ -385,10 +489,6 @@ class SmartIslandOverlayService : AccessibilityService() {
     private var shadeTitlesLocale: String? = null
     private var shadeTitlesCache: com.agupta07505.smartisland.util.ShadeTitles = com.agupta07505.smartisland.util.ShadeTitles.ENGLISH
 
-    /**
-     * Looks at the accessibility windows and tells the view model whether the notification shade / quick settings is
-     * pulled down (every event is hidden then, see util/ShadeDetector.kt). Called on window changes only.
-     */
     private fun refreshShadeState(
         locked: Boolean,
         windowList: List<android.view.accessibility.AccessibilityWindowInfo>
@@ -429,7 +529,6 @@ class SmartIslandOverlayService : AccessibilityService() {
         viewModel.setShadeOpen(open)
     }
 
-    /** SystemUI's own titles for the shade, quick settings and lock screen in the current language (English if unreadable). */
     private fun shadeTitles(): com.agupta07505.smartisland.util.ShadeTitles {
         val locale = java.util.Locale.getDefault().toLanguageTag()
         if (locale == shadeTitlesLocale) return shadeTitlesCache
@@ -458,10 +557,6 @@ class SmartIslandOverlayService : AccessibilityService() {
     private var inputMethodPackages: Set<String> = emptySet()
     private var inputMethodPackagesReadAt = 0L
 
-    /**
-     * Keyboards open their own accessibility windows. They must not replace the foreground app,
-     * or "hide music of the open app" would flip while typing.
-     */
     private fun isInputMethodPackage(pkg: String): Boolean {
         val now = android.os.SystemClock.elapsedRealtime()
         if (now - inputMethodPackagesReadAt > INPUT_METHOD_CACHE_MS) {
@@ -477,8 +572,8 @@ class SmartIslandOverlayService : AccessibilityService() {
     }
 
     /**
-     * The back key (a hardware key or the 3-button bar) closes the widget island. The key still reaches the app: this never consumes it.
-     * With gesture navigation the key is not seen, but the screen it goes back to usually raises a window event, which closes the island too.
+     * The back key (a hardware key or the 3-button bar) closes the widget island. The key still reaches the app: this
+     * never consumes it.
      */
     override fun onKeyEvent(event: android.view.KeyEvent?): Boolean {
         if (event?.keyCode == android.view.KeyEvent.KEYCODE_BACK && event.action == android.view.KeyEvent.ACTION_DOWN &&
@@ -490,7 +585,6 @@ class SmartIslandOverlayService : AccessibilityService() {
     }
 
     override fun onInterrupt() {
-        // Required override, no-op
     }
 
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
@@ -578,12 +672,6 @@ class SmartIslandOverlayService : AccessibilityService() {
 
     private var orientationRefreshJob: kotlinx.coroutines.Job? = null
 
-    /**
-     * Re-reads the orientation now and twice more shortly after. When the callback fires the
-     * system can still be handing out the old display cutout and window metrics, which leaves the
-     * island in the previous layout; the later reads pick up the settled values. Nothing changes
-     * (and nothing redraws) when the value read is the same as before.
-     */
     private fun scheduleOrientationRefresh() {
         orientationRefreshJob?.cancel()
         orientationRefreshJob = serviceScope.launch {
@@ -624,7 +712,6 @@ class SmartIslandOverlayService : AccessibilityService() {
         }
     }
 
-    /** Tells the ViewModel whether we are in portrait or landscape so it can apply the right profile. */
     private fun refreshOrientation() {
         if (!::viewModel.isInitialized) return
         val isLandscape = resources.configuration.orientation ==
@@ -688,7 +775,8 @@ class SmartIslandOverlayService : AccessibilityService() {
             addAction("android.bluetooth.device.action.BATTERY_LEVEL_CHANGED")
         }
         
-        // Android 13+ requires an explicit export flag. NOT_EXPORTED still receives system broadcasts and blocks spoofed intents from other apps.
+        // Android 13+ requires an explicit export flag. NOT_EXPORTED still receives system broadcasts and blocks
+        // spoofed intents from other apps.
         runCatchingLogged(TAG, "registerReceiver failed") {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 registerReceiver(systemEventReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
@@ -730,6 +818,13 @@ class SmartIslandOverlayService : AccessibilityService() {
             settingsProvider = { viewModel.displaySettings.value }
         ).also { it.start() }
 
+        wiredDeviceMonitor = com.agupta07505.smartisland.util.WiredDeviceEventMonitor(
+            context = this,
+            scope = serviceScope,
+            repository = notificationRepository,
+            settingsProvider = { viewModel.displaySettings.value }
+        ).also { it.start() }
+
         // Last-resort transfer detection for apps whose own notification is blocked or missing.
         transferSpeedMonitor = com.agupta07505.smartisland.util.TransferSpeedMonitor(
             context = this,
@@ -743,10 +838,63 @@ class SmartIslandOverlayService : AccessibilityService() {
             }
         ).also { it.start() }
 
-        privacyMonitor = com.agupta07505.smartisland.util.PrivacyIndicatorMonitor(
-            context = this,
-            tracker = viewModel.privacyTracker,
-            scope = serviceScope
+        faceUnlockWatcher = com.agupta07505.smartisland.util.FaceUnlockWatcher(
+            serviceScope,
+            onUnlock = { type, _ ->
+                serviceScope.launch {
+                    val power = getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+                    val keyguard = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+                    faceUnlockCoordinator.syncState(
+                        screenOn = power?.isInteractive != false,
+                        locked = keyguard?.isKeyguardLocked == true
+                    )
+                    faceUnlockCoordinator.onUnlockType(type, android.os.SystemClock.elapsedRealtime())
+                }
+            },
+            onBouncer = {
+                serviceScope.launch { faceUnlockCoordinator.onBouncerShown() }
+            },
+            onAppLockRequired = {
+                // "requireUnlock = true" is also logged when a locked app posts a notification, so it must not show
+                // the scanner.
+                com.agupta07505.smartisland.util.AppLogRecorder.i(
+                    "FaceUnlock",
+                    "app lock line seen: waiting for the real prompt before showing the scanner"
+                )
+            },
+            onPromptDismissed = {
+                serviceScope.launch { faceUnlockCoordinator.onAppPromptDismissed() }
+            },
+            onAppUnlocked = {
+                serviceScope.launch { faceUnlockCoordinator.onAppUnlocked(android.os.SystemClock.elapsedRealtime()) }
+            },
+            onMiuiAppLock = { miuiEvent ->
+                serviceScope.launch { handleMiuiAppLock(miuiEvent) }
+            }
+        ) { event, line ->
+            val strong = com.agupta07505.smartisland.util.FaceUnlockLog.isStrongSuccess(line)
+            val fromApp = com.agupta07505.smartisland.util.FaceUnlockLog.isAppScanStart(line)
+            serviceScope.launch {
+                if (fromApp || event == com.agupta07505.smartisland.util.FaceUnlockLogEvent.Start) {
+                    // the screen-on broadcast trails the scan: read the real state
+                    val power = getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+                    val keyguard = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+                    val interactive = power?.isInteractive != false
+                    val keyguardLocked = keyguard?.isKeyguardLocked == true
+                    faceUnlockCoordinator.syncState(screenOn = interactive, locked = keyguardLocked)
+                    if (!fromApp) {
+                        com.agupta07505.smartisland.util.AppLogRecorder.i(
+                            "FaceUnlock",
+                            "face start line: interactive=$interactive locked=$keyguardLocked"
+                        )
+                    }
+                }
+                faceUnlockCoordinator.onLog(event, android.os.SystemClock.elapsedRealtime(), strong, fromApp)
+            }
+        }
+        faceUnlockCoordinator.syncState(
+            screenOn = (getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager)?.isInteractive != false,
+            locked = isLockScreenActive
         )
 
         serviceScope.launch {
@@ -772,9 +920,8 @@ class SmartIslandOverlayService : AccessibilityService() {
         }
 
         serviceScope.launch {
-            runSuspendCatchingLogged(TAG, "Privacy state collector failed") {
-                // The sharing bubble changes the touchable area and the window size.
-                viewModel.privacy.collectLatest {
+            runSuspendCatchingLogged(TAG, "Face ID collector failed") {
+                com.agupta07505.smartisland.util.FaceIdController.state.collectLatest {
                     if (destroyed || !viewModel.displaySettings.value.enabled) {
                         return@collectLatest
                     }
@@ -869,14 +1016,7 @@ class SmartIslandOverlayService : AccessibilityService() {
             runSuspendCatchingLogged(TAG, "Effective-settings collector failed") {
                 // Fires when the user edits a profile or the phone rotates and the other profile applies.
                 viewModel.displaySettings.collectLatest { effective ->
-                    fun on(event: com.agupta07505.smartisland.model.IslandEvent) =
-                        effective.enabled && effective.isEventEnabled(event.id)
-                    privacyMonitor?.configure(
-                        projection = on(com.agupta07505.smartisland.model.IslandEvent.PRIVACY_MEDIA_PROJECTION),
-                        camera = on(com.agupta07505.smartisland.model.IslandEvent.PRIVACY_CAMERA),
-                        microphone = on(com.agupta07505.smartisland.model.IslandEvent.PRIVACY_MICROPHONE),
-                        location = on(com.agupta07505.smartisland.model.IslandEvent.PRIVACY_LOCATION)
-                    )
+                    configureFaceUnlock(effective)
                     if (destroyed || !effective.enabled) {
                         return@collectLatest
                     }
@@ -997,10 +1137,12 @@ class SmartIslandOverlayService : AccessibilityService() {
 
         connectivityMonitor?.stop()
         connectivityMonitor = null
+        wiredDeviceMonitor?.stop()
+        wiredDeviceMonitor = null
         transferSpeedMonitor?.stop()
         transferSpeedMonitor = null
-        privacyMonitor?.stop()
-        privacyMonitor = null
+        faceUnlockWatcher?.stop()
+        faceUnlockWatcher = null
 
         removeCollapsedWindow()
         stopForegroundSafely()
@@ -1019,15 +1161,14 @@ class SmartIslandOverlayService : AccessibilityService() {
             isWindowExpanded,
             settings.forOrientation(viewModel.orientation.value)
         )
-        // The listener's own import runs when it connects, which can be before this overlay exists: ask it to import again.
-        // Once per session: this function runs on every settings change (a slider drag), and each sync reads the whole shade.
+        // The listener's own import runs when it connects, which can be before this overlay exists: ask it to import
+        // again.
         if (!shadeSyncRequested) {
             shadeSyncRequested = true
             notificationRepository.sendCommand(com.agupta07505.smartisland.data.SmartIslandCommand.SyncShade)
         }
     }
 
-    /** The listener was already asked to import the shade for this overlay session. */
     private var shadeSyncRequested = false
 
     private fun stopOverlaySession() {
@@ -1141,10 +1282,8 @@ class SmartIslandOverlayService : AccessibilityService() {
         }
     }
 
-    // Use reflection to set up OnComputeInternalInsetsListener since it is a hidden system API.
-    // This allows the overlay window to pass through touches outside the pill boundary.
-    // Keep the suppression local: this best-effort workaround is guarded by
-    // runCatchingLogged so unsupported devices fall back without crashing.
+    // Reflection on the hidden OnComputeInternalInsetsListener lets the overlay window pass touches outside the pill
+    // through.
     @SuppressLint("PrivateApi", "SoonBlockedPrivateApi")
     private fun setupTouchableRegion(view: ComposeView) {
         android.util.Log.d(TAG, "setupTouchableRegion: starting registration for view=$view")
@@ -1157,11 +1296,9 @@ class SmartIslandOverlayService : AccessibilityService() {
                 isAccessible = true
             }
             
-            // InternalInsetsInfo touchable insets options
             val TOUCHABLE_INSETS_FRAME = 0
             val TOUCHABLE_INSETS_REGION = 3
             
-            // Create a dynamic proxy implementation of OnComputeInternalInsetsListener.
             // equals/hashCode/toString must be answered too: returning null for a primitive
             // result makes the proxy throw when the framework compares or hashes the listener.
             val proxyHolder = arrayOfNulls<Any>(1)
@@ -1186,8 +1323,7 @@ class SmartIslandOverlayService : AccessibilityService() {
                         viewModel.exemptionNow() == com.agupta07505.smartisland.model.ExemptMode.Static
                     val settingsVal = viewModel.displaySettings.value
                     val notificationsCount = viewModel.visibleNotifications.value.size
-                    val privacyNow = viewModel.privacy.value
-                    val isIdleHidden = settingsVal.hideWhenIdle && notificationsCount == 0 && !privacyNow.hasAnything && !settingsVal.enableAppShortcuts
+                    val isIdleHidden = settingsVal.hideWhenIdle && notificationsCount == 0 && !settingsVal.enableAppShortcuts
                     if (isGone || isIdleHidden) {
                         setTouchableInsetsMethod.invoke(insets, TOUCHABLE_INSETS_REGION)
                         val region = touchableRegionField.get(insets) as android.graphics.Region
@@ -1195,9 +1331,7 @@ class SmartIslandOverlayService : AccessibilityService() {
                     } else if (isExpanded) {
                         val surface = viewModel.expandedSurfaceBounds.value
                         if (viewModel.autoExpanded.value && surface != null && !viewModel.isInputActive.value) {
-                            // Opened by itself and not touched yet: only the island catches touches. Everything else goes
-                            // through to the app below; the window still hears those touches (FLAG_WATCH_OUTSIDE_TOUCH)
-                            // and closes the island.
+                            // Opened by itself and not touched yet: only the island catches touches.
                             setTouchableInsetsMethod.invoke(insets, TOUCHABLE_INSETS_REGION)
                             val pad = (8 * resources.displayMetrics.density).toInt()
                             val region = touchableRegionField.get(insets) as android.graphics.Region
@@ -1209,7 +1343,7 @@ class SmartIslandOverlayService : AccessibilityService() {
                             // outside its bounds: without this a tap on them went to the app below and counted as an outside touch.
                             region.union(
                                 collapsedGroupTouchRect(
-                                    settingsVal, privacyNow,
+                                    settingsVal,
                                     resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
                                 ).rect
                             )
@@ -1221,17 +1355,14 @@ class SmartIslandOverlayService : AccessibilityService() {
                         // The semi-expanded widget island is open: the whole frame intercepts touches, so a tap outside closes it.
                         setTouchableInsetsMethod.invoke(insets, TOUCHABLE_INSETS_FRAME)
                     } else {
-                        // PILL-ONLY TOUCHABLE REGION:
-                        // Restrict touch interception to ONLY the pill bounds + padding.
-                        // The region is local to this already-offset window. Touches outside
-                        // the visible collapsed group pass through to the system.
+                        // The region is local to this already-offset window: touches outside the visible collapsed group pass through to the system.
                         setTouchableInsetsMethod.invoke(insets, TOUCHABLE_INSETS_REGION)
                         
                         val density = resources.displayMetrics.density
                         val screenWidth = resources.displayMetrics.widthPixels
                         val isLandscapeNow = resources.configuration.orientation ==
                             android.content.res.Configuration.ORIENTATION_LANDSCAPE
-                        val group = collapsedGroupTouchRect(settingsVal, privacyNow, isLandscapeNow)
+                        val group = collapsedGroupTouchRect(settingsVal, isLandscapeNow)
                         val left = group.rect.left
                         val top = group.rect.top
                         val right = group.rect.right
@@ -1242,7 +1373,8 @@ class SmartIslandOverlayService : AccessibilityService() {
                         
                         val region = touchableRegionField.get(insets) as android.graphics.Region
                         region.set(left, top, right, bottom)
-                        // Portrait: a long press on the camera cutout (when the pill's centre band does not reach it) hides / shows the pill.
+                        // Portrait: a long press on the camera cutout (when the pill's centre band does not reach it)
+                        // hides / shows the pill.
                         cutoutTouchRect(settingsVal, isLandscapeNow, bottom)?.let { region.union(it) }
                         // Landscape idle dot (separate tap target while a card is showing).
                         idleDotRectPx(
@@ -1272,8 +1404,7 @@ class SmartIslandOverlayService : AccessibilityService() {
                 }
             }
             
-            // ViewTreeObserver changes when the view is attached to a window.
-            // We must register the listener on the live ViewTreeObserver of the attached window.
+            // Register on the live ViewTreeObserver of the attached window (it changes on attach).
             android.util.Log.d(TAG, "setupTouchableRegion: isAttachedToWindow=${view.isAttachedToWindow}")
             if (view.isAttachedToWindow) {
                 registerListener()
@@ -1297,7 +1428,6 @@ class SmartIslandOverlayService : AccessibilityService() {
     private var cachedCutoutKey = -1
     private var cachedCutout: com.agupta07505.smartisland.util.DetectedCutoutInfo? = null
 
-    /** The hardware cutout, detected once per screen width (rotation) instead of on every touch-region pass. */
     private fun detectedCutout(): com.agupta07505.smartisland.util.DetectedCutoutInfo {
         val key = resources.displayMetrics.widthPixels
         cachedCutout?.let { if (key == cachedCutoutKey) return it }
@@ -1307,12 +1437,6 @@ class SmartIslandOverlayService : AccessibilityService() {
         }
     }
 
-    /**
-     * Touch rectangle (px, local to the collapsed window, which starts at the pill's Y offset) of the camera cutout's long-press target,
-     * or null when there is none: landscape, notch mode, no known cutout, or the pill's centre band overlaps the cutout (the pill's own
-     * gestures cover it then). The same overlap rule and target size as the overlay (model/PortraitPillTap.kt). Cut to the window's
-     * height; needs the full-width window (touchable region), so it is unused on the fallback window.
-     */
     private fun cutoutTouchRect(settingsVal: SmartIslandSettings, isLandscapeNow: Boolean, windowHeightPx: Int): android.graphics.Rect? {
         if (!isTouchableRegionSupported.value) return null
         val area = com.agupta07505.smartisland.util.CameraCutoutDetector.areaFor(settingsVal, detectedCutout(), isLandscapeNow) ?: return null
@@ -1337,7 +1461,6 @@ class SmartIslandOverlayService : AccessibilityService() {
         return if (right > left && bottom > top) android.graphics.Rect(left, top, right, bottom) else null
     }
 
-    /** The collapsed cutout group's touch rectangle (px) plus the numbers the idle dot rectangle needs. */
     private class CollapsedGroupTouch(
         val rect: android.graphics.Rect,
         val startPx: Float,
@@ -1345,13 +1468,8 @@ class SmartIslandOverlayService : AccessibilityService() {
         val heightPx: Float
     )
 
-    /**
-     * The touch rectangle of the collapsed pill and its secondary cutout (with touch padding), as the collapsed window
-     * uses it. The auto-expanded window adds it to the card's bounds so the cutouts stay tappable while the card is open.
-     */
     private fun collapsedGroupTouchRect(
         settingsVal: SmartIslandSettings,
-        privacyNow: com.agupta07505.smartisland.model.PrivacyIndicatorState,
         isLandscapeNow: Boolean
     ): CollapsedGroupTouch {
         val density = resources.displayMetrics.density
@@ -1360,13 +1478,9 @@ class SmartIslandOverlayService : AccessibilityService() {
             com.agupta07505.smartisland.model.cutoutCardCount(
                 viewModel.visibleNotifications.value, expanded = false
             ),
-            privacyNow.bubbleShown, settingsVal.enableNotchMode
+            settingsVal.enableNotchMode
         )
-        val isCircleLeft = com.agupta07505.smartisland.model.ChipAvoidance.circleOnLeft(
-            settingIsLeft = settingsVal.circlePosition == SmartIslandSettings.CIRCLE_POSITION_LEFT,
-            chipShowing = com.agupta07505.smartisland.model.ChipAvoidance.chipShowing(privacyNow, viewModel.visibleNotifications.value),
-            isLandscape = isLandscapeNow
-        )
+        val isCircleLeft = (settingsVal.circlePosition == SmartIslandSettings.CIRCLE_POSITION_LEFT)
         val mainWidthPx = settingsVal.width * density
         val circleSizePx = com.agupta07505.smartisland.data.collapsedCompanionSizeDp(settingsVal) * density
         val compactGapPx = 8f * density
@@ -1400,13 +1514,6 @@ class SmartIslandOverlayService : AccessibilityService() {
         )
     }
 
-    /**
-     * Touch / window rectangle (px, window coordinates, 8 dp of slack around the circle) of the
-     * landscape idle dot, or null when the dot is not on screen. Same rule as the overlay view
-     * ([com.agupta07505.smartisland.model.shouldShowIdleDot]); the window starts at the screen top in
-     * landscape, so screen and window y are the same. [groupBottomPx] is the bottom of the collapsed
-     * cutout group including its touch padding.
-     */
     private fun idleDotRectPx(
         settings: SmartIslandSettings,
         hasCards: Boolean,
@@ -1444,7 +1551,6 @@ class SmartIslandOverlayService : AccessibilityService() {
         viewModel.isLocked.value = isLocked
         
         val isLandscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-        val privacyNow = viewModel.privacy.value
         val visibleCount = viewModel.visibleNotifications.value.size
         val isHidden = (!settings.showOnLockScreen && isLocked) || (isLandscape && !settings.showInLandscape) ||
             viewModel.exemptionNow() == com.agupta07505.smartisland.model.ExemptMode.Off
@@ -1461,13 +1567,9 @@ class SmartIslandOverlayService : AccessibilityService() {
                 viewModel.visibleNotifications.value, viewModel.expanded.value,
                 viewModel.selectedIndex.value
             ),
-            privacyNow.bubbleShown, settings.enableNotchMode
+            settings.enableNotchMode
         )
-        val isCircleLeft = com.agupta07505.smartisland.model.ChipAvoidance.circleOnLeft(
-            settingIsLeft = settings.circlePosition == SmartIslandSettings.CIRCLE_POSITION_LEFT,
-            chipShowing = com.agupta07505.smartisland.model.ChipAvoidance.chipShowing(privacyNow, viewModel.visibleNotifications.value),
-            isLandscape = isLandscape
-        )
+        val isCircleLeft = (settings.circlePosition == SmartIslandSettings.CIRCLE_POSITION_LEFT)
         val mainWidthPx = settings.width * density
         val circleSizePx = com.agupta07505.smartisland.data.collapsedCompanionSizeDp(settings) * density
         val compactGapPx = 8f * density
@@ -1502,7 +1604,10 @@ class SmartIslandOverlayService : AccessibilityService() {
         // outside the pill going to the app below, as it does for the full width). Growing the window on the tap took a frame or
         // two, and the opening card was clipped to the small collapsed window before the jump to its real height.
         val preGrown = isTouchableRegionSupported.value && visibleCount > 0 && !isHidden && !isStatic
-        val fullWindow = expanded || widgetWindowOpen
+        // the square scan is taller than the collapsed window
+        val faceIdState = com.agupta07505.smartisland.util.FaceIdController.state.value
+        val fullWindow = expanded || widgetWindowOpen ||
+            (faceIdState.active && faceIdState.style != com.agupta07505.smartisland.util.FaceIdController.Style.Cutout)
         val h = if (fullWindow || preGrown) {
             WindowManager.LayoutParams.MATCH_PARENT
         } else {
@@ -1603,14 +1708,9 @@ class SmartIslandOverlayService : AccessibilityService() {
                 viewModel.visibleNotifications.value, viewModel.expanded.value,
                 viewModel.selectedIndex.value
             ),
-            viewModel.privacy.value.bubbleShown,
             settings.enableNotchMode
         )
-        val isCircleLeft = com.agupta07505.smartisland.model.ChipAvoidance.circleOnLeft(
-            settingIsLeft = settings.circlePosition == SmartIslandSettings.CIRCLE_POSITION_LEFT,
-            chipShowing = ::viewModel.isInitialized && com.agupta07505.smartisland.model.ChipAvoidance.chipShowing(viewModel.privacy.value, viewModel.visibleNotifications.value),
-            isLandscape = isLandscapeNow
-        )
+        val isCircleLeft = (settings.circlePosition == SmartIslandSettings.CIRCLE_POSITION_LEFT)
         val mainWidthPx = settings.width * density
         val circleSizePx = com.agupta07505.smartisland.data.collapsedCompanionSizeDp(settings) * density
         val compactGapPx = 8f * density
@@ -1735,10 +1835,6 @@ class SmartIslandOverlayService : AccessibilityService() {
         viewModel.collapse()
     }
 
-    /**
-     * Gives the Utilities page the few things it needs from this service (see [com.agupta07505.smartisland.util.UtilityBridge]):
-     * collapsing the island, global actions such as screenshot and lock screen, and the floating window.
-     */
     private fun installUtilityBridge() {
         val bridge = com.agupta07505.smartisland.util.UtilityBridge
         bridge.collapse = {
@@ -1755,8 +1851,8 @@ class SmartIslandOverlayService : AccessibilityService() {
                         true
                     } ?: false
                 }
-                // LMO Freeform opens an activity by package and class, so the page's intent is resolved to its activity first.
-                // Anything the intent carries besides the activity (data, extras) is lost, which is fine for settings pages.
+                // LMO Freeform opens an activity by package and class, so the page's intent is resolved to its
+                // activity first.
                 com.agupta07505.smartisland.model.FloatingWindowRoute.Lmo -> {
                     val lmo = com.agupta07505.smartisland.util.LmoFreeform
                     val component = if (lmo.isInstalled(this)) {
@@ -1787,7 +1883,6 @@ class SmartIslandOverlayService : AccessibilityService() {
         }
     }
 
-    /** A long-press action on a launcher app (see [com.agupta07505.smartisland.model.AppShortcutAction]). */
     private fun launchAppAction(packageName: String, action: com.agupta07505.smartisland.model.AppShortcutAction) {
         when (action) {
             com.agupta07505.smartisland.model.AppShortcutAction.AppInfo -> openAppInfo(packageName)
@@ -1803,7 +1898,6 @@ class SmartIslandOverlayService : AccessibilityService() {
         viewModel.collapse()
     }
 
-    /** Opens [packageName] in a floating window, through whichever engine the floating-window setting picks. */
     private fun openAppInFloatingWindow(packageName: String) {
         val settings = viewModel.settings.value
         val launched = when (com.agupta07505.smartisland.model.floatingWindowRoute(settings.floatingWindowEnabled, settings.floatingWindowMode)) {
@@ -1831,7 +1925,6 @@ class SmartIslandOverlayService : AccessibilityService() {
         return started
     }
 
-    /** LMO Freeform opens the app's launcher activity itself. */
     private fun openPackageInLmoFreeform(packageName: String): Boolean {
         val lmo = com.agupta07505.smartisland.util.LmoFreeform
         if (!lmo.isInstalled(this)) {
@@ -1849,11 +1942,6 @@ class SmartIslandOverlayService : AccessibilityService() {
         return sent
     }
 
-    /**
-     * Split screen for a launcher app. With an app open under the island, that app takes one half and [packageName] opens next to
-     * it. From the home screen (nothing to pair with) the app opens and Android's own split-screen app selection picks the other
-     * half. See [com.agupta07505.smartisland.model.splitScreenPlan].
-     */
     private fun openAppInSplitScreen(packageName: String) {
         val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
         if (launchIntent == null) {
@@ -1889,7 +1977,6 @@ class SmartIslandOverlayService : AccessibilityService() {
         notificationRepository.removeNotificationsForPackage(packageName)
     }
 
-    /** The home (launcher) apps installed on the device. The home screen cannot be one half of a split. */
     private fun homePackageNames(): Set<String> = runCatchingLogged(TAG, "Failed to list home apps") {
         packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)
             .map { it.activityInfo.packageName }
@@ -1920,10 +2007,6 @@ class SmartIslandOverlayService : AccessibilityService() {
         viewModel.collapse()
     }
 
-    /**
-     * The launch options of a system freeform window: centred, 90% x 65% of the screen, in freeform windowing mode. Shared by the
-     * notification swipe and the launcher's long-press action.
-     */
     private fun systemFreeformBundle(): android.os.Bundle {
         val options = ActivityOptions.makeBasic()
         runCatchingLogged(TAG, "Failed to set launch bounds") {
@@ -1946,7 +2029,6 @@ class SmartIslandOverlayService : AccessibilityService() {
         return bundle
     }
 
-    /** Android's own freeform windowing. Returns false when nothing could be started. */
     private fun openInSystemFreeform(notification: IslandNotification): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
             Toast.makeText(this, "Floating window requires Android 7+.", Toast.LENGTH_SHORT).show()
@@ -1978,12 +2060,6 @@ class SmartIslandOverlayService : AccessibilityService() {
         return started
     }
 
-    /**
-     * LMO Freeform, main way: open the chat with the notification's own content intent (so the right conversation
-     * opens), find the new task's id through Shizuku, then send LMO `START_FREEFORM` with that `taskId` so it moves
-     * the task into a window. Fallback: ask LMO to launch the notification's target activity (or the launcher
-     * activity) itself, which cannot carry the chat id. Returns false when nothing could be started.
-     */
     private fun openInLmoFreeform(notification: IslandNotification): Boolean {
         val lmo = com.agupta07505.smartisland.util.LmoFreeform
         if (!lmo.isInstalled(this)) {
@@ -2024,7 +2100,7 @@ class SmartIslandOverlayService : AccessibilityService() {
                     com.agupta07505.smartisland.util.ShizukuManager.runShellForOutput(lmo.LIST_TASKS_COMMAND).getOrDefault("")
                 )
                 task = lmo.pickTask(after, before, notification.packageName)
-                    ?.takeIf { it.taskId !in before } // wait for a genuinely new task while polling
+                    ?.takeIf { it.taskId !in before }
                 if (task == null) kotlinx.coroutines.delay(LMO_TASK_POLL_MS)
             }
             // No new task appeared: the app reused one it had, so take its front-most task.
@@ -2045,13 +2121,6 @@ class SmartIslandOverlayService : AccessibilityService() {
         return true
     }
 
-    /**
-     * LMO Freeform, direct way: ask LMO for a window (it creates a virtual display named `lmo-freeform:<pkg>,...`),
-     * then send the notification's content intent with that display as the launch display. The chat opens inside
-     * the window and never becomes the top task of the main display, so the foreground app is left alone.
-     * Returns false when it could not be done before anything was opened on the main display (caller falls back).
-     * If Android ignores the display and the chat lands on display 0, that task is moved like the old path does.
-     */
     private suspend fun openInLmoDisplay(notification: IslandNotification, pending: PendingIntent): Boolean {
         val lmo = com.agupta07505.smartisland.util.LmoFreeform
         val shizuku = com.agupta07505.smartisland.util.ShizukuManager
@@ -2102,7 +2171,6 @@ class SmartIslandOverlayService : AccessibilityService() {
         return true
     }
 
-    /** LMO fallback: LMO launches the activity itself. Opens the right app, usually not the right conversation. */
     private fun openInLmoFallback(notification: IslandNotification): Boolean {
         val lmo = com.agupta07505.smartisland.util.LmoFreeform
         val component = notification.contentIntent?.let { lmo.pendingIntentActivity(it) }
@@ -2167,37 +2235,22 @@ class SmartIslandOverlayService : AccessibilityService() {
             private set
 
         private const val TAG = "SmartIslandOverlayService"
-        /** How long to look for the chat's new task, polling back to back (each poll is one Shizuku shell call). */
         private const val LMO_TASK_POLL_WINDOW_MS = 3_000L
         private const val LMO_TASK_POLL_MS = 30L
-        /** How long to wait for LMO to create the window's display. */
         private const val LMO_DISPLAY_WAIT_MS = 2_000L
         private const val NOTIFICATION_ID = 8105
-        /** Lets the recorder finish saving before we press Back. */
         private const val SILENT_BACK_DELAY_MS = 300L
         private const val WINDOWING_MODE_FREEFORM = 5
-        /** After the open app was sent to one half, how long before the chosen app is started next to it. */
         private const val SPLIT_LAUNCH_DELAY_MS = 450L
-        /** After the chosen app was started, how long before split screen is asked for (it has to be in front first). */
         private const val SPLIT_PICKER_DELAY_MS = 600L
         private const val OVERLAY_CHANNEL_ID = "smart_island_overlay"
         private const val OVERLAY_CHANNEL_NAME = "Smart Island overlay"
-        /**
-         * How long the window stays full size after the island starts to collapse. It must outlast
-         * the closing animation (softer, slower springs in landscape); shrinking sooner clips the
-         * close, which then looks different from the opening.
-         */
         private const val AUTO_COLLAPSE_DELAY_MS = 750L
-        /** How long the window keeps its full size after the widget island starts to close (its spring, plus a margin). */
         private const val WIDGET_WINDOW_LINGER_MS = 700L
-        /** Window events this soon after the widget island opened do not close it (the opening itself resizes windows). */
         private const val WIDGET_ISLAND_EVENT_GRACE_MS = 500L
         private const val INPUT_METHOD_CACHE_MS = 60_000L
-        /** The lock-state fallback runs at most this often on content-change events. */
         private const val KEYGUARD_POLL_MS = 1_000L
-        /** Shade / foreground scans are at least this far apart (a trailing scan follows a burst). */
         private const val WINDOW_REFRESH_MIN_MS = 120L
-        /** Re-checks of the foreground app after a window event (see [settleScanRunnable]). */
         private const val SETTLE_SCAN_FIRST_MS = 400L
         private const val SETTLE_SCAN_SECOND_MS = 1_100L
         private const val WINDOW_PACKAGE_CACHE_MAX = 96

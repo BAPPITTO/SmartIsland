@@ -69,7 +69,6 @@ class IslandOverlayLayoutTest {
                 val circleLeftPx = if (isCircleLeft) mainLeftPx - compactGapPx - circleSizePx else mainLeftPx + mainWidthPx + compactGapPx
                 val circleRightPx = circleLeftPx + circleSizePx
 
-                // 1. Assert no overlap between main pill and circle (separation >= compactGapPx)
                 if (isCircleLeft) {
                     val gap = mainLeftPx - circleRightPx
                     org.junit.Assert.assertTrue(
@@ -84,7 +83,6 @@ class IslandOverlayLayoutTest {
                     )
                 }
 
-                // 2. Assert that the secondary circle is completely inside the window
                 org.junit.Assert.assertTrue(
                     "Circle left ($circleLeftPx) must be >= window left ($windowLeftPx)",
                     circleLeftPx >= windowLeftPx - 0.01f
@@ -94,7 +92,6 @@ class IslandOverlayLayoutTest {
                     circleRightPx <= windowRightPx + 0.01f
                 )
 
-                // 3. Assert circle and pill are within screen bounds
                 org.junit.Assert.assertTrue(circleLeftPx >= edgePaddingPx - 0.01f)
                 org.junit.Assert.assertTrue(circleRightPx <= screenWidthPx - edgePaddingPx + 0.01f)
                 org.junit.Assert.assertTrue(mainLeftPx >= edgePaddingPx - 0.01f)
@@ -189,7 +186,7 @@ class IslandOverlayLayoutTest {
     fun pickerIslandStartsWhereTheRightPartOfTheWindowBegins() {
         // 548 dp window, 274 dp picker: it starts at about 50% of the width.
         assertEquals(0.5f, com.agupta07505.smartisland.ui.splitPickerLeftFraction(548f, 914f), 0.01f)
-        // Unknown width falls back to the old half.
+        // Unknown width falls back to 50 %.
         assertEquals(0.5f, com.agupta07505.smartisland.ui.splitPickerLeftFraction(0f, 914f), 0.0001f)
     }
 
@@ -270,8 +267,7 @@ class IslandOverlayLayoutTest {
         // Collapsed left-side circle center offset: circle is to the LEFT of pill
         val collapsedLeftCircleOffset = (expandedCompactX - compactGap - circleSize / 2f) - screenCenter
 
-        // 1. With ONLY 2 notifications (secondaryIsPill == true):
-        // In left-side circle mode, it MUST shift RIGHT to pill location
+        // With only 2 notifications (secondaryIsPill == true) a left-side circle shifts right to the pill location.
         val expandedOffsetLeftMode = com.agupta07505.smartisland.ui.calculateSecondaryExpandedOffset(
             secondaryIsPill = true,
             isCircleLeft = true,
@@ -288,7 +284,7 @@ class IslandOverlayLayoutTest {
             expandedOffsetLeftMode > collapsedLeftCircleOffset
         )
 
-        // 2. Right-side circle mode also lands at pill location
+        // A right-side circle also lands at the pill location.
         val expandedOffsetRightMode = com.agupta07505.smartisland.ui.calculateSecondaryExpandedOffset(
             secondaryIsPill = true,
             isCircleLeft = false,
@@ -301,8 +297,7 @@ class IslandOverlayLayoutTest {
         )
         assertEquals(pillCenterOffset, expandedOffsetRightMode, 0.01f)
 
-        // 3. With 3+ notifications (secondaryIsPill == false):
-        // Left circle stays on the left
+        // With 3+ notifications (secondaryIsPill == false) the left circle stays on the left.
         val threeNotifLeftOffset = com.agupta07505.smartisland.ui.calculateSecondaryExpandedOffset(
             secondaryIsPill = false,
             isCircleLeft = true,

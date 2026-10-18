@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
@@ -40,29 +41,18 @@ import com.agupta07505.smartisland.util.HapticKind
 import com.agupta07505.smartisland.util.HapticStrength
 import com.agupta07505.smartisland.util.IslandHaptics
 
-/** Spring of the widget island's open and close (before the user's animation speed). Calm: no bounce to speak of. */
 private const val WIDGET_ISLAND_STIFFNESS = 420f
 private const val WIDGET_ISLAND_DAMPING = 0.82f
 
-/** The content starts to show once the island is this far open, so it never shows squeezed in the cutout. */
+private const val WIDGET_ISLAND_BELOW_GAP_DP = 1f
+
 private const val WIDGET_ISLAND_CONTENT_FROM = 0.55f
 
-/** Gap (dp) between the collapsed pill's bottom edge and the open island, so the camera cutout never covers its content. */
-private const val WIDGET_ISLAND_BELOW_GAP_DP = 4f
+private const val WIDGET_ISLAND_PILL_BACK_AT = 0.02f
 
-/** A sideways drag on the open island of at least this much (dp) changes the widget. */
 private const val WIDGET_ISLAND_SWIPE_DP = 28f
 
-/**
- * The semi-expanded idle widget island. A separate layer above the collapsed pill, not part of the expand machinery: the pill underneath
- * stays as it is, the island grows out of its rectangle (same top, same centre as far as the screen edge allows) to about twice its size and
- * shrinks back into it. It draws nothing at progress 0.
- *
- * [open] comes from the view model (the service needs it for the window and the touchable region too); [onOpenChange] writes it back.
- * The island closes by itself whenever the pill stops being an idle widget pill ([widgetIslandMustClose]).
- * It shows the widget on the pill. While it is open the pill does not switch widgets by itself, and a swipe on the pill moves both to the next widget
- * that has content. Only a call or live event, an expanded island, the widget losing its content or the small idle circle close it; other cards wait.
- */
+/** The semi-expanded idle widget island. */
 @Composable
 internal fun WidgetIslandLayer(
     open: Boolean,
@@ -76,22 +66,28 @@ internal fun WidgetIslandLayer(
     islandLayout: IslandLayout,
     ui: IslandInteractionState,
     screenWidthDp: Float,
+    /** Landscape: the camera sits in a corner, not under the island, so the island needs no strip above its content. */
+    isLandscape: Boolean,
     animSpeed: AnimationSpeed,
     onOpenChange: (Boolean) -> Unit,
+    onShownChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val frame = ui.idleFrameNow
     val context = LocalContext.current
-    // Plain memory, not state: the last frame keeps the island's content alive while it shrinks after the pill lost its widget, and while a
-    // low-priority card sits on the pill underneath (the idle widget is off the pill then, the island stays).
+    // Plain memory, not state: the last frame keeps the island's content alive while it shrinks after the pill lost
+    // its widget, and while a low-priority card sits on the pill underneath (the idle widget is off the pill then,
+    // the island stays).
     val lastFrame = remember { arrayOfNulls<IdleWidgetFrame>(1) }
     if (frame != null) lastFrame[0] = frame
     val source = frame ?: lastFrame[0]
-    // The pill's pause hook and the swipe hook read this: while the island is open the pill does not switch by itself, and a swipe moves the island.
+    // The pill's pause hook and the swipe hook read this: while the island is open the pill does not switch by
+    // itself, and a swipe moves the island.
     SideEffect { ui.widgetIslandOpen = open }
     DisposableEffect(ui) { onDispose { ui.widgetIslandOpen = false } }
 
-    // The island follows the widget on the pill (a swipe on the pill steps both). Its content has to exist (charger plugged, an alarm still to come, ...).
+    // The island follows the widget on the pill (a swipe on the pill steps both). Its content has to exist (charger
+    // plugged, an alarm still to come, ...).
     val hasContent = source == null || WidgetIslandContent.hasContent(
         kind = source.kind,
         charging = source.data.charging,
@@ -101,8 +97,8 @@ internal fun WidgetIslandLayer(
         notificationCount = source.data.notificationSummary.total,
         modeActive = source.data.mode.active
     )
-    // Only calls and live events close it ([cardClosesWidgetIsland]); other cards wait behind the island, and the idle widget leaving the pill for
-    // them does not count as losing the widget.
+    // Only calls and live events close it ([cardClosesWidgetIsland]); other cards wait behind the island, and the
+    // idle widget leaving the pill for them does not count as losing the widget.
     val waitingCard = hasCards && !importantCard
     val widgetAvailable = frame != null || (waitingCard && settings.idleWidgetsEnabled)
     val mustClose = widgetIslandMustClose(
@@ -114,8 +110,8 @@ internal fun WidgetIslandLayer(
     )
     LaunchedEffect(open, mustClose) { if (open && mustClose) onOpenChange(false) }
 
-    // Auto close: after the set time without a touch. Any touch on the island or the pill (ui.touch) starts the count again. The pill's own
-    // auto-hide and idle timers do not close it (and the pill does not auto-hide while the island is open, see AutoHideEffects).
+    // Auto close: after the set time without a touch. Any touch on the island or the pill (ui.touch) starts the count
+    // again.
     val lastTouch = ui.userInteractionTimestamp
     LaunchedEffect(open, lastTouch, settings.widgetIslandCloseSeconds) {
         val delayMs = WidgetIslandTimer.closeDelayMs(settings.widgetIslandCloseSeconds)
@@ -134,7 +130,27 @@ internal fun WidgetIslandLayer(
             spring(dampingRatio = WIDGET_ISLAND_DAMPING, stiffness = stiffness)
         )
     }
-    // The shade, the screen turning off or locking and a rotation close it with no closing animation (declared after the effect above: it wins).
+    // While the island is out of the pill the pill underneath is not drawn: the island is the cutout, grown. Flips at
+    // the first and last pixel of growth.
+    SideEffect { ui.widgetIslandCovers = { progress.value > WIDGET_ISLAND_PILL_BACK_AT } }
+    DisposableEffect(ui) { onDispose { ui.widgetIslandCovers = { false } } }
+    val shownChangeNow = androidx.compose.runtime.rememberUpdatedState(onShownChange)
+    LaunchedEffect(progress, ui) {
+        // The spring can swing a little past 0 on the way home: the pill stays hidden until it has really stopped, or
+        // it would blink on and off.
+        snapshotFlow { progress.value > 0.001f || progress.isRunning }.collect {
+            ui.widgetIslandShown = it
+            shownChangeNow.value(it)
+        }
+    }
+    DisposableEffect(ui) {
+        onDispose {
+            ui.widgetIslandShown = false
+            shownChangeNow.value(false)
+        }
+    }
+    // The shade, the screen turning off or locking and a rotation close it with no closing animation (declared after
+    // the effect above: it wins).
     LaunchedEffect(snapCount) { if (snapCount > 0) progress.snapTo(0f) }
 
     val kind = source?.kind
@@ -145,11 +161,35 @@ internal fun WidgetIslandLayer(
         com.agupta07505.smartisland.model.NotificationCounts.islandContentHeightDp(
             com.agupta07505.smartisland.model.NotificationCounts.rows(source.data.notificationSummary)
         )
+    } else if (kind == com.agupta07505.smartisland.model.IdleWidgetKind.Weather) {
+        // The weather island grows with the extra rows the person picked (and that have a value now).
+        val reading = source.data.weather
+        if (reading == null) {
+            0f
+        } else {
+            com.agupta07505.smartisland.model.WeatherDisplay.islandContentHeightDp(
+                com.agupta07505.smartisland.model.WeatherDisplay.availableReadouts(
+                    settings.weatherPrefs().effectiveReadouts(), reading, System.currentTimeMillis()
+                )
+            )
+        }
+    } else if (kind == com.agupta07505.smartisland.model.IdleWidgetKind.Date) {
+        // The date island grows to also name the next calendar event.
+        val next = source.data.nextEvent
+        if (next != null && com.agupta07505.smartisland.model.CalendarRules.islandShows(next.beginMs, source.data.nowMs)) {
+            com.agupta07505.smartisland.model.CalendarRules.ISLAND_EVENT_HEIGHT_DP
+        } else {
+            0f
+        }
     } else {
         0f
     }
     val target = widgetIslandSize(settings.width, settings.height, screenWidthDp, listHeight)
-    // The pill's centre from the screen centre, from the layout's own main-centre (right for the full-width window the open island runs in).
+    // Starts as the pill's own rectangle and moves down to sit below the cutout as it grows (portrait); landscape stays on the pill.
+    val notchDp = if (isLandscape) 0f else settings.height + WIDGET_ISLAND_BELOW_GAP_DP
+    val totalHeightDp = target.heightDp
+    // The pill's centre from the screen centre, from the layout's own main-centre (right for the full-width window
+    // the open island runs in).
     val pillCentre = islandLayout.mainCenter.value - screenWidthDp / 2f
     val islandCentre = widgetIslandCentre(pillCentre, target.widthDp, screenWidthDp)
     val shellColor = islandLayout.pillBackgroundColor.copy(alpha = settings.opacity.coerceIn(0f, 1f))
@@ -158,21 +198,20 @@ internal fun WidgetIslandLayer(
     Box(
         modifier = modifier
             .layout { measurable, _ ->
-                val p = progress.value
-                if (p <= 0.001f) {
+                val p = progress.value.coerceAtLeast(0f)
+                if (p <= 0.001f && !progress.isRunning) {
                     layout(0, 0) {}
                 } else {
                     val w = (lerpF(settings.width, target.widthDp, p).dp.toPx()).toInt().coerceAtLeast(0)
-                    val h = (lerpF(settings.height, target.heightDp, p).dp.toPx()).toInt().coerceAtLeast(0)
+                    val h = (lerpF(settings.height, totalHeightDp, p).dp.toPx()).toInt().coerceAtLeast(0)
                     val placeable = measurable.measure(Constraints.fixed(w, h))
                     layout(w, h) { placeable.place(0, 0) }
                 }
             }
             .graphicsLayer {
-                val p = progress.value
+                val p = progress.value.coerceAtLeast(0f)
                 translationX = lerpF(pillCentre, islandCentre, p).dp.toPx()
-                // The island drops out from under the pill instead of growing over it: its top ends just below the collapsed pill.
-                translationY = ((settings.height + WIDGET_ISLAND_BELOW_GAP_DP) * p).dp.toPx()
+                translationY = lerpF(0f, notchDp, p).dp.toPx()
                 val radius = lerpF(settings.cornerRadius, WIDGET_ISLAND_CORNER_RADIUS_DP, p).dp.toPx()
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(radius)
                 clip = true
@@ -180,8 +219,8 @@ internal fun WidgetIslandLayer(
             .drawBehind { drawRect(shellColor) }
             // A tap on the island itself is the island's: it must not fall through to the outside tap that closes it.
             .pointerInput(Unit) { detectTapGestures(onPress = { ui.touch() }) { } }
-            // The island covers the pill, so a sideways swipe on it never reaches the pill's own handler: it steps the widgets from here
-            // (left = next, right = previous, like on the pill). Only widgets with content take a turn; none = nothing happens.
+            // The island covers the pill, so a sideways swipe on it never reaches the pill's own handler: it steps
+            // the widgets from here (left = next, right = previous, like on the pill).
             .pointerInput(Unit) {
                 var total = 0f
                 val threshold = WIDGET_ISLAND_SWIPE_DP.dp.toPx()
@@ -233,8 +272,9 @@ internal fun Modifier.widgetIslandOutsideTap(active: Boolean, onTap: () -> Unit)
     if (active) pointerInput(active) { detectTapGestures { onTap() } } else this
 
 /**
- * Gives the pill's tap handling and the outside tap their calls, [IslandInteractionState.onWidgetGlyphTap] and [IslandInteractionState.onWidgetValueTap]: it buzzes once like every other
- * pill tap and flips the island (open becomes closed and the other way round). Own composable, so the big overlay composable stays small.
+ * Gives the pill's tap handling and the outside tap their calls, [IslandInteractionState.onWidgetGlyphTap] and
+ * [IslandInteractionState.onWidgetValueTap]: it buzzes once like every other pill tap and flips the island (open
+ * becomes closed and the other way round).
  */
 @Composable
 internal fun WidgetIslandWiring(

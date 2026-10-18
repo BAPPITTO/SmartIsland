@@ -55,36 +55,30 @@ import com.agupta07505.smartisland.util.runCatchingLogged
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
-/*
- * Building blocks of the media card laid out like the notification shade's media player:
- * app badge and output chip on top, title / artist with the big play button in the
- * middle, previous / seek bar / next / the app's own buttons at the bottom.
- */
+/* Building blocks of the media card laid out like the notification shade's media player. */
 
 /** The shade shows at most this many of the app's own buttons (like, shuffle, cast ...) after "next". */
 internal const val MEDIA_SHADE_MAX_CUSTOM = 2
 
-/** Metadata key apps use to flag an explicit track (the shade shows the small "E" badge for it). */
 private const val EXPLICIT_KEY = "android.media.IS_EXPLICIT"
 
 /** The dim over the artwork: a little lighter on top, a little darker where the bar and buttons are. */
 internal const val MEDIA_SHADE_SCRIM_TOP = 0.40f
 internal const val MEDIA_SHADE_SCRIM_BOTTOM = 0.55f
 
-
-/** Corner radii of the media card's buttons (play button 16 -> 12 dp while playing; paused stays a full circle at 24 dp; chip 13 -> 9 dp). */
+/**
+ * Corner radii of the media card's buttons (play button 16 -> 12 dp while playing; paused stays a full circle at 24
+ * dp; chip 13 -> 9 dp).
+ */
 internal val PLAY_CORNER_PLAYING = 12.dp
 internal val PLAY_CORNER_PAUSED = 24.dp
 internal val CHIP_CORNER = 9.dp
 
-/** Fill and glyph colour of the shade-style badge, chip and play button. */
 internal data class MediaShadeColors(val container: Color, val onContainer: Color)
 
 /**
- * Android's shade colours, built from tones like the shade does: the container is the artwork's colour at lightness 90, the glyph
- * the same hue at lightness 10 (measured from the shade's own screenshots: L* 90.0 and 9 to 10), with the colour's real chroma, so a
- * vivid green cover gives a vivid green button and a dull cover a dull one. Grey artwork gives neutral colours; no artwork at all
- * falls back to the music accent colour.
+ * Android's shade colours built from tones: the container is the artwork's colour at lightness 90, the glyph the same
+ * hue at 10, with the colour's real chroma, so a vivid cover gives a vivid button and a dull one a dull button.
  */
 internal fun mediaShadeColors(
     settings: SmartIslandSettings,
@@ -127,7 +121,7 @@ internal const val SHADE_GLYPH_TONE_LIGHT = 95.0
 internal const val SHADE_MIN_CHROMA = 4.0
 internal const val SHADE_MAX_CHROMA = 70.0
 
-/** The glyph's chroma stays low even for a vivid cover (the shade's was 22 at most in the screenshots). */
+/** The glyph's chroma stays low even for a vivid cover. */
 internal const val SHADE_GLYPH_MAX_CHROMA = 22.0
 
 internal fun toneColor(tone: Double, chroma: Double, hueDeg: Float): Color {
@@ -143,17 +137,12 @@ internal fun animatedShadeColors(target: MediaShadeColors): MediaShadeColors {
     return MediaShadeColors(container, onContainer)
 }
 
-/** True when the playing app flagged the current track as explicit. */
 internal fun mediaIsExplicit(meta: android.media.MediaMetadata): Boolean =
     runCatchingLogged("MediaShade", "Failed to read the explicit flag") {
         meta.description?.extras?.getLong(EXPLICIT_KEY, 0L) == 1L || meta.getLong(EXPLICIT_KEY) == 1L
     } == true
 
-/**
- * App icon, top left, with no disc or outline behind it. The app's small (monochrome) notification icon is tinted with the
- * shade's light container colour (the dark glyph colour would vanish on the dimmed artwork). Without one the launcher icon is
- * shown in colour; without that, a music note.
- */
+/** App icon, top left, with no disc behind it. */
 @Composable
 internal fun MediaAppBadge(
     smallIcon: ImageBitmap?,
@@ -193,7 +182,6 @@ internal fun MediaAppBadge(
     }
 }
 
-/** The chip's glyph for an output kind. */
 internal fun mediaOutputIcon(kind: com.agupta07505.smartisland.util.MediaOutputKind): androidx.compose.ui.graphics.vector.ImageVector =
     when (kind) {
         com.agupta07505.smartisland.util.MediaOutputKind.Phone -> Icons.Rounded.PhoneAndroid
@@ -204,16 +192,13 @@ internal fun mediaOutputIcon(kind: com.agupta07505.smartisland.util.MediaOutputK
         com.agupta07505.smartisland.util.MediaOutputKind.Cast -> Icons.Rounded.Cast
     }
 
-/**
- * Where the music plays now: read when the card opens, then kept current while the card is shown (a device
- * connecting or leaving, the session moving to a cast target).
- */
+/** Where the music plays now: read when the card opens, then kept current while shown (a device connecting or leaving, a cast move). */
 @Composable
 internal fun rememberMediaOutput(controller: android.media.session.MediaController?): com.agupta07505.smartisland.util.MediaOutput {
     val context = androidx.compose.ui.platform.LocalContext.current.applicationContext
     val scope = androidx.compose.runtime.rememberCoroutineScope()
-    // Reading the audio routes is a binder call: it runs in the background (the card must not wait for it on the tap that opens
-    // it). The last output read seeds the chip, so it does not flash "This phone" first.
+    // Reading the audio routes is a binder call: it runs in the background (the card must not wait for it on the tap
+    // that opens it).
     var output by androidx.compose.runtime.remember(controller) {
         androidx.compose.runtime.mutableStateOf(lastMediaOutput ?: com.agupta07505.smartisland.util.MediaOutput.Phone)
     }
@@ -247,13 +232,9 @@ internal fun rememberMediaOutput(controller: android.media.session.MediaControll
     return output
 }
 
-/** The output the chip showed last (seeds the next card). Main thread only. */
 private var lastMediaOutput: com.agupta07505.smartisland.util.MediaOutput? = null
 
-/**
- * Audio output chip, top right: the current output's glyph and name ("This phone", earbuds, a cast target).
- * [onClick] null draws it without a tap action.
- */
+/** Audio output chip, top right: the output's glyph and name. [onClick] null draws it without a tap action. */
 @Composable
 internal fun MediaOutputChip(
     label: String,
@@ -266,7 +247,6 @@ internal fun MediaOutputChip(
     val tappable = if (onClick != null) modifier.bounceClick { onClick() } else modifier
     Row(
         modifier = tappable
-            // 22 dp (was 26) so the top row is lighter and the middle gets more room.
             .height(22.dp)
             .clip(RoundedCornerShape(CHIP_CORNER))
             .background(shade.container)
@@ -291,7 +271,6 @@ internal fun MediaOutputChip(
     }
 }
 
-/** The small boxed "E" next to the artist. */
 @Composable
 internal fun ExplicitBadge(color: Color, modifier: Modifier = Modifier) {
     Box(
@@ -331,7 +310,6 @@ internal fun MediaPlayPauseButton(
     }
 }
 
-/** Plain white transport glyph (previous / next) without a background. */
 @Composable
 internal fun MediaShadeIconButton(
     icon: ImageVector,

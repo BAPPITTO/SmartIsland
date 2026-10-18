@@ -37,20 +37,7 @@ import androidx.compose.runtime.setValue
 
 /**
  * One state machine for the landscape cutout leaving AND coming back (rules: model/PillPresence.kt, maths of the
- * slide: model/LandscapePillExit.kt). Kept out of the overlay's very large function on purpose, like the idle dot.
- *
- * One number drives everything:
- *  - [presence]: 1 = collapsed pill in place, 0 = pill gone. It is driven by a critically damped spring (no bounce)
- *    on an [Animatable], so a card arriving mid-exit (or the card going mid-entry) reverses in place and keeps the
- *    velocity it had: never a snap, never a restart from rest. The animation speed scales the spring's stiffness.
- *
- * The idle circle (the camera cutout circle) is NOT part of the motion: it never fades, blinks or pulses, and the pill
- * does not wait for it. It is on or off (see [dotAlpha]): on while the pill leaves and during the hand-over, so it is
- * simply there when the pill has gone.
- *
- * While the pill leaves, the island keeps the settings it had with the card (size and position do not glide to
- * the idle size); when it is gone the island takes the idle settings with a jump ([PillPhase.Settling]) and the dot
- * hands over at the same spot.
+ * slide: model/LandscapePillExit.kt).
  */
 internal class PillExitState {
     // Plain fields: written after composition, read when composing.
@@ -74,13 +61,9 @@ internal class PillExitState {
     /** 1 = pill in place, 0 = gone. Mirror of [presenceAnim] that the draw code reads. */
     var presence by mutableFloatStateOf(1f)
 
-    /** The spring that owns [presence]; it keeps its velocity when a run is cancelled and a reversal takes over. */
     private val presenceAnim = Animatable(1f)
 
-    /**
-     * Stiffness (user speed applied, system scale not) the next exit runs on, or null for the normal pill spring. Set for
-     * an exit that step 2 of the idle-circle close starts ([IdleCloseSequence]); it is also what a reversal then uses.
-     */
+    /** Stiffness (user speed applied, system scale not) the next exit runs on, or null for the normal pill spring. */
     var exitStiffnessUser: Float? = null
 
     /** The next run starts from [presence] at rest (a new exit or entry), instead of continuing the running motion. */
@@ -100,15 +83,11 @@ internal class PillExitState {
 
     /**
      * The separate idle dot exists (landscape, not notch mode), so it can stand in for the island's own idle cutout
-     * while the island takes the idle settings (see [PillPhase.Settling]). Portrait has no dot and keeps the old hand-over.
+     * while the island takes the idle settings. Portrait has no dot and keeps its own hand-over.
      */
     var dotCoversHandover = false
 
-    /**
-     * True once the island shell has really reached the idle settings (size and opacity), read from the overlay.
-     * The shell's size and opacity are animated values; right after the exit they still hold the pill's numbers, which showed
-     * as a dark pill-sized box at the idle spot that shrank and faded into the circle (the warp).
-     */
+    /** True once the island shell has really reached the idle settings (size and opacity), read from the overlay. */
     var shellSettled: () -> Boolean = { true }
 
     val hasRecord: Boolean get() = lastSettings != null && lastWidthDp > 0f && lastHeightDp > 0f
@@ -124,7 +103,6 @@ internal class PillExitState {
         frozen = settings
     }
 
-    /** Hard stop: the island shows as usual. */
     fun reset() {
         job?.cancel()
         frozen = null
@@ -142,17 +120,10 @@ internal class PillExitState {
 
     fun pillAlpha(): Float = pillExitAlpha(pillSlideProgress(effPresence()))
 
-    /**
-     * Opacity of the island shell itself. Like [pillAlpha], except that while the island takes the idle settings (and the dot
-     * covers the spot) the shell is not drawn: its size and opacity are still the pill's for a few frames. The secondary
-     * cutouts keep using [pillAlpha].
-     */
+    /** Opacity of the island shell itself. */
     fun shellAlpha(): Float = if (phase == PillPhase.Settling && dotCoversHandover) 0f else pillAlpha()
 
-    /**
-     * Opacity of the idle circle: on or off, never animated. It is fully on from the moment the pill starts to leave
-     * until the island's own idle cutout has taken over (the circle stands in for it while the shell settles), else [base].
-     */
+    /** Opacity of the idle circle: on or off, never animated. */
     fun dotAlpha(base: Float): Float =
         if (phase == PillPhase.Leaving || (phase == PillPhase.Settling && dotCoversHandover)) 1f else base
 
@@ -167,7 +138,6 @@ internal class PillExitState {
             stiffness = exitStiffnessUser?.let { speed.systemStiffness(it) } ?: speed.stiffness(PILL_SPRING_STIFFNESS)
         )
 
-    /** A new run starts at rest from [presence]; a reversal keeps the value and the velocity the spring has. */
     private suspend fun beginPresenceRun() {
         if (restartPresence) {
             presenceAnim.snapTo(presence)
@@ -175,7 +145,6 @@ internal class PillExitState {
         }
     }
 
-    /** Pill slides out and fades. Continues from the current motion. The idle circle takes no part in it. */
     suspend fun runExit(speed: AnimationSpeed) {
         beginPresenceRun()
         presenceAnim.animateTo(0f, presenceSpec(speed)) { presence = value }
@@ -187,7 +156,7 @@ internal class PillExitState {
         withFrameNanos { }
         withFrameNanos { }
         // Hold the hand-over (shell hidden, dot drawn) until the shell is really at the idle size and opacity, else
-        // the pill-sized shell shows at the idle spot and shrinks and fades into the circle. Capped, so it can never hang.
+        // the pill-sized shell shows at the idle spot and shrinks and fades into the circle.
         if (dotCoversHandover && !com.agupta07505.smartisland.util.SystemAnimScale.animationsOff()) {
             var startNanos = -1L
             while (true) {
@@ -200,7 +169,6 @@ internal class PillExitState {
         exitStiffnessUser = null
     }
 
-    /** Pill springs back in right away (it does not wait for the idle circle). Continues from the current motion. */
     suspend fun runEnter(speed: AnimationSpeed) {
         beginPresenceRun()
         presenceAnim.animateTo(1f, presenceSpec(speed)) { presence = value }
@@ -211,12 +179,11 @@ internal class PillExitState {
     }
 }
 
-/** Longest the hand-over after an exit waits for the shell to reach the idle settings (ms). */
 private const val SETTLE_CAP_MS = 700L
 
 /**
  * Creates the state machine and runs it. Call before the island's layout so the snap flag and the frozen settings are
- * known when its geometry targets change. Landscape, not notch mode only; an expanding card during an exit reverses it.
+ * known when its geometry targets change.
  */
 @Composable
 internal fun rememberLandscapePillExit(
@@ -228,10 +195,7 @@ internal fun rememberLandscapePillExit(
     notchMode: Boolean,
     screenWidthDp: Float,
     animSpeed: AnimationSpeed,
-    /**
-     * The collapsed pill is really on screen (not auto-hidden). A pill that was hidden must not "exit": the slide
-     * draws it at full opacity at its old spot and carries it off the edge, which showed as a stray dark pill smearing away.
-     */
+    /** The collapsed pill is really on screen (not auto-hidden). */
     pillOnScreen: Boolean = true
 ): PillExitState {
     val state = remember { PillExitState() }
@@ -294,7 +258,6 @@ internal fun rememberLandscapePillExit(
     return state
 }
 
-/** Remembers the collapsed cutout's settings and spot while it shows a card, so the machine knows where it starts. */
 internal fun PillExitState.record(
     shown: Boolean,
     isLandscape: Boolean,

@@ -25,8 +25,8 @@ data class DetectedCutoutInfo(
 object CameraCutoutDetector {
 
     /**
-     * The camera hole as best known, portrait only: the manual area when set, else the detected one (without the padding the pill
-     * size adds), else null. Notch mode has no camera hole of its own (null).
+     * The camera hole as best known, portrait only: the manual area when set, else the detected one (without the
+     * padding the pill size adds), else null. Notch mode has no camera hole of its own (null).
      */
     fun areaFor(
         settings: SmartIslandSettings,
@@ -50,9 +50,6 @@ object CameraCutoutDetector {
     const val PADDING_W_DP = 24f
     const val PADDING_H_DP = 10f
 
-    /**
-     * Calculates the physical pill position and dimensions matching the device's camera cutout coordinates.
-     */
     fun calculateCutoutOffset(
         left: Int,
         top: Int,
@@ -97,9 +94,6 @@ object CameraCutoutDetector {
         )
     }
 
-    /**
-     * Calculates the physical pill position and dimensions matching the device's camera cutout rect.
-     */
     fun calculateCutoutOffset(
         rect: Rect,
         screenWidthPx: Int,
@@ -113,9 +107,6 @@ object CameraCutoutDetector {
         density = density
     )
 
-    /**
-     * Detects hardware camera cutout on the current device using WindowInsets / DisplayCutout API.
-     */
     fun detect(context: Context): DetectedCutoutInfo {
         val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager
             ?: return fallbackInfo(context)

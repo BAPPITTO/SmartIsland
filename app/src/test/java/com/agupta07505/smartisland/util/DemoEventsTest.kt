@@ -16,10 +16,8 @@ import org.junit.Test
 class DemoEventsTest {
 
     @Test
-    fun everyEventHasASampleExceptScreenSharing() {
-        assertFalse(IslandEvent.PRIVACY_MEDIA_PROJECTION in DemoEvents.available)
-        assertFalse(IslandEvent.PRIVACY_CAMERA in DemoEvents.available)
-        assertEquals(IslandEvent.entries.count { !it.isPrivacy }, DemoEvents.available.size)
+    fun everyEventIsListed() {
+        assertEquals(IslandEvent.entries.size, DemoEvents.available.size)
     }
 
     @Test

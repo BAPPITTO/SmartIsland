@@ -13,9 +13,8 @@ import android.os.Build
 import com.agupta07505.smartisland.model.IslandNotificationAction
 
 /**
- * Reads the extras Android's `Notification.CallStyle` adds, so a ringing call is recognised even
- * when the app's buttons have no (or an unexpected) label, or when the notification is not flagged
- * ongoing (a heads-up / full-screen incoming call usually is not).
+ * Reads the extras of `Notification.CallStyle`, so a ringing call is recognised even when the app's buttons have
+ * no (or an unexpected) label, or the notification is not flagged ongoing (a heads-up incoming call usually is not).
  *
  * Every read is guarded: a malformed OEM bundle must never break notification handling.
  */
@@ -32,8 +31,8 @@ object CallStyleExtras {
     private const val COMPAT_TEMPLATE_KEY = "androidx.core.app.extras.COMPAT_TEMPLATE"
 
     /**
-     * True for the platform CallStyle and for the androidx compat CallStyle (what apps use below
-     * Android 12, or when they build through NotificationCompat), which has its own template name.
+     * True for the platform CallStyle and for the androidx compat CallStyle (what apps use below Android 12, or when
+     * they build through NotificationCompat), which has its own template name.
      */
     fun isCallTemplate(n: Notification): Boolean = runCatching {
         val extras = n.extras ?: return@runCatching false
@@ -45,8 +44,8 @@ object CallStyleExtras {
     private val CHANNEL_NOT_CALL = listOf("missed", "history", "ended", "summary", "reminder", "message", "record", "log")
 
     /**
-     * VoIP apps put their ringing and in-call notifications on a channel named like "voip_notification"
-     * or "incoming_calls". Used when the app sets no call category and no CallStyle.
+     * VoIP apps put their ringing and in-call notifications on a channel named like "voip_notification" or
+     * "incoming_calls". Used when the app sets no call category and no CallStyle.
      */
     fun channelLooksLikeCall(n: Notification): Boolean {
         val id = runCatching { n.channelId }.getOrNull()?.lowercase() ?: return false
@@ -68,8 +67,8 @@ object CallStyleExtras {
     }.getOrNull()
 
     /**
-     * True when the notification itself says the call is ringing: CallStyle type, an answer
-     * button, or an answer intent. Strict on purpose; it decides whether the shade copy is removed.
+     * True when the notification itself says the call is ringing: CallStyle type, an answer button, or an answer
+     * intent. Strict on purpose; it decides whether the shade copy is removed.
      */
     fun isRinging(n: Notification): Boolean {
         val type = callType(n)
@@ -82,10 +81,8 @@ object CallStyleExtras {
     }
 
     /**
-     * [isRinging] plus guesses for VoIP apps that keep their buttons in a custom view: a
-     * call-category notification with a full-screen intent and no running chronometer, or one that
-     * says "incoming" / "ringing". Only for what the card shows; never used to hide the shade copy,
-     * because an outgoing "connecting" notification can look the same.
+     * [isRinging] plus guesses for VoIP apps that keep their buttons in a custom view: a call-category notification
+     * with a full-screen intent and no running chronometer, or one that says "incoming" / "ringing".
      */
     fun looksRinging(n: Notification): Boolean {
         if (isRinging(n)) return true
@@ -103,10 +100,8 @@ object CallStyleExtras {
     }
 
     /**
-     * The app's own status line when the notification is an outgoing call that has not been picked up
-     * yet ("Calling...", "Dialing", "Ringing"), exactly as written; null when it is not. Such a
-     * notification has only a hang-up button and no running chronometer, so without this it looked
-     * like a call already in progress.
+     * The app's own status line ("Calling...", "Dialing", "Ringing"), exactly as written, when the notification is an
+     * outgoing call not yet picked up; null otherwise.
      */
     fun connectingStatus(n: Notification): String? {
         if (isRinging(n)) return null
@@ -121,7 +116,6 @@ object CallStyleExtras {
         return connectingStatusOf(texts)
     }
 
-    /** Pure part of [connectingStatus]: the first text that is a short dialing status, trimmed. */
     fun connectingStatusOf(texts: List<String>): String? =
         texts.map { it.trim() }.firstOrNull { textLooksConnecting(it) }
 
@@ -142,7 +136,6 @@ object CallStyleExtras {
         "eingehender anruf", "来电", "着信", "входящий"
     )
 
-    /** The caller's name from a CallStyle notification, for apps that leave the title empty. */
     fun callerName(n: Notification): String? =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) callerNameApi28(n) else null
 
@@ -159,8 +152,8 @@ object CallStyleExtras {
     }.getOrNull()
 
     /**
-     * The app's own buttons plus the CallStyle intents that are missing from them (some apps hand
-     * the system an action without a title, and those are dropped when the actions are read).
+     * The app's own buttons plus the CallStyle intents that are missing from them (some apps hand the system an
+     * action without a title, and those are dropped when the actions are read).
      */
     fun withCallIntents(
         n: Notification,

@@ -7,17 +7,12 @@
 
 package com.agupta07505.smartisland.util
 
-/**
- * Whether a press on a clock button can reach the app. A button mirrored from the clock's custom view is a proxy
- * broadcast that presses a kept view; the broadcast succeeds even when that view is gone, so it must be checked first.
- */
+/** Whether a press on a clock button can reach the app. */
 object ButtonPress {
 
     enum class Refusal {
-        /** The button has no intent. */
         NoIntent,
 
-        /** Proxy button whose kept view is gone. */
         ViewGone
     }
 
@@ -28,7 +23,6 @@ object ButtonPress {
         else -> null
     }
 
-    /** True when a kept view is still behind the proxy button with this label. */
     fun hasLive(liveLabels: List<String>, title: String): Boolean {
         val wanted = title.trim()
         return liveLabels.any { it.trim().equals(wanted, ignoreCase = true) }

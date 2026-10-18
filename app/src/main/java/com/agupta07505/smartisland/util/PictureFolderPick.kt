@@ -8,12 +8,11 @@
 package com.agupta07505.smartisland.util
 
 /**
- * Picks the picture a chat notification is about out of a listing of an app's media folders
- * (lines of `modified|accessed|changed|path`, times in seconds). Pure, so it can be unit-tested.
+ * Picks the picture a chat notification is about from a listing of an app's media folders
+ * (lines of `modified|accessed|changed|path`, times in seconds).
  *
- * Stickers need their own rules: WhatsApp keeps one file per sticker and reuses it when the same
- * sticker arrives again, so the file can be older than the notification. For a sticker the newest of the three
- * times counts, extension-less files are accepted, and only files in a folder with "sticker" in its path qualify.
+ * WhatsApp reuses one file per sticker, so a sticker file can be older than its notification. For a sticker the newest of
+ * the three times counts, extension-less files are accepted, and only folders with "sticker" in the path qualify.
  */
 internal object PictureFolderPick {
     class Candidate(val seconds: Long, val path: String, val modified: Long = seconds)

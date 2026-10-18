@@ -25,16 +25,15 @@ import java.nio.ByteBuffer
 import kotlin.math.max
 
 /**
- * Reads the pictures a notification shows in the shade: the image of a chat message (MessagingStyle
- * data URI, which is how WhatsApp sends photos, stickers and animated stickers) and the big picture
- * of picture-style notifications. Every read is guarded; an unreadable picture just means no media.
+ * Reads the pictures a notification shows in the shade: the image of a chat message (MessagingStyle data URI, which
+ * is how WhatsApp sends photos, stickers and animated stickers) and the big picture of picture-style notifications.
  */
 class NotificationMediaReader(private val context: Context) {
     private val cache = LruCache<String, NotificationMedia>(24)
 
     /**
-     * [allowFallbacks] false is the fast read for building the card: the normal open of the picture link only, no Shizuku shell
-     * and no folder search (those take seconds). The late-picture job calls it again with true.
+     * [allowFallbacks] false is the fast read for building the card: the normal open of the picture link only, no
+     * Shizuku shell and no folder search (those take seconds).
      */
     fun read(
         key: String, notification: Notification, shadeText: String, packageName: String = "",
@@ -91,10 +90,6 @@ class NotificationMediaReader(private val context: Context) {
         }
     }.getOrNull()
 
-    /**
-     * A sticker: the message's own text says so (a chat can hold a photo and a sticker, so the notification's
-     * last line is not enough), or the file is WebP, which is what chat apps send stickers as.
-     */
     private fun isStickerMessage(bundle: Bundle, mime: String?, shadeText: String): Boolean {
         val own = runCatching { bundle.getCharSequence(MESSAGE_TEXT)?.toString() }.getOrNull().orEmpty()
         return own.contains("sticker", ignoreCase = true) ||
@@ -119,12 +114,6 @@ class NotificationMediaReader(private val context: Context) {
         }
     }
 
-    /**
-     * Opens a picture link by every way available. Many apps (WhatsApp, Telegram, Signal, Instagram, ...) refuse
-     * the notification listener a link to their picture. Order: the normal open; then Shizuku's shell, which
-     * runs as the `shell` user and can read links and files the app cannot; then the newest picture the app
-     * saved in its own media / data folder since the notification was posted.
-     */
     private fun loadWithFallbacks(
         uri: Uri, mime: String?, shadeText: String, packageName: String, postedAtMs: Long, stickerHint: Boolean = false,
         allowFallbacks: Boolean = true
@@ -140,7 +129,6 @@ class NotificationMediaReader(private val context: Context) {
         return loadFromAppFolder(packageName, postedAtMs, shadeText, stickerHint)
     }
 
-    /** `content read` (content links) or `cat` (file links) run through Shizuku. */
     private fun loadViaShell(uri: Uri, mime: String?, shadeText: String, stickerHint: Boolean = false): NotificationMedia? {
         val command = when (uri.scheme) {
             "content" -> "content read --user ${android.os.Process.myUid() / 100000} --uri ${shellQuote(uri.toString())}"
@@ -157,10 +145,6 @@ class NotificationMediaReader(private val context: Context) {
             ?.also { AppLogRecorder.i(TAG, "Picture ${uri.authority} read through Shizuku (${bytes.size} bytes)") }
     }
 
-    /**
-     * Last resort: the newest image saved by [packageName] in its media or data folder since the notification
-     * was posted (received photos and stickers land there). Avatars, thumbnails and icons are skipped.
-     */
     private fun loadFromAppFolder(packageName: String, postedAtMs: Long, shadeText: String, stickerHint: Boolean = false): NotificationMedia? {
         if (packageName.isBlank()) return null
         val sticker = stickerHint || shadeText.contains("sticker", ignoreCase = true)
@@ -172,9 +156,7 @@ class NotificationMediaReader(private val context: Context) {
             if (packageName == "com.whatsapp.w4b") add("/storage/emulated/0/WhatsApp Business")
         }.joinToString(" ") { shellQuote(it) }
         val ageMinutes = ((System.currentTimeMillis() - postedAtMs) / 60_000L).coerceIn(0L, 120L) + 3L
-        // Stickers: WhatsApp reuses the file when the same sticker arrives again, so it can be old. Look in
-        // sticker folders only, any extension (or none), any age, and let the pick use the newest of the
-        // modified / accessed / changed times. Photos keep the old rule (recent, 2 KB or more).
+        // Stickers: WhatsApp reuses the file when the same sticker arrives again, so it can be old.
         val listCommand = if (sticker) {
             "for r in $roots; do [ -d \"\$r\" ] && find \"\$r\" -type f -ipath '*sticker*' -size +0 " +
                 "-exec stat -c '%Y|%X|%Z|%n' {} + 2>/dev/null; done"

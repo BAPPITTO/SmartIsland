@@ -84,7 +84,7 @@ class CollapseMotionTest {
         assertEquals(1, CollapseMotion.cardContentOutMs(1))
     }
 
-    // ---- The pill content's wait follows how far open the island was ----
+    // The pill content's wait follows how far open the island was
 
     @Test
     fun fromFullSizeTheWaitIsTheOldOne() {

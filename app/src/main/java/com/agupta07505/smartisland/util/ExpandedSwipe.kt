@@ -12,11 +12,7 @@ import com.agupta07505.smartisland.model.SwipeAction
 import com.agupta07505.smartisland.model.nextAppGroupIndex
 import com.agupta07505.smartisland.model.nextSiblingIndex
 
-/**
- * What an expanded left / right swipe will do to the card on screen, worked out before the finger lifts.
- * [Changes] = another card will show; [Stays] = the same card stays (a track skip, a dismiss, no other app, no sibling);
- * [Unknown] = decided later (next / previous event may first look at the shade).
- */
+/** What an expanded left / right swipe will do to the card on screen, worked out before the finger lifts. */
 enum class SwipeCardOutcome { Changes, Stays, Unknown }
 
 fun predictCardChange(action: SwipeAction, cards: List<IslandNotification>, index: Int): SwipeCardOutcome = when (action) {
@@ -45,7 +41,6 @@ fun swipeNeighbourHint(action: SwipeAction): Int = when (action) {
 /** The page offsets the neighbour probe measures, the likely target first (the idle order is previous, then next). */
 fun neighbourProbeOrder(hint: Int): List<Int> = if (hint == 1) listOf(1, -1) else listOf(-1, 1)
 
-/** Sibling swipes with no sibling do nothing at all: no buzz, no tick, no movement. */
 fun swipeIsNoOp(action: SwipeAction, cards: List<IslandNotification>, index: Int): Boolean =
     (action == SwipeAction.NextSibling || action == SwipeAction.PreviousSibling) &&
         predictCardChange(action, cards, index) == SwipeCardOutcome.Stays
@@ -54,7 +49,6 @@ fun swipeIsNoOp(action: SwipeAction, cards: List<IslandNotification>, index: Int
 fun expandedCardRubberBand(drag: Float, density: Float): Float =
     (drag * RUBBER_BAND_FOLLOW).coerceIn(-RUBBER_BAND_MAX_DP * density, RUBBER_BAND_MAX_DP * density)
 
-/** Calmer rubber band (was 0.25 and 16 dp). */
 const val RUBBER_BAND_FOLLOW = 0.2f
 const val RUBBER_BAND_MAX_DP = 8f
 /** How long a swipe waits for a card to arrive: next / previous event may import from the shade first. */

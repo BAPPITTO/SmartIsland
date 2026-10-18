@@ -22,19 +22,7 @@ import android.widget.RemoteViews
 import android.widget.TextView
 import com.agupta07505.smartisland.model.IslandNotificationAction
 
-/**
- * Reads what an app put into its notification through custom [RemoteViews] instead of the standard
- * fields. Some clocks and voice recorders do that: the running time lives in a Chronometer view
- * (the notification's `when` is only the moment it was posted) and Pause / Stop are buttons inside
- * the view, so neither shows up in `Notification.actions`.
- *
- * The views are inflated off screen with the public [RemoteViews.apply]. Nothing is pressed while
- * inspecting. Each button view is kept in [liveButtons] and the island gets a self-addressed
- * broadcast PendingIntent for it; when that fires, [click] presses the kept view, which makes
- * RemoteViews send the app's own PendingIntent exactly as in the shade.
- * Everything is best effort; any failure returns null and the island falls back to the standard
- * fields.
- */
+/** Reads what an app put into its notification through custom [RemoteViews] instead of the standard fields. */
 object NotificationViewInspector {
 
     data class Result(
@@ -115,8 +103,6 @@ object NotificationViewInspector {
 
     private fun inflate(context: Context, views: RemoteViews, key: String): Pair<Result, List<View>> {
         // Send the app's own intent ourselves (background start allowed, fallbacks, result logged).
-        // The handler overload of apply() is hidden in the SDK, so it is reached by reflection and
-        // falls back to the plain apply() whenever it is not available.
         val root = applyWithPressHandler(context, views) ?: views.apply(context, FrameLayout(context))
 
         var chronometer: Chronometer? = null
@@ -175,7 +161,6 @@ object NotificationViewInspector {
         return true
     }
 
-    /** The button's text; for a layout around its label, the first visible inner text, then description, then id name. */
     private fun buttonLabel(v: View): String {
         (v as? TextView)?.text?.toString()?.takeIf { it.isNotBlank() }?.let { return it.trim() }
         if (v is ViewGroup) {
@@ -190,14 +175,12 @@ object NotificationViewInspector {
         return v.contentDescription?.toString()?.takeIf { it.isNotBlank() } ?: idName(v)
     }
 
-    /** Seconds of a text that is nothing but a clock time ("04:59", "1:02:03"), else null. */
     private fun clockOnly(text: String?): Long? {
         val t = text?.trim().orEmpty()
         if (t.isEmpty() || t.length > 9 || !CLOCK_ONLY.matches(t)) return null
         return TimerStopwatchParser.parseClockTimeToSeconds(t)
     }
 
-    /** Self-addressed broadcast; the data URI keeps one distinct PendingIntent per key and button. */
     private fun clickIntent(context: Context, key: String, index: Int): PendingIntent {
         val uri = Uri.Builder()
             .scheme(SCHEME)
@@ -229,14 +212,8 @@ object NotificationViewInspector {
         return pressed
     }
 
-    /** Labels of the proxy buttons whose kept view still exists. */
     fun liveLabels(key: String): List<String> = liveLabels[key].orEmpty()
 
-    /**
-     * Inflates [views] with a handler that sends the app's own PendingIntent when a kept view is pressed.
-     * `RemoteViews.apply(Context, ViewGroup, InteractionHandler)` is hidden, so it is called by reflection.
-     * Returns null when the hidden overload cannot be used (the caller then uses the default apply()).
-     */
     @android.annotation.SuppressLint("PrivateApi", "DiscouragedPrivateApi", "SoonBlockedPrivateApi")
     private fun applyWithPressHandler(context: Context, views: RemoteViews): View? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return null
@@ -270,7 +247,6 @@ object NotificationViewInspector {
         }
     }
 
-    /** Drops the kept views of a notification that is gone. */
     fun forget(key: String) {
         liveButtons.remove(key)
         liveLabels.remove(key)
@@ -288,7 +264,6 @@ object NotificationViewInspector {
         }
     }
 
-    /** "pause_button" for a button with no label: the id name still says what it does. */
     private fun idName(view: View): String = runCatching {
         if (view.id != View.NO_ID) view.resources.getResourceEntryName(view.id) else ""
     }.getOrDefault("").replace('_', ' ')
@@ -298,9 +273,7 @@ object NotificationViewInspector {
     private const val TAG = "NotificationViewInspector"
     private val CLOCK_ONLY = Regex("""-?(?:\d{1,2}:)?\d{1,2}:\d{2}""")
 
-    /** Off-screen button views per notification key, indexed like the island's buttons. */
     private val liveButtons = java.util.concurrent.ConcurrentHashMap<String, List<View>>()
 
-    /** Labels of [liveButtons], same order. */
     private val liveLabels = java.util.concurrent.ConcurrentHashMap<String, List<String>>()
 }

@@ -47,7 +47,7 @@ import androidx.compose.runtime.setValue
 /**
  * Landscape Lab: plays every landscape situation on the real island (entry, expand, second and third app with both
  * merge styles, sibling picker, call, popup, exit, interrupted exit, idle circle tap) for every combination of
- * rotation (normal / reverse), idle circle position and pill position. Nothing is saved; stored settings are untouched.
+ * rotation (normal / reverse), idle circle position and pill position.
  */
 @Composable
 fun LandscapeLabSection(notificationRepository: INotificationRepository?) {

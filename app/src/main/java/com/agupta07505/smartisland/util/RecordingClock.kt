@@ -12,14 +12,6 @@ import kotlin.math.abs
 
 /**
  * Elapsed time of a screen / voice recording, tracked from the recorder's own notification.
- *
- * Why not just use `Notification.when`: recorders re-post their notification every second (or on
- * every pause / resume), and `when` then moves with it, so a timer built on it restarts, runs ahead
- * or keeps counting after the recording is saved. Instead the clock reads, in this order:
- *   1. the time written in the notification ("Currently recording 00:26"),
- *   2. the notification's chronometer base,
- *   3. its own previous value.
- * While paused or finished the value is frozen, so it never moves.
  */
 object RecordingClock {
     /** [startMillis] is `now - elapsed` while running; [frozenMs] is non-null while paused / finished. */
@@ -52,7 +44,6 @@ object RecordingClock {
         return null
     }
 
-    /** A stopped chronometer prints elapsed plus the age of its post. */
     fun withoutPostAge(readingMs: Long?, ageMs: Long): Long? =
         readingMs?.minus(ageMs.coerceAtLeast(0L))?.takeIf { it > 0L }
 
@@ -78,8 +69,8 @@ object RecordingClock {
         own ?: lastForApp?.takeIf { paused }
 
     /**
-     * Paused state that survives a clock app's cancel-and-repost (the new post may show neither "Resume" nor "paused").
-     * Counts as running again only once the app offers "Pause".
+     * Paused state that survives a clock app's cancel-and-repost (the new post may show neither "Resume" nor
+     * "paused"). Counts as running again only once the app offers "Pause".
      */
     fun resolvePaused(detected: Boolean, lastForApp: State?, actionTitles: List<String>): Boolean {
         if (detected) return true
@@ -89,8 +80,8 @@ object RecordingClock {
     }
 
     /**
-     * The next clock state. [exactFrozenMs] ([TimerClock.elapsedFromChronometer]) wins while paused; [exactStart] means
-     * [chronometerBaseMs] is exact, so the start is not smoothed towards the previous one.
+     * The next clock state. [exactFrozenMs] ([TimerClock.elapsedFromChronometer]) wins while paused; [exactStart]
+     * means [chronometerBaseMs] is exact, so the start is not smoothed towards the previous one.
      */
     fun next(
         previous: State?,
@@ -132,7 +123,7 @@ object RecordingClock {
         return State(startMillis = start, frozenMs = null)
     }
 
-    /** True when a recorder's notification is a paused recording (still ongoing in spirit). */
+    /** True when a recorder's notification is a paused recording. */
     fun looksPaused(n: Notification): Boolean {
         val titles = runCatching { n.actions.orEmpty().map { it.title?.toString().orEmpty() } }
             .getOrDefault(emptyList())

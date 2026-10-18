@@ -40,7 +40,8 @@ class WidgetIslandContentTest {
 
     @Test
     fun batteryOnlyWhileCharging() {
-        assertFalse(has(IdleWidgetKind.Battery, charging = false))
+        // Not charging, the battery island still opens: it says when the battery runs out.
+        assertTrue(has(IdleWidgetKind.Battery, charging = false))
         assertTrue(has(IdleWidgetKind.Battery, charging = true))
     }
 

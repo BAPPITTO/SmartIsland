@@ -28,10 +28,7 @@ import androidx.compose.ui.unit.dp
 import com.agupta07505.smartisland.data.SmartIslandSettings
 import com.agupta07505.smartisland.model.IslandNotification
 
-/**
- * Collapsed: the secondary circle. Expanded with 2 cards: the same item morphs into a full-size pill. Expanded with 3+:
- * it stays the circle on the right. While expanded with same-app siblings it is the picker button.
- */
+/** Collapsed: the secondary circle. Expanded with 2 cards: the same item morphs into a full-size pill. */
 @Composable
 internal fun SecondaryBubble(
     settings: SmartIslandSettings,
@@ -46,9 +43,8 @@ internal fun SecondaryBubble(
     ui: IslandInteractionState
 ) {
     if (!settings.enableNotchMode && secondary.secondaryShown &&
-        (layout.screenShareBubble || secondary.secondaryNotification != null)
+        secondary.secondaryNotification != null
     ) {
-        val privacyContext = androidx.compose.ui.platform.LocalContext.current
         val bubbleMerge = settings.mergeStyleKind() == com.agupta07505.smartisland.util.MergeStyle.BUBBLE
         // The outline is built where it is drawn (graphicsLayer blocks below), so the springs behind it do not
         // recompose this function on every frame.
@@ -82,12 +78,7 @@ internal fun SecondaryBubble(
                 }
                 .islandAnimatedSize({ secondary.secondaryBubbleWidth }, { layout.circleSize })
                 .graphicsLayer {
-                    // merge = 0 normal bubble, 1 fused into the primary cutout. The bubble slides
-                    // sideways to the pill's near edge, stretching toward it like a drop of liquid,
-                    // then sinks into the pill (same colour, so the join is seamless). It never
-                    // travels to the pill's centre.
-                    // An open island never shows a merge: a merge value left over from the collapsed state
-                    // would stretch / squeeze the round cutout (it looked warped beside the open card).
+                    // merge = 0 normal bubble, 1 fused into the primary cutout.
                     val merge = if (cb.currentExpanded) 0f else secondary.secondaryMergeAnim.value
                     val dist = (layout.animatedXOffset - secondary.secondaryOffset).toPx()
                     val distDp = (layout.animatedXOffset - secondary.secondaryOffset).value
@@ -95,8 +86,6 @@ internal fun SecondaryBubble(
                     val travel = mergeTravelDp(distDp, layout.safeWidth.value, secondary.secondaryBubbleWidth.value).dp.toPx()
                     val towardPill = if (dist >= 0f) 1f else -1f
                     // Landscape exit: the secondary rides along with the pill (same slide and fade).
-                    // Bubble style, join: the body is drawn behind the pill by the layer above (so it never covers the
-                    // pill's own content as it passes into it); this crisp copy only exists up to the join.
                     val joined = bubbleMerge && merge > 0f && mergeJoin(merge, contact) > 0f
                     alpha = if (joined) 0f else (secondary.secondaryAlpha * mergeBubbleAlpha(merge) * pillExit.pillAlpha() * layout.hidingAlpha)
                     val bubbleScale = secondary.secondaryScale * switchScaleAnim.value
@@ -139,16 +128,6 @@ internal fun SecondaryBubble(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
                 ) {
-                    if (layout.screenShareBubble) {
-                        // A privacy cutout (camera, microphone, location, screen share): a small dialog listing the
-                        // apps using it (the system's own screens refuse to open from this app).
-                        val kind = layout.privacyKind
-                        if (kind != null) {
-                            ui.touch()
-                            privacyContext.showPrivacyUsage(kind)
-                        }
-                        return@clickable
-                    }
                     // A real touch (not just a timer restart): an auto-expanded island that was never touched would otherwise
                     // close again 0.8 s after this tap.
                     ui.userTouched()
@@ -168,9 +147,7 @@ internal fun SecondaryBubble(
                 },
             contentAlignment = Alignment.Center
         ) {
-            if (layout.screenShareBubble) {
-                layout.privacyKind?.let { PrivacyBubbleGlyph(it) }
-            } else if (secondary.sameAppCompanion) {
+            if (secondary.sameAppCompanion) {
                 // Expanded and the card has siblings: this cutout is the picker button, so it shows
                 // three lines (a list) instead of repeating a card's own icon.
                 SiblingPickerLines(open = cb.currentSiblingPickerOpen)

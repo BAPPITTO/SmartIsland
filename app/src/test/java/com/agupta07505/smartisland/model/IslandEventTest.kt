@@ -42,6 +42,16 @@ class IslandEventTest {
     }
 
     @Test
+    fun usbAndHeadphoneCardsHaveTheirOwnSwitches() {
+        assertEquals(IslandEvent.USB_CONNECTED, IslandEvent.forNotification(notif(IslandMode.Bluetooth, "usb_connected")))
+        assertEquals(IslandEvent.USB_DISCONNECTED, IslandEvent.forNotification(notif(IslandMode.Bluetooth, "usb_disconnected")))
+        assertEquals(IslandEvent.HEADPHONES_CONNECTED, IslandEvent.forNotification(notif(IslandMode.Bluetooth, "headphones_connected")))
+        assertEquals(IslandEvent.HEADPHONES_DISCONNECTED, IslandEvent.forNotification(notif(IslandMode.Bluetooth, "headphones_disconnected")))
+        assertTrue(IslandEvent.USB_CONNECTED.canSwitchAutoExpand && IslandEvent.HEADPHONES_DISCONNECTED.canHideOnLockScreen)
+        assertEquals("Connectivity", IslandEvent.HEADPHONES_CONNECTED.group)
+    }
+
+    @Test
     fun emptyModeIsNeverGated() {
         assertNull(IslandEvent.forNotification(notif(IslandMode.Empty)))
     }
@@ -113,9 +123,8 @@ class IslandEventTest {
     }
 
     @Test
-    fun callsAndPrivacyIndicatorsHaveNoAutoExpandSwitchEverythingElseHasOne() {
+    fun callsHaveNoAutoExpandSwitchEverythingElseHasOne() {
         assertFalse(IslandEvent.CALL.canSwitchAutoExpand)
-        IslandEvent.entries.filter { it.isPrivacy }.forEach { assertFalse(it.id, it.canSwitchAutoExpand) }
         assertTrue(IslandEvent.PLUGGED_IN.canSwitchAutoExpand)
         assertTrue(IslandEvent.NOTIFICATION.canSwitchAutoExpand)
         assertTrue(IslandEvent.BLUETOOTH.canSwitchAutoExpand)

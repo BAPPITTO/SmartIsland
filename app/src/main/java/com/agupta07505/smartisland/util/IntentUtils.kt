@@ -12,10 +12,7 @@ import android.content.Context
 import android.content.Intent
 import android.widget.Toast
 
-/**
- * Opens a system or external activity without allowing a missing/OEM-restricted
- * destination to crash Smart Island.
- */
+/** Swallows a missing or OEM-restricted destination instead of crashing. */
 fun Context.safeStartActivity(
     intent: Intent,
     errorMessage: String? = "This setting is not available on your device.",

@@ -76,9 +76,8 @@ fun MusicExpanded(
         }
     }
 
-    // The playhead is a State that is only read while drawing (the seek bar) or by two small texts, so a
-    // tick does not recompose the whole card (artwork, blur, buttons). It is also worked out from the last playback state
-    // the session reported, not by asking the media app over binder 33 times a second.
+    // The playhead is a State that is only read while drawing (the seek bar) or by two small texts, so a tick does
+    // not recompose the whole card (artwork, blur, buttons).
     var playbackState by remember(controller) { mutableStateOf(controller?.playbackState) }
     val playbackStateNow = rememberUpdatedState(playbackState)
     val getEstimatedPosition = remember {
@@ -115,7 +114,6 @@ fun MusicExpanded(
         }
     }
 
-    // Draw-time progress (0..1). Reads the State here, in the seek bar's draw block, not in composition.
     val progressNow: () -> Float = {
         when {
             durationMs != null && durationMs > 0 ->
@@ -126,8 +124,8 @@ fun MusicExpanded(
         }
     }
 
-    // The buttons come from what this app's media session offers (prev / next only when supported,
-    // plus its own custom buttons such as like, shuffle or cast), never from a fixed set.
+    // The buttons come from what the app's media session offers (prev / next only when supported, plus its own custom
+    // buttons), not a fixed set.
     DisposableEffect(controller) {
         if (controller == null) return@DisposableEffect onDispose {}
         val callback = object : android.media.session.MediaController.Callback() {
@@ -145,14 +143,15 @@ fun MusicExpanded(
         MediaControls.resolve(playbackState, notification)
     }
 
-    // The artwork, its colour and the explicit flag come from [MediaArt]: read and reduced (and blurred, when the media blur is on)
-    // off the main thread, usually already while the pill was collapsed. Until then the notification's own small picture shows.
+    // The artwork, its colour and the explicit flag come from [MediaArt]: read and reduced (and blurred, when the
+    // media blur is on) off the main thread, usually already while the pill was collapsed.
     val mediaSettings = remember(settings) { settings.forMedia() }
     val blurRadiusDp = if (mediaSettings.expandedBlurEnabled) mediaSettings.expandedBlurRadius else null
     val artKey = MediaArt.keyFor(notification, blurRadiusDp)
-    // A track change posts the title first and the session's picture a moment later, so the key above (title and artist) can stay the
-    // same while the picture arrives: the notification's own large icon is a second key (it changes when the picture is read), and
-    // while only a fallback picture (the app's icon, the 128 px one) is shown the session is read again a few times.
+    // A track change posts the title first and the session's picture a moment later, so the key above (title and
+    // artist) can stay the same while the picture arrives: the notification's own large icon is a second key (it
+    // changes when the picture is read), and while only a fallback picture (the app's icon, the 128 px one) is shown
+    // the session is read again a few times.
     val art by androidx.compose.runtime.produceState(
         initialValue = MediaArt.cached(artKey) ?: MediaArt.quick(notification, blurRadiusDp),
         artKey,
@@ -161,8 +160,9 @@ fun MusicExpanded(
         val n = notification ?: return@produceState
         if (n.mediaToken == null) return@produceState
         MediaArt.cached(artKey)?.let { value = it; return@produceState }
-        // The app's icon is only a stand-in: while a real cover was shown before, it stays on screen until the new one is read (the
-        // card does not flip to the app icon, drawn enlarged as the backdrop, on every track change).
+        // The app's icon is only a stand-in: while a real cover was shown before, it stays on screen until the new
+        // one is read (the card does not flip to the app icon, drawn enlarged as the backdrop, on every track
+        // change).
         val hadCover = MediaArt.lastGood(n.key, blurRadiusDp) != null
         var loaded = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
             MediaArt.load(context.applicationContext, n, blurRadiusDp)
@@ -199,10 +199,8 @@ fun MusicExpanded(
                 contentScale = ContentScale.Crop,
                 // Bicubic / mipmapped drawing; the default (low) filter shows hard pixels when a picture is scaled.
                 filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
-                // The media card's own blur (off unless the owner turns it on for media).
                 modifier = Modifier.matchParentSize()
             )
-            // Shade look: the artwork dimmed (blur is the media setting above).
             Box(
                 modifier = Modifier
                     .matchParentSize()
@@ -218,7 +216,6 @@ fun MusicExpanded(
         }
 
         val resetTimer = { SmartIslandRepositories.notificationRepository(context).resetTimer() }
-        // The colour that stands out most in the artwork tints the badge, chip and play button.
         val artworkTint = art.tint
         val shadeColors = remember(artworkTint, artwork != null, settings.musicVisualizerColor, palette.isLight) {
             mediaShadeColors(settings, artworkTint, artwork != null, palette.isLight)
@@ -241,7 +238,6 @@ fun MusicExpanded(
                 )
                 .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = bottomPadding)
         ) {
-            // Top row: app badge left, audio output chip right (real output; tap opens the system output picker).
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -257,7 +253,6 @@ fun MusicExpanded(
                         headphonesLabel = stringResource(R.string.media_output_wired_headphones)
                     ),
                     colors = shadeColors,
-                    // The system's own output dialog does the switching (see MediaOutputSwitcher).
                     onClick = {
                         val pkg = notification?.packageName
                         if (pkg != null) {
@@ -269,9 +264,7 @@ fun MusicExpanded(
                     icon = mediaOutputIcon(mediaOutput.kind)
                 )
             }
-            // The middle row sits 6 dp lower (was 10 dp of space), the bottom row 4 dp lower in all (6 dp to 4 dp below the middle).
             Spacer(Modifier.height(16.dp))
-            // Middle row: title and artist left, big play / pause button right.
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -321,7 +314,6 @@ fun MusicExpanded(
                 }
             }
             Spacer(Modifier.height(4.dp))
-            // Bottom row: previous, seek bar, next, then the app's own buttons. No time labels, like the shade.
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -410,7 +402,6 @@ fun MusicExpanded(
     }
 }
 
-/** The elapsed time; recomposes once per second, not on every playhead tick. */
 @Composable
 private fun MusicPositionText(position: androidx.compose.runtime.LongState) {
     val seconds by remember(position) { derivedStateOf { position.longValue / 1000L } }
@@ -422,8 +413,6 @@ private fun MusicPositionText(position: androidx.compose.runtime.LongState) {
     )
 }
 
-/** Waits before the session's picture is read again while only a fallback picture shows (it often arrives after the title). */
 private val MEDIA_ART_RETRY_MS = longArrayOf(400L, 1_200L, 3_000L)
 
-/** Position refresh interval (ms) of a media card that is pre-composed but not shown. */
 private const val WAITING_CARD_TICK_MS = 250L

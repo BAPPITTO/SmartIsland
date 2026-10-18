@@ -97,7 +97,6 @@ import kotlinx.coroutines.withContext
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
-/** How long a dragged app rests on another app (or a folder) before letting go makes a folder; a quicker drop trades places. */
 private const val FOLDER_DWELL_MS = 1500L
 
 @Composable
@@ -119,8 +118,9 @@ fun AppShortcutsSection(
     var dragOrder by remember(pinnedApps) { mutableStateOf(pinnedApps) }
     var draggedPackage by remember { mutableStateOf<String?>(null) }
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
-    // Where the dragged entry would land if let go now: the entry it is over, whether it is resting on one it could make a
-    // folder with, and whether it has rested there long enough ([FOLDER_DWELL_MS]) for letting go to make the folder.
+    // Where the dragged entry would land if let go now: the entry it is over, whether it is resting on one it could
+    // make a folder with, and whether it has rested there long enough ([FOLDER_DWELL_MS]) for letting go to make the
+    // folder.
     var dragTarget by remember { mutableStateOf<String?>(null) }
     var dragOverJoinable by remember { mutableStateOf(false) }
     var dragJoin by remember { mutableStateOf(false) }
@@ -145,7 +145,6 @@ fun AppShortcutsSection(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Card 1: Launcher Configuration & Recent Apps
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(16.dp),
@@ -154,7 +153,6 @@ fun AppShortcutsSection(
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                // Master Switch: Enable / Disable App Shortcut Launcher
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -284,7 +282,6 @@ fun AppShortcutsSection(
             }
         }
 
-        // Card 2: Pinned Apps Display & Quick Manage
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(16.dp),
@@ -329,7 +326,6 @@ fun AppShortcutsSection(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
                 if (pinnedApps.isEmpty()) {
-                    // Clean Empty State
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
@@ -372,11 +368,8 @@ fun AppShortcutsSection(
                         }
                     }
                 } else {
-                    // Pinned Apps List with Icons & Quick Unpin. Drag a handle to move an entry: letting go trades places with the
-                    // entry it is over; resting on another app (or a folder with room) for 1.5 s first makes a folder with it. A
-                    // folder lists its apps under it; their handles reorder them, and dragging one out past the folder takes it out.
-                    // Where letting go of [dragged], [offsetY] px from where it rests, would drop it: the nearest other entry, and
-                    // whether the row is resting on it (its middle is inside that entry) and the two could make a folder.
+                    // Drag a handle to move an entry: letting go trades places with the entry it is over; resting on
+                    // another app (or a folder with room) for 1.5 s first makes a folder.
                     fun dropFor(dragged: String, offsetY: Float): Pair<String?, Boolean> {
                         val from = entryBounds[dragged] ?: return null to false
                         val centerY = from.center.y + offsetY
@@ -549,7 +542,6 @@ fun AppShortcutsSection(
                                 }
                             }
 
-                            // The apps of a folder, under it.
                             memberApps.forEach { member ->
                                 key(member.packageName) {
                                     val memberPkg = member.packageName
@@ -629,7 +621,8 @@ fun AppShortcutsSection(
                                                             if (block != null && row != null) {
                                                                 val centerY = block.top + row.center.y + memberOffsetY
                                                                 if (centerY < block.top || centerY > block.bottom) {
-                                                                    // Past the folder: the app takes a slot of its own, or is unpinned when none is free.
+                                                                    // Past the folder: the app takes a slot of its
+                                                                    // own, or is unpinned when none is free.
                                                                     if (PinnedApps.dragOutUnpins(current)) {
                                                                         android.widget.Toast.makeText(
                                                                             context,
@@ -667,7 +660,6 @@ fun AppShortcutsSection(
                     }
                 }
 
-                // Action Button to Open Full App Selection
                 FilledTonalButton(
                     onClick = { showAppSelectionDialog = true },
                     shape = RoundedCornerShape(12.dp),
@@ -687,7 +679,6 @@ fun AppShortcutsSection(
             }
         }
 
-        // Card 3: the Utilities page (swipe up in the quick-launch window)
         UtilitiesEditorCard(settings = settings, repository = repository)
     }
 

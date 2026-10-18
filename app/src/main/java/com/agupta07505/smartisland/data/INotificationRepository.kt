@@ -20,9 +20,8 @@ interface INotificationRepository {
     fun postNotification(notification: IslandNotification, autoExpand: Boolean = false)
 
     /**
-     * Changes one stored card in place (never adds one, never auto-expands). Used for live fields that change faster than
-     * the app re-posts its notification, such as the track shown by a media card. A card that is gone is left alone.
-     * The default does nothing so test doubles need not implement it.
+     * Changes one stored card in place (never adds one, never auto-expands). Used for live fields that change faster
+     * than the app re-posts its notification, such as the track shown by a media card.
      */
     fun updateNotification(key: String, transform: (IslandNotification) -> IslandNotification) {}
     fun removeNotification(key: String)

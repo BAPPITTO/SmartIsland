@@ -73,7 +73,6 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     else -> null
 }
 
-/** The first empty cell of the Utilities grid (tab 1 first), or null when every cell is taken. */
 internal fun firstEmptyUtilityCell(layout: List<UtilityPlacement>): Pair<Int, Int>? =
     (0 until UtilityGrid.TOTAL_ROWS).firstNotNullOfOrNull { r ->
         (0 until UtilityGrid.COLUMNS).firstOrNull { c -> UtilityLayout.itemAt(layout, r, c) == null }?.let { c -> r to c }
@@ -92,9 +91,8 @@ private const val NO_WIDGET = -1
 private enum class AddStage { Kind, Widget }
 
 /**
- * "Add a utility" for the empty cell at [row], [col]: the list of utilities, then (for "App widget") the list of installed widgets,
- * the bind permission, and the widget's own setup screen. One composable for both homes: the Utilities editor on the settings screen
- * and [PickerActivity]. Every ending goes through [onClose]; [onPlaced] gets the key of what was added just before it.
+ * "Add a utility" for the empty cell at [row], [col]: the list of utilities, then (for "App widget") the list of
+ * installed widgets, the bind permission, and the widget's own setup screen.
  */
 @Composable
 fun UtilityAddFlow(
@@ -112,8 +110,7 @@ fun UtilityAddFlow(
     val latestLayout by rememberUpdatedState(layout)
     var stage by remember { mutableStateOf(AddStage.Kind) }
     var pending by remember { mutableStateOf<PendingWidget?>(null) }
-    // The half-added widget's id also survives the app being killed while its bind/setup screen is in front. The widget setup
-    // callback does not survive that, so a restored id is released and the add starts over rather than leaking the id.
+    // The half-added widget's id also survives the app being killed while its bind/setup screen is in front.
     var savedPendingId by rememberSaveable { mutableIntStateOf(NO_WIDGET) }
     val restoredPendingId = remember { savedPendingId }
     LaunchedEffect(restoredPendingId) {

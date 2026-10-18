@@ -32,9 +32,7 @@ import kotlin.math.max
 import androidx.compose.runtime.getValue
 
 /**
- * Which notification's picture is open at full size in the expanded island: the card key and the
- * picture's position. Provided once at the top of the overlay so the card and the outside-tap
- * handler share it without being passed through every layer.
+ * Which notification's picture is open at full size in the expanded island: the card key and the picture's position.
  */
 class MediaExpansion(
     val key: String?,
@@ -52,7 +50,7 @@ val LocalMediaExpansion = compositionLocalOf { MediaExpansion(null, 0) { _, _ ->
 
 /**
  * The open step (preview / reader / picture) of the shown card, held by the view model so the card, its arrow and the
- * swipe gestures share it (model/CardDepth.kt). A card that is not the shown one always reads the first state.
+ * swipe gestures share it (model/CardDepth.kt). Any other card reads the first state.
  */
 class CardStepsAccess(
     private val state: com.agupta07505.smartisland.model.CardStepState,
@@ -69,14 +67,14 @@ val LocalCardSteps = compositionLocalOf {
 }
 
 /**
- * Where the reader text and its thumbnail column report their scrolling, so the island's gesture handler can refuse a tap that
- * only stops a fling. Provided once at the top of the overlay.
+ * Where the reader text and its thumbnail column report scrolling, so the island's gesture handler can refuse a tap
+ * that only stops a fling. Provided once at the top of the overlay.
  */
 val LocalReaderScroll = compositionLocalOf { com.agupta07505.smartisland.util.ReaderScrollTracker() }
 
 /**
  * Reports a reader list's scrolling to [LocalReaderScroll]: drag and fling (state) and every offset change (moves).
- * Call it with the list's [ScrollState] next to its `verticalScroll`.
+ * Call it next to the list's `verticalScroll`.
  */
 @androidx.compose.runtime.Composable
 fun ReportReaderScroll(state: androidx.compose.foundation.ScrollState) {
@@ -110,11 +108,7 @@ internal val EXPANDED_MEDIA_HEIGHT = com.agupta07505.smartisland.model.PictureSi
 /** Height the half-size picture step gets: halfway between the card's smallest height and [EXPANDED_MEDIA_HEIGHT]. */
 internal val PICTURE_MID_HEIGHT = com.agupta07505.smartisland.model.PictureSize.MID_DP.dp
 
-/**
- * A notification picture. Animated stickers and GIFs play; everything else is the still image.
- * [maxSidePx] caps the decoded size of an animated image so a small thumbnail does not hold a
- * full-size animation in memory.
- */
+/** A notification picture. Animated stickers and GIFs play; everything else is the still image. */
 @Composable
 fun NotificationMediaView(
     media: NotificationMedia,

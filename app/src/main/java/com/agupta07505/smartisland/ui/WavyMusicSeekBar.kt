@@ -126,7 +126,6 @@ fun WavyMusicSeekBar(
         val maxWaveHeightPx = waveHeight.toPx() * waveAmount
         val thumbRadiusPx = thumbRadius.toPx()
         
-        // 1. Draw remaining track on the right (thin straight rounded bar)
         val remainingWidth = width - progressX
         if (remainingWidth > 0) {
             drawRoundRect(
@@ -137,13 +136,11 @@ fun WavyMusicSeekBar(
             )
         }
         
-        // 2. Draw played wave fill on the left
         if (progressX > 0) {
             val path = Path()
             val startX = 0f
             val endX = progressX
             
-            // Left cap height
             path.arcTo(
                 rect = Rect(
                     left = startX,
@@ -157,35 +154,28 @@ fun WavyMusicSeekBar(
             )
             
             // The wave should transition smoothly to flat at the left edge and near the thumb
-            // transitionWidth: width over which the wave fades to flat (e.g. 24dp)
             val transitionWidthPx = with(density) { WAVE_FADE_WIDTH.toPx() }
             
-            // Generate path points along the wavy top edge
-            // We start from the end of the left arc (startX + baseThicknessPx / 2f)
             val pathStartX = startX + baseThicknessPx / 2f
             if (endX > pathStartX) {
                 for (xInt in pathStartX.toInt()..endX.toInt()) {
                     val x = xInt.toFloat()
                     
-                    // Damp the wave near startX and endX so it smoothly meets the flat baseline
                     val dampLeft = ((x - pathStartX) / transitionWidthPx).coerceIn(0f, 1f)
                     val dampRight = ((endX - x) / transitionWidthPx).coerceIn(0f, 1f)
                     val damp = dampLeft * dampRight
                     
-                    // Premium-looking organic wave: combine two sine frequencies
-                    // Using phase to shift the wave left/right
+                    // Two sine frequencies for an organic wave.
                     val waveVal = sin(x * WAVE_FREQ_1 - phase) * 0.6f + cos(x * WAVE_FREQ_2 + phase * 1.3f) * 0.4f
-                    val normalizedWave = (waveVal + 1f) / 2f // 0f..1f
+                    val normalizedWave = (waveVal + 1f) / 2f
                     
                     val y = baselineY - (baseThicknessPx / 2f) - (maxWaveHeightPx * damp * normalizedWave)
                     path.lineTo(x, y)
                 }
             }
             
-            // Draw down to the bottom baseline at progressX
             path.lineTo(progressX, baselineY + baseThicknessPx / 2f)
             
-            // Draw flat bottom baseline back to the start of the left arc
             path.lineTo(pathStartX, baselineY + baseThicknessPx / 2f)
             
             path.close()
@@ -197,7 +187,6 @@ fun WavyMusicSeekBar(
             )
         }
         
-        // 3. Draw thumb at progressX
         if (pillThumb) {
             val pillW = pillThumbWidth.toPx()
             val pillH = pillThumbHeight.toPx()

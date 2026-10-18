@@ -88,7 +88,6 @@ fun BackupRestoreSection(
 
     var showResetDialog by rememberSaveable { mutableStateOf(false) }
 
-    // Storage Access Framework: Export Document Launcher
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
     ) { uri: Uri? ->
@@ -119,7 +118,6 @@ fun BackupRestoreSection(
         }
     }
 
-    // Storage Access Framework: Open Document Launcher
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -165,7 +163,6 @@ fun BackupRestoreSection(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Section Header Card: Configuration Summary
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -215,7 +212,6 @@ fun BackupRestoreSection(
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
-                // Stats badge row
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -247,7 +243,6 @@ fun BackupRestoreSection(
             }
         }
 
-        // Card 2: Export Backup
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -320,7 +315,6 @@ fun BackupRestoreSection(
             }
         }
 
-        // Card 3: Restore from Backup
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -389,7 +383,6 @@ fun BackupRestoreSection(
             }
         }
 
-        // Card 4: Factory Reset Settings
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -458,7 +451,6 @@ fun BackupRestoreSection(
         }
     }
 
-    // Restore Confirmation Dialog
     if (showRestoreDialog && pendingRestoreSettings != null) {
         val metadata = pendingRestoreMetadata
         val dateStr = metadata?.let {
@@ -528,7 +520,6 @@ fun BackupRestoreSection(
         )
     }
 
-    // Reset All Settings Confirmation Dialog
     if (showResetDialog) {
         AlertDialog(
             onDismissRequest = { showResetDialog = false },

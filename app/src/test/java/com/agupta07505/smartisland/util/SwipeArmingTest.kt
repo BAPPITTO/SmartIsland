@@ -131,7 +131,7 @@ class SwipeArmingTest {
         assertEquals(120f, expandedCardMaxSlideDp(900f), 0f)
     }
 
-    // ---- The short lock replaces the 25 % longer pull ----
+    // The short lock replaces the 25 % longer pull
 
     @Test
     fun pullingAnArmedSwipeBackStartsTheLockAndTheSameDistanceDoesNotRearmDuringIt() {

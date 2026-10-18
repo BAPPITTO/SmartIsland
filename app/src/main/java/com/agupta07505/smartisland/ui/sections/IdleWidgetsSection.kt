@@ -27,6 +27,7 @@ import androidx.compose.material.icons.rounded.BatteryChargingFull
 import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.DoNotDisturbOn
 import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.AccessTime
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.WbSunny
@@ -71,8 +72,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Layout tab: live readouts (time, weather, ...) that the collapsed cutout shows while no event is on the island.
- * One setting for both orientations; the landscape idle circle shows just the value.
+ * Layout tab: live readouts (time, weather, ...) that the collapsed cutout shows while no event is on the island. One
+ * setting for both orientations; the landscape idle circle shows just the value.
  */
 @Composable
 fun IdleWidgetsSection(
@@ -81,7 +82,7 @@ fun IdleWidgetsSection(
     /** Opens Settings > Idle widgets, where the switches, the widget selection and the timers are. */
     onOpenSettings: () -> Unit = {}
 ) {
-    // The switches are per orientation now (Settings > Idle widgets); the display options below show while either one is on.
+    // The switches are per orientation (Settings > Idle widgets); the display options below show while either one is on.
     val anyEnabled = settings.idleWidgetsEnabled || settings.idleWidgetsEnabledLandscape
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -202,6 +203,10 @@ fun IdleWidgetsSection(
                     }
                     when {
                         !settings.allowNetworkChecks -> NoteText(stringResource(R.string.idle_widgets_weather_needs_network))
+                        settings.weatherLocationSource == com.agupta07505.smartisland.model.WeatherConfig.SOURCE_MANUAL ->
+                            NoteText(stringResource(R.string.idle_widgets_weather_manual_note))
+                        settings.weatherLocationSource == com.agupta07505.smartisland.model.WeatherConfig.SOURCE_LAST_KNOWN ->
+                            NoteText(stringResource(R.string.idle_widgets_weather_last_known_note))
                         locationGranted -> NoteText(stringResource(R.string.idle_widgets_weather_location_ok))
                         else -> {
                             NoteText(stringResource(R.string.idle_widgets_weather_no_location))
@@ -220,11 +225,11 @@ fun IdleWidgetsSection(
     }
 }
 
-/** Seconds until the widget island closes by itself: 2 s up to never ([WidgetIslandTimer.NEVER]). */
 private val ISLAND_CLOSE_CHOICES = listOf(2, 3, 5, 10, WidgetIslandTimer.NEVER)
 
 internal fun kindIcon(kind: IdleWidgetKind): ImageVector = when (kind) {
     IdleWidgetKind.Clock -> Icons.Rounded.Schedule
+    IdleWidgetKind.LiveClock -> Icons.Rounded.AccessTime
     IdleWidgetKind.Date -> Icons.Rounded.CalendarToday
     IdleWidgetKind.Weather -> Icons.Rounded.WbSunny
     IdleWidgetKind.Wind -> Icons.Rounded.Air
@@ -238,6 +243,7 @@ internal fun kindIcon(kind: IdleWidgetKind): ImageVector = when (kind) {
 
 internal fun kindTint(kind: IdleWidgetKind): Color = when (kind) {
     IdleWidgetKind.Clock -> Color(0xFF6366F1)
+    IdleWidgetKind.LiveClock -> Color(0xFF14B8A6)
     IdleWidgetKind.Date -> Color(0xFFEF4444)
     IdleWidgetKind.Weather -> Color(0xFFF59E0B)
     IdleWidgetKind.Wind -> Color(0xFF5EEAD4)
@@ -251,6 +257,7 @@ internal fun kindTint(kind: IdleWidgetKind): Color = when (kind) {
 
 internal fun kindTitle(kind: IdleWidgetKind): Int = when (kind) {
     IdleWidgetKind.Clock -> R.string.idle_widget_clock_title
+    IdleWidgetKind.LiveClock -> R.string.idle_widget_liveclock_title
     IdleWidgetKind.Date -> R.string.idle_widget_date_title
     IdleWidgetKind.Weather -> R.string.idle_widget_weather_title
     IdleWidgetKind.Wind -> R.string.idle_widget_wind_title
@@ -264,6 +271,7 @@ internal fun kindTitle(kind: IdleWidgetKind): Int = when (kind) {
 
 internal fun kindDesc(kind: IdleWidgetKind): Int = when (kind) {
     IdleWidgetKind.Clock -> R.string.idle_widget_clock_desc
+    IdleWidgetKind.LiveClock -> R.string.idle_widget_liveclock_desc
     IdleWidgetKind.Date -> R.string.idle_widget_date_desc
     IdleWidgetKind.Weather -> R.string.idle_widget_weather_desc
     IdleWidgetKind.Wind -> R.string.idle_widget_wind_desc

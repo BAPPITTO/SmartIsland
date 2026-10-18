@@ -14,17 +14,12 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
 
-/**
- * The most prominent colour of a picture: [hue] in degrees (0 until 360) and [saturation] 0..1 (HSV, how the colour was found),
- * plus its CIELAB [chroma] (how colourful it really is: a vivid green is about 70, a dark brown cover under 20) and [labHue]
- * (degrees), which the media card uses to build Android's tones.
- */
+/** [hue] in degrees (0 until 360) and [saturation] 0..1 are HSV. */
 data class ArtworkTint(val hue: Float, val saturation: Float, val chroma: Float = 0f, val labHue: Float = hue)
 
 /**
- * Finds the colour that stands out most in album art, the way the notification shade tints its
- * media controls: pixels vote for their hue, vivid and bright ones count more, near-black and grey
- * pixels do not vote at all. Pure maths on pixels, so it can be tested without Android.
+ * Finds the colour that stands out most in album art, like the notification shade's media tint: pixels vote for their
+ * hue, vivid and bright ones count more, near-black and grey ones do not vote.
  */
 object ArtworkPalette {
     private const val HUE_BINS = 36
@@ -32,7 +27,6 @@ object ArtworkPalette {
     private const val MIN_VALUE = 0.15f
     private const val MIN_SATURATION = 0.12f
 
-    /** Share of opaque pixels that must carry a colour; below it the picture counts as grey. */
     private const val MIN_COLOURED_SHARE = 0.05f
 
     /** Null when the picture has no real colour (black and white, grey, empty). */
@@ -96,7 +90,7 @@ object ArtworkPalette {
         if (sw <= 0.0) return null
         var hue = Math.toDegrees(atan2(sy, sx)).toFloat()
         if (hue < 0f) hue += 360f
-        // CIELAB mean of the pixels that voted for the winning hue (and its two neighbours): the colour's real chroma and hue.
+        // CIELAB mean of the pixels in the winning bin and its two neighbours.
         var labA = 0.0
         var labB = 0.0
         var labCount = 0

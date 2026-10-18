@@ -29,7 +29,7 @@ class PortraitPillTapTest {
 
     @Test
     fun glyphSlotsAreNotTheCentre() {
-        // Left glyph (about 12% in) and right glyph / privacy dots (about 90% in).
+        // Left glyph (about 12% in) and right glyph (about 90% in).
         assertFalse(pillCenterTapHit(pillW * 0.12f, 50f, pillW, pillW, pillH))
         assertFalse(pillCenterTapHit(pillW * 0.9f, 50f, pillW, pillW, pillH))
     }

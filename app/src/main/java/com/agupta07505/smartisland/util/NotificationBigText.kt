@@ -10,13 +10,12 @@ package com.agupta07505.smartisland.util
 import android.app.Notification
 import android.os.Bundle
 
-/** Longest expanded text kept per card; keeps a chatty app from filling memory. */
 private const val MAX_BIG_TEXT_CHARS = 1500
 private const val MAX_MESSAGE_LINES = 6
 
 /**
- * The text the shade shows when a notification is expanded: the BigText body, an inbox list, or the
- * latest chat messages. Empty when the notification has nothing beyond its one-line text.
+ * The text the shade shows when a notification is expanded: the BigText body, an inbox list, or the latest chat
+ * messages. Empty when the notification has nothing beyond its one-line text.
  */
 internal fun Notification.expandedText(): String {
     val extras: Bundle = extras ?: return ""
@@ -42,9 +41,8 @@ internal fun Notification.expandedText(): String {
 }
 
 /**
- * The text the picture reader keeps next to a notification's pictures. Chat apps: the messages that carry
- * no picture (a picture message's label and caption are left out, the thumbnail stands for it). Other
- * notifications: the usual expanded text, unless it is only a picture label such as "Photo".
+ * The text the picture reader keeps next to a notification's pictures. Chat apps: the messages that carry no picture
+ * (a picture message's label and caption are left out, the thumbnail stands for it).
  */
 internal fun Notification.readerTextWithoutPictures(shortText: String): String {
     val extras: Bundle = extras ?: return ""

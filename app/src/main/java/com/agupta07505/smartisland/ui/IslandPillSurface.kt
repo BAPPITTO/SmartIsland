@@ -35,9 +35,8 @@ internal fun Modifier.islandPillSurface(
     squareTop: Boolean,
     pickerSideBySide: Boolean,
     /**
-     * The expanded content is really drawing the two landscape islands (the overlay's flag AND the content's own report). The shell's
-     * clip and shadow follow this, not the flag alone: the flag also sizes the window early, and a flag that is ahead of (or left behind by) the
-     * content left a single card drawn with no rounded clip and no surface, a plain rectangle. Defaults to the flag.
+     * The expanded content is really drawing the two landscape islands (the overlay's flag AND the content's own
+     * report).
      */
     twoIslandsDrawn: Boolean = pickerSideBySide,
     /** The shell's opacity, read while drawing so a fade between the media and the shared value does not recompose. */
@@ -47,14 +46,17 @@ internal fun Modifier.islandPillSurface(
      * single island with a 160 ms surface fade, so the rect is held back until that fade is done.
      */
     reportBounds: Boolean = true,
-    /** Read while drawing: true while the island closes onto the idle circle (landscape, the last card gone). The shell is not drawn then. */
+    /**
+     * Read while drawing: true while the island closes onto the idle circle (landscape, the last card gone). The
+     * shell is not drawn then.
+     */
     shellHidden: () -> Boolean = { false },
     /** The look of the expanded island (light or dark). */
     palette: IslandPalette = IslandPalette.Dark
 ): Modifier = this
         .islandAnimatedSize({
-            // Landscape split: the shell's width is a direct function of the split progress (model/SplitShell.kt), so at progress 0 it
-            // is the single island and the card island fills it. After the split has gone it keeps the single width until its own is there.
+            // Landscape split: the shell's width is a direct function of the split progress (model/SplitShell.kt), so
+            // at progress 0 it is the single island and the card island fills it.
             val splitW = ui.stepDrag.splitShellWidthDp(
                 splitNow = pickerSideBySide,
                 expanded = cb.currentExpanded,
@@ -81,8 +83,9 @@ internal fun Modifier.islandPillSurface(
             }
         })
         .graphicsLayer {
-            // While the split override sets the width, the island is centred (the offset of an expanded island at rest is 0); the animated
-            // offset is worked out from the shell's own width, which is not the width drawn then.
+            // While the split override sets the width, the island is centred (the offset of an expanded island at
+            // rest is 0); the animated offset is worked out from the shell's own width, which is not the width drawn
+            // then.
             val splitW = ui.stepDrag.splitShellWidthDp(
                 splitNow = pickerSideBySide,
                 expanded = cb.currentExpanded,
@@ -111,9 +114,7 @@ internal fun Modifier.islandPillSurface(
                 scaleX = switchScaleAnim.value * swell
                 scaleY = switchScaleAnim.value * swell
             }
-            // A swipe that would fire if the finger lifted now: the pill swells a touch (1 -> 1.04). In the dead zone
-            // (the finger moved, lifting does nothing) it shrinks a touch instead, so the three states look different.
-            // A swipe down stretches the island downward with the finger: the dead-zone shrink fades out as it grows.
+            // A swipe that would fire if the finger lifted now: the pill swells a touch (1 -> 1.04).
             val pull = ui.swipeDownPull
             val deadWeight = com.agupta07505.smartisland.util.SwipeDownPull.deadShrinkWeight(pull)
             val pullScaleY: Float
@@ -131,8 +132,8 @@ internal fun Modifier.islandPillSurface(
                 pullScaleY = com.agupta07505.smartisland.util.SwipeDownPull.expandedScaleY(pull) *
                     com.agupta07505.smartisland.util.SwipeDownPull.handleScaleY(handle)
                 scaleY *= deadShrink * pullScaleY
-                // A left / right swipe leans the whole island towards the finger and stretches it a little that way; the lean the
-                // finger let go with runs out on the swap's spring. The trailing edge stays, so the stretch reaches only in the swipe's direction.
+                // A left / right swipe leans the whole island towards the finger and stretches it a little that way;
+                // the lean the finger let go with runs out on the swap's spring.
                 val lean = com.agupta07505.smartisland.util.SwipeSideways.totalLeanPx(ui.cardDragX, ui.cardLeanFromPx, ui.cardPop.value)
                 if (lean != 0f) {
                     val leanProgress = com.agupta07505.smartisland.util.SwipeSideways.progress(lean, ui.cardSlideMaxPx)
@@ -144,8 +145,7 @@ internal fun Modifier.islandPillSurface(
             }
             // Keep the top edge in place: the stretch reaches down only.
             translationY += com.agupta07505.smartisland.util.SwipeDownPull.topAnchorShiftPx(pullScaleY, size.height)
-            // Only the pill exit fades the layer. The swipe lock cue does not dim it, because a layer alpha covers the whole subtree
-            // (the card's backdrop and content) and the card would go see-through for the 400 ms of the lock. The cue is the outline below.
+            // Only the pill exit fades the layer.
             alpha = if (shellHidden()) 0f else (pillExit.shellAlpha() * layout.hidingAlpha)
         }
         .then(
@@ -162,7 +162,6 @@ internal fun Modifier.islandPillSurface(
         .then(if (twoIslandsDrawn) Modifier else Modifier.islandShellClip({ layout.safeRadius }, squareTop))
         .then(
             if (cb.currentExpanded && !pickerSideBySide && reportBounds) {
-                // Reports the island's rect (after scale and drag) for the touch region.
                 Modifier.onGloballyPositioned { coords ->
                     val b = coords.boundsInWindow()
                     cb.currentOnExpandedSurfaceBounds(
@@ -181,8 +180,8 @@ internal fun Modifier.islandPillSurface(
             // Light look: the shell eases from the pill colour to the pale surface as the island opens (and back on collapse).
             expandedColor = if (palette.isLight) palette.surface else null,
             expandedFraction = { layout.expandProgress },
-            // The cards do not slide under the finger (the island leans with them inside it) and the two cards of a swap are one
-            // card apart, so there is no strip of bare shell to cover: the shell keeps its own opacity.
+            // The cards do not slide under the finger (the island leans with them inside it) and the two cards of a
+            // swap are one card apart, so there is no strip of bare shell to cover: the shell keeps its own opacity.
             alpha = { shellOpacity() * layout.singleSurfaceAlpha }
         )
         .lockCueOutline(

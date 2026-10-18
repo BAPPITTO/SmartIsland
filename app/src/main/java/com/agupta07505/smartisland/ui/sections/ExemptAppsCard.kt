@@ -47,8 +47,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Exempt apps: while one of the chosen apps is in the foreground the island is totally off (no pill, no widgets, no cards).
- * One list per orientation ([landscape] picks which one this card edits), so an app can be exempt in portrait only, in landscape only, or both.
+ * Exempt apps: while one of the chosen apps is in the foreground the island is totally off (no pill, no widgets, no
+ * cards).
  */
 @Composable
 fun ExemptAppsCard(

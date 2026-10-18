@@ -10,9 +10,8 @@ package com.agupta07505.smartisland.util
 import kotlin.math.abs
 
 /**
- * How see-through a swiped card is, as a function of how far it sits from the middle: the further the card is pushed the
- * fainter it gets (the look of Android's swipe-to-dismiss). It only reads the distance the drag already allows
- * ([maxPx], the card's or the pill content's own slide limit), so the drag itself is not made longer.
+ * How see-through a swiped card is, as a function of how far it sits from the middle: the further the card is pushed
+ * the fainter it gets (the look of Android's swipe-to-dismiss).
  */
 object SwipeFade {
     /** The lowest opacity the expanded card reaches at (or past) its slide limit. */

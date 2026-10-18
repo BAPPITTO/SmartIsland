@@ -13,7 +13,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 
-/** Plays [HapticKind]s at the user's [HapticStrength]. Never throws: a phone without a motor just does nothing. */
+/** Never throws: a phone without a motor does nothing. */
 object IslandHaptics {
     fun play(context: Context, strength: HapticStrength, kind: HapticKind) {
         val spec = strength.spec(kind) ?: return

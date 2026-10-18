@@ -496,7 +496,7 @@ class IslandViewModelTest {
         testDispatcher.scheduler.runCurrent()
         assertEquals(1, viewModel.visibleNotifications.value.size)
 
-        // The default idle timeout (5 s since the Timing phase): still shown just before it (plus the extra second), gone just after.
+        // The default idle timeout (5 s): still shown just before it (plus the extra second), gone just after.
         testDispatcher.scheduler.advanceTimeBy(com.agupta07505.smartisland.util.IslandTimings.STATIC_IDLE_TIMEOUT_MS + IslandViewModel.IDLE_TIMER_EXTRA_MS - 100L)
         testDispatcher.scheduler.runCurrent()
         assertEquals(1, viewModel.visibleNotifications.value.size)
@@ -1098,38 +1098,6 @@ class IslandViewModelTest {
     }
 
     @Test
-    fun screenSharingIsGatedByItsEventSwitch() = runTest {
-        val settingsRepo = mockk<SmartIslandSettingsRepository>(relaxed = true)
-        val flow = kotlinx.coroutines.flow.MutableStateFlow(
-            com.agupta07505.smartisland.data.SmartIslandSettings(
-                disabledEvents = setOf("privacy_media_projection")
-            )
-        )
-        io.mockk.every { settingsRepo.settings } returns flow
-        val viewModel = IslandViewModel(settingsRepo, SmartIslandNotificationRepository())
-        try {
-            // The privacy timers (2 s start delay, 2 s hold) must follow the test's virtual time.
-            viewModel.clock = { testDispatcher.scheduler.currentTime }
-            testDispatcher.scheduler.runCurrent()
-            viewModel.privacyTracker.setMediaProjectionActive(true)
-            testDispatcher.scheduler.advanceTimeBy(3_000L)
-            testDispatcher.scheduler.runCurrent()
-            // Switch is off: the share never shows, however long it runs.
-            assertFalse(viewModel.privacy.value.mediaProjectionActive)
-
-            flow.value = com.agupta07505.smartisland.data.SmartIslandSettings()
-            testDispatcher.scheduler.advanceTimeBy(300L)
-            testDispatcher.scheduler.runCurrent()
-            assertTrue(viewModel.privacy.value.mediaProjectionActive)
-        } finally {
-            // The privacy flow re-evaluates every 250 ms while projection is active. runTest drains the
-            // shared scheduler after the body (even when an assertion failed), so without this the loop
-            // spins in virtual time forever and the whole test task never ends.
-            viewModel.viewModelScope.cancel()
-        }
-    }
-
-    @Test
     fun newNotificationPopsIntoPrimaryForOnePointEightSecondsThenPriorityReturns() = runTest {
         val settingsRepo = mockk<SmartIslandSettingsRepository>(relaxed = true)
         val notifRepo = SmartIslandNotificationRepository()
@@ -1642,7 +1610,7 @@ class IslandViewModelTest {
         assertTrue(viewModel.expanded.value)
     }
 
-    // ---- Auto-expand rules ----
+    // Auto-expand rules
 
     private fun settingsFlow(settings: com.agupta07505.smartisland.data.SmartIslandSettings) =
         kotlinx.coroutines.flow.MutableStateFlow(settings)

@@ -21,15 +21,14 @@ data class AppWindow(
 /**
  * Which app the user is looking at, and which of the island's cards that app hides.
  *
- * Before: the foreground app was the package of the last "window opened" event, so a dialog, a floating window or a share
- * sheet from another package replaced it while the real app was still on screen, and the app's own live card came back
- * over it. Now it is read from the window list: the focused (else active) application window.
+ * The foreground app is read from the window list (the focused, else active application window), not from the last
+ * "window opened" event, which a dialog, floating window or share sheet from another package would replace.
  */
 object ForegroundApp {
 
     /**
-     * The package of the app window the user is in, or null when there is none (the shade, a transition).
-     * [ignored] is true for packages that must never count: this app, SystemUI, keyboards.
+     * The package of the app window the user is in, or null when there is none (the shade, a transition). [ignored]
+     * is true for packages that must never count: this app, SystemUI, keyboards.
      */
     fun pick(windows: List<AppWindow>, ignored: (String) -> Boolean): String? {
         val candidates = windows.filter { w ->
@@ -40,9 +39,7 @@ object ForegroundApp {
 
     /**
      * True when [mode] is a live card (something the app keeps running: music, navigation, a timer, a recording, a
-     * download, a live activity). The app that runs it shows it itself, so the island hides it while that app is open.
-     * Calls are exempt (the user answers them from the island or the dialer), and so are plain notifications and every
-     * system event card.
+     * download, a live activity).
      */
     fun isLiveMode(mode: IslandMode): Boolean = when (mode) {
         IslandMode.Music,

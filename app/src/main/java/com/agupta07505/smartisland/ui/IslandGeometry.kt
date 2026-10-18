@@ -15,7 +15,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.agupta07505.smartisland.model.IslandMode
 
-// Animation specs
 internal const val EXPANDED_WIDTH_RATIO = 0.95f
 internal const val LANDSCAPE_EXPANDED_WIDTH_RATIO = 0.5f
 internal const val LANDSCAPE_EXPANDED_MIN_WIDTH_DP = 340f
@@ -35,7 +34,6 @@ internal const val LAUNCHER_EXPANDED_LIFT_DP = 6f
 internal const val LANDSCAPE_SPLIT_CARD_MIN_WIDTH_DP = 240f
 internal const val LANDSCAPE_PICKER_SCREEN_MARGIN_DP = 16f
 
-/** Left edge of the picker island as a fraction of the island's width (0.5 when the width is unknown). */
 internal fun splitPickerLeftFraction(islandWidthDp: Float, screenWidthDp: Float): Float =
     if (islandWidthDp <= 0f) 0.5f
     else (1f - splitPickerWidthDp(screenWidthDp) / islandWidthDp).coerceIn(0.3f, 0.9f)
@@ -46,9 +44,9 @@ internal fun splitPickerWidthDp(screenWidthDp: Float): Float =
         .coerceIn(LANDSCAPE_SPLIT_PICKER_MIN_WIDTH_DP, LANDSCAPE_SPLIT_PICKER_MAX_WIDTH_DP)
 
 /**
- * Widest the card island may get in the split layout: what is left of the split group's share of
- * the screen after the gap and the picker, never so wide that card + gap + picker would not fit
- * the screen minus its margin, and never below the minimum card width.
+ * Widest the card island may get in the split layout: what is left of the split group's share of the screen after the
+ * gap and the picker, never so wide that card + gap + picker would not fit the screen minus its margin, and never
+ * below the minimum card width.
  */
 internal fun splitCardMaxWidthDp(screenWidthDp: Float): Float {
     val picker = splitPickerWidthDp(screenWidthDp)
@@ -62,15 +60,12 @@ internal fun splitCardMaxWidthDp(screenWidthDp: Float): Float {
 }
 
 /**
- * Landscape: the overlay window always starts at the top of the screen, so the expanded island
- * sits under the status bar wherever the collapsed cutout was (a camera circle is mid-height on
- * the side). The collapsed cutouts are lowered by this much inside the window instead; it
- * animates to 0 while expanded. Portrait and notch mode: 0 (the window itself is offset).
+ * Landscape: the overlay window always starts at the top of the screen, so the expanded island sits under the status
+ * bar wherever the collapsed cutout was (a camera circle is mid-height on the side).
  */
 internal fun collapsedTopShiftDp(isLandscape: Boolean, enableNotchMode: Boolean, yOffsetDp: Float): Float =
     if (isLandscape && !enableNotchMode) yOffsetDp.coerceAtLeast(0f) else 0f
 
-/** Status bar height in landscape (`status_bar_height_landscape`), or null when the device has none. */
 /** Returns the landscape status bar height in dp, or 0f when the device doesn't define one. */
 internal fun landscapeStatusBarHeightDp(context: android.content.Context): Float {
     val id = context.resources.getIdentifier("status_bar_height_landscape", "dimen", "android")
@@ -96,8 +91,7 @@ internal fun calculateExpandedWidth(
         (card + com.agupta07505.smartisland.ui.expanded.SPLIT_ISLAND_GAP.value + splitPickerWidthDp(screenWidthDp))
             .coerceAtMost((screenWidthDp - LANDSCAPE_PICKER_SCREEN_MARGIN_DP).coerceAtLeast(0f))
     } else if (isLandscape) {
-        // Landscape: about half of the screen width, centred, so the card takes the same top
-        // strip a heads-up notification does (owner's reference screenshot).
+        // Landscape: about half of the screen width, centred, so the card takes the same top strip a heads-up notification does.
         (screenWidthDp * LANDSCAPE_EXPANDED_WIDTH_RATIO)
             .coerceIn(LANDSCAPE_EXPANDED_MIN_WIDTH_DP, LANDSCAPE_EXPANDED_MAX_WIDTH_DP)
     } else {
@@ -155,11 +149,7 @@ internal const val DRAG_MAX_OFFSET_DP = 100f
 internal const val PILL_DEAD_SHRINK = 0.04f
 internal const val EXPANDED_DEAD_SHRINK = 0.015f
 
-/**
- * The swipe-lock cue. While swiping is locked the island shows a thin light outline ([LOCK_CUE_OUTLINE_DP] wide at
- * [LOCK_CUE_OUTLINE_ALPHA]); it fades in and out over [LOCK_CUE_IN_MS] / [LOCK_CUE_OUT_MS] and is gone when the lock ends.
- * Calm on purpose: no scale, no spring, and no dimming (a dim made the whole card see-through).
- */
+/** The swipe-lock cue. */
 internal const val LOCK_CUE_OUTLINE_DP = 2.5f
 internal const val LOCK_CUE_OUTLINE_ALPHA = 0.55f
 internal const val LOCK_CUE_IN_MS = 60
@@ -170,7 +160,6 @@ internal const val SECONDARY_RETURN_MS = com.agupta07505.smartisland.model.SECON
 internal val MERGE_IN_EASING = androidx.compose.animation.core.CubicBezierEasing(0.55f, 0.05f, 0.35f, 1f)
 internal val MERGE_OUT_EASING = androidx.compose.animation.core.CubicBezierEasing(0.25f, 0.1f, 0.25f, 1f)
 
-/** Spring damping for island size / position changes; landscape is softer and slower. */
 internal fun islandSpringDamping(isLandscape: Boolean): Float = if (isLandscape) 0.86f else 0.8f
 internal fun islandSpringStiffness(isLandscape: Boolean): Float = if (isLandscape) 280f else 400f
 

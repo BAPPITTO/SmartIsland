@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -36,9 +37,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Headphones
+import androidx.compose.material.icons.rounded.HeadsetOff
+import androidx.compose.material.icons.rounded.UsbOff
+import androidx.compose.material.icons.rounded.Usb
 import androidx.compose.material.icons.rounded.AvTimer
 import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.DeleteSweep
+import androidx.compose.material.icons.rounded.Face
 import androidx.compose.material.icons.rounded.FileCopy
 import androidx.compose.material.icons.rounded.InstallMobile
 import androidx.compose.material.icons.rounded.BatteryAlert
@@ -95,7 +102,6 @@ import kotlinx.coroutines.launch
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
-/** Row key of an event tile on the Home grid; the search index and the tile must agree. */
 internal fun eventSearchKey(event: IslandEvent): String = "event.${event.group}.${event.id}"
 
 internal fun iconFor(event: IslandEvent): ImageVector = when (event) {
@@ -109,6 +115,10 @@ internal fun iconFor(event: IslandEvent): ImageVector = when (event) {
     IslandEvent.WIFI_DISCONNECTED -> Icons.Rounded.WifiOff
     IslandEvent.VPN_DISCONNECTED -> Icons.Rounded.VpnKeyOff
     IslandEvent.BLUETOOTH -> Icons.Rounded.BluetoothConnected
+    IslandEvent.USB_CONNECTED -> Icons.Rounded.Usb
+    IslandEvent.USB_DISCONNECTED -> Icons.Rounded.UsbOff
+    IslandEvent.HEADPHONES_CONNECTED -> Icons.Rounded.Headphones
+    IslandEvent.HEADPHONES_DISCONNECTED -> Icons.Rounded.HeadsetOff
     IslandEvent.HOTSPOT -> Icons.Rounded.WifiTethering
     IslandEvent.CALL -> Icons.Rounded.Call
     IslandEvent.MUSIC -> Icons.Rounded.MusicNote
@@ -126,10 +136,7 @@ internal fun iconFor(event: IslandEvent): ImageVector = when (event) {
     IslandEvent.AUDIO_RECORDING -> Icons.Rounded.Mic
     IslandEvent.TIMER -> Icons.Rounded.HourglassBottom
     IslandEvent.STOPWATCH -> Icons.Rounded.AvTimer
-    IslandEvent.PRIVACY_CAMERA -> Icons.Rounded.PhotoCamera
-    IslandEvent.PRIVACY_MICROPHONE -> Icons.Rounded.Mic
-    IslandEvent.PRIVACY_LOCATION -> Icons.Rounded.LocationOn
-    IslandEvent.PRIVACY_MEDIA_PROJECTION -> Icons.Rounded.Cast
+    IslandEvent.FACE_UNLOCK -> Icons.Rounded.Face
 }
 
 /** One switch per activity, grouped. Lives on the Home tab. */
@@ -137,7 +144,8 @@ internal fun iconFor(event: IslandEvent): ImageVector = when (event) {
 fun EventTogglesSection(
     settings: SmartIslandSettings,
     repository: SmartIslandSettingsRepository,
-    landscape: Boolean = false
+    landscape: Boolean = false,
+    onOpenFaceIdSettings: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
@@ -195,7 +203,6 @@ fun EventTogglesSection(
                                 }
                             )
                         }
-                        // One switch for the whole group: on when every event in it is on.
                         Switch(
                             checked = onCount == events.size,
                             onCheckedChange = { turnOn ->
@@ -226,6 +233,7 @@ fun EventTogglesSection(
                                     onAutoExpandChange = { turnOn ->
                                         scope.launch { repository.setEventAutoExpand(event.id, turnOn) }
                                     },
+                                    onOpenSettings = if (event == IslandEvent.FACE_UNLOCK) onOpenFaceIdSettings else null,
                                     modifier = Modifier
                                         .weight(1f)
                                         .searchAnchor(eventSearchKey(event)),
@@ -254,8 +262,6 @@ fun EventTogglesSection(
                             needsLocation -> "Wi-Fi: grant location permission to show the network name"
                             needsLocationSwitch -> "Wi-Fi: turn on location services to show the network name"
                             event == IslandEvent.VPN && !settings.allowNetworkChecks -> "VPN: location needs network checks turned on"
-                            event == IslandEvent.PRIVACY_MEDIA_PROJECTION -> "Screen share: needs Shizuku to detect screen sharing"
-                            event == IslandEvent.PRIVACY_LOCATION && !locationGranted -> "Location: grant location permission to detect GPS use"
                             else -> null
                         }
                         if (note != null) {
@@ -287,10 +293,6 @@ fun EventTogglesSection(
     }
 }
 
-/**
- * One tile of the Home grid: icon on top, short label below, tap to switch on or off. When [autoExpand] is not null
- * a small badge in the corner switches the event's own auto-expand (does it open the island by itself).
- */
 @Composable
 private fun EventTile(
     title: String,
@@ -299,7 +301,8 @@ private fun EventTile(
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     autoExpand: Boolean? = null,
-    onAutoExpandChange: (Boolean) -> Unit = {}
+    onAutoExpandChange: (Boolean) -> Unit = {},
+    onOpenSettings: (() -> Unit)? = null
 ) {
     val shape = RoundedCornerShape(14.dp)
     val accent = MaterialTheme.colorScheme.primary
@@ -348,13 +351,27 @@ private fun EventTile(
                 onChange = onAutoExpandChange
             )
         }
+        if (onOpenSettings != null) {
+            // Own touch target in the corner, so a tap here opens the event's settings and never toggles the event.
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(30.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable(role = Role.Button, onClick = onOpenSettings),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Settings,
+                    contentDescription = "$title settings",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (checked) 0.85f else 0.55f),
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
     }
 }
 
-/**
- * Small corner switch for an event's auto-expand: expand arrows when it opens the island by itself, shrink arrows
- * (dimmer) when it only shows in the pill. Its own touch target, so a tap here never toggles the event.
- */
 @Composable
 private fun AutoExpandBadge(
     on: Boolean,
@@ -380,7 +397,6 @@ private fun AutoExpandBadge(
     }
 }
 
-/** A short hint under the grid, optionally with a button (Grant / Turn on). */
 @Composable
 private fun EventNote(
     text: String,
@@ -404,7 +420,6 @@ private fun EventNote(
     }
 }
 
-/** True when the system location switch is on (older Android has no query, so it counts as on). */
 private fun isLocationServiceOn(context: android.content.Context): Boolean {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return true
     val manager = context.getSystemService(android.content.Context.LOCATION_SERVICE) as? LocationManager

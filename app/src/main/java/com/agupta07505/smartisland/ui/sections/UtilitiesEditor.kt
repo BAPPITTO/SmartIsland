@@ -79,11 +79,7 @@ import kotlinx.coroutines.launch
 private val EDITOR_CELL_HEIGHT = 56.dp
 private val EDITOR_CELL_GAP = 8.dp
 
-/**
- * The Utilities page editor: a picture of the grid, one tab at a time (Tab 1 / Tab 2). Tap an empty cell to add a utility or an app widget there,
- * tap an item to select it (then remove it, resize a widget, move it by tapping another empty cell, or set the calculator).
- * Press and hold an item and drag it to move it: onto an empty cell it moves there, onto another item the two trade places.
- */
+/** The Utilities page editor: a picture of the grid, one tab at a time. */
 @Composable
 internal fun UtilitiesEditorCard(settings: SmartIslandSettings, repository: SmartIslandSettingsRepository) {
     val context = LocalContext.current
@@ -179,7 +175,6 @@ internal fun UtilitiesEditorCard(settings: SmartIslandSettings, repository: Smar
                         }
                     }
                 }
-                // Where the lifted item would land, shown as a soft square under it.
                 if (liftedItem != null) {
                     landing(liftedItem, dragDelta)?.firstOrNull { it.key == liftedItem.key }?.let { spot ->
                         Box(

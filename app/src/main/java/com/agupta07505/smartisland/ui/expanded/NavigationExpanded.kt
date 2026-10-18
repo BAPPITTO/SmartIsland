@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.Navigation
 import androidx.compose.material3.Icon
@@ -95,10 +94,8 @@ fun NavigationExpanded(
             .heightIn(min = NAVIGATION_EXPANDED_HEIGHT)
             .clickable { onOpenNotification() }
             .padding(start = 18.dp, top = 20.dp, end = 18.dp, bottom = bottomPadding),
-        // The extra height (a third taller than before) is shared between the rows.
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // Top Section: App Icon + App Name & ETA Subtitle + Navigation Badge
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -155,7 +152,6 @@ fun NavigationExpanded(
                 )
             }
 
-            // Distance / Maneuver Badge
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(14.dp))
@@ -172,7 +168,6 @@ fun NavigationExpanded(
             }
         }
 
-        // Maneuver Direction Card
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -237,7 +232,6 @@ fun NavigationExpanded(
             }
         }
 
-        // Action Buttons Row & Collapse Arrow
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -278,29 +272,11 @@ fun NavigationExpanded(
             } else {
                 Spacer(modifier = Modifier.weight(1f))
             }
-
-            Box(
-                modifier = Modifier
-                    .size(24.dp)
-                    .clip(CircleShape)
-                    .background(LocalIslandPalette.current.pick(Color(0xFF222222), Color(0xFFD9D8DB)))
-                    .bounceClick { onOpenNotification() },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.KeyboardArrowDown,
-                    contentDescription = "Open App",
-                    tint = LocalIslandPalette.current.text,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
         }
     }
 }
 
-/** Turn-arrow badge on the navigation card: the circle and the arrow inside it. */
 private val NAVIGATION_ARROW_CIRCLE = 56.dp
 private val NAVIGATION_ARROW_ICON = 36.dp
 
-/** Expanded navigation card height: the old 180 dp plus a third. */
 internal val NAVIGATION_EXPANDED_HEIGHT = 240.dp

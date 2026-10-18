@@ -43,7 +43,7 @@ class GestureSensitivityTest {
 
     @Test
     fun normalPillSwipeMatchesTheOldRule() {
-        // Old rule: either axis past the threshold; the longer axis wins, a tie goes vertical.
+        // Either axis past the threshold; the longer axis wins, a tie goes vertical.
         assertEquals(PillSwipeDirection.Left, n.pillSwipe(-20f, 5f, 16f))
         assertEquals(PillSwipeDirection.Right, n.pillSwipe(20f, -5f, 16f))
         assertEquals(PillSwipeDirection.Up, n.pillSwipe(5f, -20f, 16f))

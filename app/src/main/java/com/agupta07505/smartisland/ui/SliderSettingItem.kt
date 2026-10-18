@@ -70,7 +70,6 @@ fun SliderSettingItem(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                // Micro decrement button
                 Box(
                     modifier = Modifier
                         .size(24.dp)
@@ -108,7 +107,6 @@ fun SliderSettingItem(
                     )
                 }
 
-                // Micro increment button
                 Box(
                     modifier = Modifier
                         .size(24.dp)

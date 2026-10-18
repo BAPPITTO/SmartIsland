@@ -149,10 +149,15 @@ import com.agupta07505.smartisland.ui.sections.AnimationSpeedSection
 import com.agupta07505.smartisland.ui.sections.MergeStyleSection
 import com.agupta07505.smartisland.ui.sections.IdleWidgetsSection
 import com.agupta07505.smartisland.ui.sections.IdleWidgetsSettingsSection
+import com.agupta07505.smartisland.ui.sections.WeatherSettingsCard
+import com.agupta07505.smartisland.ui.sections.NetSpeedSettingsCard
+import com.agupta07505.smartisland.ui.sections.CalendarSettingsCard
+import com.agupta07505.smartisland.ui.search.searchAnchor
 import com.agupta07505.smartisland.ui.sections.AboutSection
 import com.agupta07505.smartisland.ui.sections.BackupRestoreSection
 import com.agupta07505.smartisland.ui.sections.CustomizationsSection
 import com.agupta07505.smartisland.ui.sections.DiagnosticsSection
+import com.agupta07505.smartisland.ui.sections.FaceIdSettingsSection
 import com.agupta07505.smartisland.ui.sections.TimingSection
 import com.agupta07505.smartisland.ui.sections.GesturesSection
 import com.agupta07505.smartisland.ui.sections.NotificationHistorySection
@@ -196,8 +201,18 @@ internal enum class FeatureDetailSection {
     About,
     UpdatesAndDownloads,
     SupportCommunity,
-    DeveloperOptions
+    DeveloperOptions,
+    FaceIdSettings,
+    WeatherSettings,
+    NetSpeedSettings,
+    CalendarSettings
 }
+
+private val IDLE_SETTINGS_PAGES = setOf(
+    FeatureDetailSection.WeatherSettings,
+    FeatureDetailSection.NetSpeedSettings,
+    FeatureDetailSection.CalendarSettings
+)
 
 @SuppressLint("BatteryLife")
 @Composable
@@ -323,7 +338,7 @@ fun SmartIslandHomeScreen(
     var selectedTab by rememberSaveable { mutableStateOf(StudioTab.Studio) }
     var orientationTab by rememberSaveable { mutableStateOf(OrientationTab.Portrait) }
     var activeDetailSection by rememberSaveable { mutableStateOf<FeatureDetailSection?>(null) }
-    var transitionDirection by rememberSaveable { mutableIntStateOf(1) } // 1 = forward, -1 = backward
+    var transitionDirection by rememberSaveable { mutableIntStateOf(1) }
 
     // Settings search: the query survives rotation; the focus state tells the chosen row to
     // scroll into view and flash once its screen is showing.
@@ -377,7 +392,8 @@ fun SmartIslandHomeScreen(
 
     BackHandler(enabled = activeDetailSection != null) {
         transitionDirection = -1
-        activeDetailSection = null
+        // The weather page is opened from the Idle widgets page, so back goes there; every other page goes home.
+        activeDetailSection = if (activeDetailSection in IDLE_SETTINGS_PAGES) FeatureDetailSection.IdleWidgets else null
     }
 
     CompositionLocalProvider(LocalSearchFocus provides searchFocus) {
@@ -427,7 +443,6 @@ fun SmartIslandHomeScreen(
                         ),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    // Studio Top Header
                     StudioTopHeader(
                         isIslandEnabled = settings.enabled,
                         canEnable = canEnable,
@@ -439,7 +454,6 @@ fun SmartIslandHomeScreen(
 
                     when (selectedTab) {
                         StudioTab.Studio -> {
-                            // 1. Master Power Switch Card
                             MasterPowerCard(
                                 enabled = settings.enabled,
                                 canEnable = canEnable,
@@ -458,7 +472,7 @@ fun SmartIslandHomeScreen(
                                 }
                             )
 
-                            // 2. Portrait / Landscape switch, then event toggles for that profile
+                            // Portrait / Landscape switch, then event toggles for that profile
                             OrientationTabs(
                                 selected = orientationTab,
                                 onSelected = { orientationTab = it }
@@ -466,7 +480,11 @@ fun SmartIslandHomeScreen(
                             EventTogglesSection(
                                 settings = settings,
                                 repository = resolvedRepository,
-                                landscape = orientationTab == OrientationTab.Landscape
+                                landscape = orientationTab == OrientationTab.Landscape,
+                                onOpenFaceIdSettings = {
+                                    transitionDirection = 1
+                                    activeDetailSection = FeatureDetailSection.FaceIdSettings
+                                }
                             )
                         }
 
@@ -561,7 +579,7 @@ fun SmartIslandHomeScreen(
                     bluetoothGranted = bluetoothGranted,
                     onBack = {
                         transitionDirection = -1
-                        activeDetailSection = null
+                        activeDetailSection = if (detailSection in IDLE_SETTINGS_PAGES) FeatureDetailSection.IdleWidgets else null
                     },
                     onBluetoothClick = {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -596,11 +614,6 @@ fun SmartIslandHomeScreen(
     }
 }
 
-/**
- * Side padding of the scrolling screens. Phones keep the usual margin; on wide screens (landscape,
- * tablets) the content stays in a centred column of at most [MAX_CONTENT_WIDTH_DP] instead of
- * stretching edge to edge.
- */
 private const val MAX_CONTENT_WIDTH_DP = 640
 
 private fun contentSidePadding(screenWidthDp: Int): androidx.compose.ui.unit.Dp {
@@ -682,11 +695,10 @@ private fun StudioTopHeader(
             }
         }
 
-        // Live Health Status Badge
         val statusColor = when {
-            !canEnable -> Color(0xFFE88C25) // Action required
-            isIslandEnabled -> Color(0xFF0F9F6E) // Active
-            else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f) // Ready/Off
+            !canEnable -> Color(0xFFE88C25)
+            isIslandEnabled -> Color(0xFF0F9F6E)
+            else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
         }
         val statusText = when {
             !canEnable -> stringResource(R.string.status_setup_needed)
@@ -814,8 +826,6 @@ private fun MasterPowerCard(
     }
 }
 
-
-/** Segmented System / Light / Dark switch for the app theme. */
 @Composable
 private fun ThemeModeSelector(selected: String, onSelected: (String) -> Unit) {
     val options = listOf("system" to "System", "light" to "Light", "dark" to "Dark")
@@ -1289,6 +1299,10 @@ private fun DetailScreenHost(
                 FeatureDetailSection.UpdatesAndDownloads -> stringResource(R.string.detail_title_updates_downloads)
                 FeatureDetailSection.SupportCommunity -> stringResource(R.string.detail_title_support_community)
                 FeatureDetailSection.DeveloperOptions -> stringResource(R.string.detail_title_developer_options)
+                FeatureDetailSection.FaceIdSettings -> "Face ID settings"
+                FeatureDetailSection.WeatherSettings -> stringResource(R.string.weather_cfg_title)
+                FeatureDetailSection.NetSpeedSettings -> stringResource(R.string.net_cfg_title)
+                FeatureDetailSection.CalendarSettings -> stringResource(R.string.cal_cfg_title)
             }
             Text(
                 text = title,
@@ -1364,7 +1378,13 @@ private fun DetailScreenHost(
                 TimingSection(settings = settings, repository = repository)
             }
             FeatureDetailSection.IdleWidgets -> {
-                IdleWidgetsSettingsSection(settings = settings, repository = repository)
+                IdleWidgetsSettingsSection(
+                    settings = settings,
+                    repository = repository,
+                    onOpenWeatherSettings = { onNavigateTo(FeatureDetailSection.WeatherSettings) },
+                    onOpenNetSpeedSettings = { onNavigateTo(FeatureDetailSection.NetSpeedSettings) },
+                    onOpenCalendarSettings = { onNavigateTo(FeatureDetailSection.CalendarSettings) }
+                )
             }
             FeatureDetailSection.About -> {
                 AboutSection(settings = settings, repository = repository)
@@ -1377,6 +1397,18 @@ private fun DetailScreenHost(
             }
             FeatureDetailSection.DeveloperOptions -> {
                 DeveloperOptionsSection(settings = settings, repository = repository)
+            }
+            FeatureDetailSection.FaceIdSettings -> {
+                FaceIdSettingsSection(settings = settings, repository = repository)
+            }
+            FeatureDetailSection.WeatherSettings -> {
+                WeatherSettingsCard(settings = settings, repository = repository, modifier = Modifier.searchAnchor("idle.weather"))
+            }
+            FeatureDetailSection.NetSpeedSettings -> {
+                NetSpeedSettingsCard(settings = settings, repository = repository, modifier = Modifier.searchAnchor("idle.netspeed"))
+            }
+            FeatureDetailSection.CalendarSettings -> {
+                CalendarSettingsCard(modifier = Modifier.searchAnchor("idle.calendar"))
             }
         }
     }

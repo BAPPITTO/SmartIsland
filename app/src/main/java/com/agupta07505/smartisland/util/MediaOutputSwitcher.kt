@@ -14,23 +14,9 @@ import android.provider.Settings
 
 /**
  * What a tap on the media card's output chip does.
- *
- * Research result (checked against AOSP `MediaOutputConstants`, `MediaOutputDialogReceiver` and SystemUI's
- * `AndroidManifest.xml`: the receiver is `exported="true"` with no permission, and the code does no caller check,
- * so an ordinary app may send the broadcast on AOSP; OEM skins can differ): an ordinary app can only route its OWN playback (`MediaRouter2`); it cannot move another
- * app's session to a speaker or earbuds, and it cannot list the routes of another app's session. The picker that
- * can do it is the system's own media output dialog in SystemUI. SystemUI opens it for the broadcast
- * `com.android.systemui.action.LAUNCH_MEDIA_OUTPUT_DIALOG` with the extra `package_name`; an app may send it on AOSP. So:
- *  1. Send that broadcast (directly; from the Shizuku shell when the skin hides the receiver from apps). The system dialog lists the outputs and does the
- *     switching for the playing app.
- *  2. Without it (or when the command fails): open the system volume panel (Android 10+), which carries the output
- *     switcher on many devices, else Bluetooth settings.
- * There is no way to tell from here whether the dialog really opened (the broadcast reports success even with no
- * receiver), so the fallback runs only when the command itself could not run.
  */
 object MediaOutputSwitcher {
     private const val ACTION = "com.android.systemui.action.LAUNCH_MEDIA_OUTPUT_DIALOG"
-    /** Opens the same dialog with no app or playback attached (system routing only). Used when the package name is unusable. */
     private const val ACTION_SYSTEM = "com.android.systemui.action.LAUNCH_SYSTEM_MEDIA_OUTPUT_DIALOG"
     private const val SYSTEMUI = "com.android.systemui"
     private val PACKAGE_NAME = Regex("^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+$")
@@ -41,14 +27,11 @@ object MediaOutputSwitcher {
         return "am broadcast -a $ACTION -p $SYSTEMUI --es package_name $packageName 2>&1"
     }
 
-    /** The system-routing-only variant (no package). */
     fun systemBroadcastCommand(): String = "am broadcast -a $ACTION_SYSTEM -p $SYSTEMUI 2>&1"
 
-    /** True when the shell's answer says the broadcast was delivered ("Broadcast completed"). */
     fun broadcastSucceeded(output: String): Boolean =
         output.contains("Broadcast completed", ignoreCase = true) && !output.contains("Exception", ignoreCase = true)
 
-    /** What the app itself sends: an explicit broadcast to SystemUI (the receiver is exported with no permission in AOSP). */
     private fun directIntent(packageName: String?): Intent {
         val usable = packageName?.takeIf { it.length <= 255 && PACKAGE_NAME.matches(it) }
         return Intent(if (usable != null) ACTION else ACTION_SYSTEM).setPackage(SYSTEMUI).apply {
