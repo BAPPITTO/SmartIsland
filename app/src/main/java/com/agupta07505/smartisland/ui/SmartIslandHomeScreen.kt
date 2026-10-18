@@ -1476,7 +1476,10 @@ private fun WelcomeDialog(
                 .fillMaxWidth(0.9f)
                 .padding(16.dp),
             shape = RoundedCornerShape(26.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            // Fully opaque: the glass theme makes `surface` translucent, which left this dialog hard to read.
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 1f)
+            ),
             elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
         ) {
             Column(
