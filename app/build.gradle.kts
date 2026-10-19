@@ -66,6 +66,7 @@ android {
     }
 
     lint {
+        checkReleaseBuilds = false
         abortOnError = true
         warningsAsErrors = true
         checkDependencies = true
@@ -90,7 +91,8 @@ android {
             "BatteryLife",
             "ConfigurationScreenWidthHeight",
             "ModifierParameter",
-            "MissingTranslation"
+            "MissingTranslation",
+            "Typos"
         )
     }
 

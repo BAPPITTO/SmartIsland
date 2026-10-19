@@ -169,10 +169,10 @@
     <string name="toast_reset_position">工場のデフォルトへの位置のリセット</string>
     <string name="opacity_card_title">アイランドオパシティ&amp;透明性</string>
     <string name="opacity_card_desc">洗練されたガラス形態の外観のための背景の透明度を調整する</string>
-    <string name="opacity_solid">100ZXQトークン0QXZ ソリッド</string>
-    <string name="opacity_dark">85ZXQトークン0QXZ ダーク</string>
-    <string name="opacity_glass">70ZXQトークン0QXZ ガラス</string>
-    <string name="opacity_clear">50ZXQトークン0QXZ クリア</string>
+    <string name="opacity_solid">100%% ソリッド</string>
+    <string name="opacity_dark">85%% ダーク</string>
+    <string name="opacity_glass">70%% ガラス</string>
+    <string name="opacity_clear">50%% クリア</string>
     <string name="slider_precision_opacity">精密オパシティ</string>
     <string name="media_player_title">音楽&amp;メディアプレーヤー</string>
     <string name="media_player_desc">周囲のバックドロップのアートワークと視覚化者のアニメーションの設定</string>
@@ -393,7 +393,7 @@
     <string name="confirm_clear_history_title">明確な通知履歴?</string>
     <string name="confirm_clear_history_msg">これは、デバイスデータベースから保存されたすべての通知ログを永久に削除します.</string>
     <string name="confirm_delete_app_history_title">%1$sの履歴を削除しますか?</string>
-    <string name="confirm_delete_app_history_msg">これは、%2$sからログオン通知をすべて完全に削除します.</string>
+    <string name="confirm_delete_app_history_msg">これにより、%2$s のログに記録された %1$d 件の通知がすべて完全に削除されます。</string>
     <string name="retention_24h">24時間(1日)</string>
     <string name="retention_72h">3日(推奨)</string>
     <string name="retention_7d">7日間(1週間)</string>
@@ -486,7 +486,7 @@
     <string name="backup_reset_card_desc">すべての島のサイズ、位置、オフセット、色のテーマ、ルールを元のデフォルト値に戻します.</string>
     <string name="btn_reset_all_settings">すべての設定をリセットする</string>
     <string name="dialog_restore_confirm_title">設定を復元する?</string>
-    <string name="dialog_restore_confirm_desc">これは、このバックアップファイル(%1$s設定が検出された)から構成で、現在の島のレイアウト、色、および設定を置き換えます。\n\nExported: %2$s\nAppバージョン: %3$s\nNDoあなたは続行しますか?</string>
+    <string name="dialog_restore_confirm_desc">これは、このバックアップファイル(%1$s設定が検出された)の設定で、現在の島のレイアウト、色、および設定を置き換えます。\n\nエクスポート日時: %2$s\nアプリバージョン: %3$s\n\n続行しますか？</string>
     <string name="dialog_reset_confirm_title">すべての設定をリセットしますか?</string>
     <string name="dialog_reset_confirm_desc">すべての島の設定をリセットして、デフォルトの工場値に戻りたいですか? このアクションは元に戻すことができません.</string>
     <string name="toast_backup_exported_success">設定バックアップが正常に保存されました!</string>
@@ -587,11 +587,11 @@
     <string name="shizuku_method_screen_recorder">スクリーンレコーダー</string>
     <string name="shizuku_method_trim_cache">キャッシュトリミング</string>
     <string name="shizuku_method_hotspot">ホットスポット</string>
-    <string name="utility_timer_minutes_short">ZXQトークン0QXZm</string>
+    <string name="utility_timer_minutes_short">%1$dm</string>
     <string name="camera_cutout_title">カメラカットアウト</string>
     <string name="camera_cutout_summary">検出されていない場合、手でカメラホールを設定</string>
     <string name="camera_cutout_manual_title">手動でカメラのカットアウトを設定する</string>
-    <string name="camera_cutout_manual_desc">検出された領域の代わりに、自分の領域を使用してください。 これは、タップされたときに広がる島が閉じる場所です(ポートレート)。 この領域は、ピル\のセンターバンドよりも広い取得しません.</string>
+    <string name="camera_cutout_manual_desc">検出された領域の代わりに、手動の領域を使用してください。 これは、タップされたときに広がる島が閉じる場所です(ポートレート)。 この領域は、ピルのセンターバンドよりも広くなりません.</string>
     <string name="camera_cutout_x">カットアウトセンター(画面中央からX)</string>
     <string name="camera_cutout_y">カットアウトトップ(画面上からY)</string>
     <string name="camera_cutout_width">切り口の幅</string>
@@ -726,7 +726,7 @@
     <string name="floating_window_mode_title">オープン</string>
     <string name="floating_window_mode_system">システム</string>
     <string name="floating_window_mode_lmo">LMOフリーフォーム</string>
-    <string name="floating_window_mode_system_desc">Android\独自のフリーフォームウィンドウ。 このROM(開発オプション)でフリーフォームのサポートが必要です.</string>
+    <string name="floating_window_mode_system_desc">Android独自のフリーフォームウィンドウ。 このROM(開発者向けオプション)でフリーフォームのサポートが必要です.</string>
     <string name="floating_window_mode_lmo_desc">LibreMobileOSベースのROMで見つかったLMOフリーフォームアプリ(com.libremobileos.freeform)を使用します。 アプリのメイン画面をウィンドウに開きます.</string>
     <string name="haptics_title">ハプティックフィードバック</string>
     <string name="haptics_desc">島が開いたり、閉じたり、泳いだりする際の小さな振動。 丸薬を握ることは自身の強い脈拍を保ちます.</string>
@@ -825,7 +825,7 @@
     <string name="cal_cfg_allow">カレンダーアクセスを許可する</string>
     <string name="idle_battery_only_charging_title">電池: 充満ときだけ</string>
     <string name="idle_battery_only_charging_desc">オフ:電池はまた、充電しない間、左のバッテリーグリフと右上のパーセンテージで回ります。 オン: プラグイン中にのみ表示されます.</string>
-    <string name="battery_island_till">zXQTOKEN0QXZまで</string>
+    <string name="battery_island_till">%1$sまで</string>
     <string name="idle_widget_liveclock_title">クロック</string>
     <string name="idle_widget_liveclock_desc">切り口の左側の時間と、右側の分、システムのように12または24時間。 分は、毎分上方にチェックします。 島は、満日以上の大型の時刻を示しています.</string>
     <string name="idle_widget_date_title">開催期間</string>
@@ -843,7 +843,7 @@
     <string name="idle_widget_notifications_title">通知数</string>
     <string name="idle_widget_notifications_desc">すべてのメッセージングとメールアプリからメッセージやメールを未読化し、カットアウトの左側にある番号としてメールを送信します。 タップすると、各アプリが何台あるかが表示されます。 何もないままスキップします.</string>
     <string name="idle_widget_modes_title">捨てない/モード</string>
-    <string name="idle_widget_modes_desc">アクティブモード(ディストリビューション、ベッドタイム、ドライビング、...)は、カットアウトの左にあるアイコンとして。 mode\の名前をタップします。 誰にもでもスキップされます。 モードを離れた(Android 15以降) に伝えるために、アクセスを解除しないでください.</string>
+    <string name="idle_widget_modes_desc">アクティブモード(おやすみ時間、運転など)はカットアウトの左にアイコンとして表示されます。モード名をタップします。どのモードも有効でない場合はスキップされます。モードを区別するためにサイレントモードへのアクセスを許可してください(Android 15以降)。</string>
     <string name="idle_modes_access_desc">モードウィジェットは、そのままに、Don Not Disturb を表示します。 ベッドタイム、運転、その他のモードを別々に(Android 15以降)指示し、名前を表示するためには、Do Not Disturbアクセスのスマートアイランドを許可します。 どのモードがオンになっているかだけ読みます。何も変更しません.</string>
     <string name="idle_modes_access_button">助成金は、アクセスを抑制しない</string>
     <string name="idle_widgets_cycle_title">すべてのスイッチ</string>
@@ -952,7 +952,7 @@
     <string name="weather_cfg_city_search">インフォメーション</string>
     <string name="weather_cfg_city_searching">お問い合わせ</string>
     <string name="weather_cfg_city_no_results">都市が見つかりません。 スペルチェック、またはネットワークチェックがオンになっていることを確認します.</string>
-    <string name="weather_cfg_city_privacy">位置許可は必要ありません。 検索テキストはOpen-Meteo\のジオコーディングサービスに移動します。選択した都市のラウンドされた場所のみが保存されます.</string>
+    <string name="weather_cfg_city_privacy">位置情報の権限は不要です。検索テキストはOpen-Meteoのジオコーディングサービスに送信され、選択した都市のおおよその位置のみが保持されます.</string>
     <string name="weather_cfg_refresh_title">リフレッシュ間隔</string>
     <string name="weather_cfg_refresh_15m">15分</string>
     <string name="weather_cfg_refresh_30m">30分</string>
@@ -973,7 +973,7 @@
     <string name="weather_cfg_custom_url_invalid">Https://example.com/v1/forecast などの https アドレスを入力します.</string>
     <string name="weather_cfg_custom_key">APIキー(オプション)</string>
     <string name="weather_cfg_custom_save">保存する</string>
-    <string name="weather_cfg_custom_desc">サービスは、Open-Meteo\の予報API(セルフホスト型のOpen-Meteoまたは顧客API)のように答えなければなりません。 丸みのある場所とキーを、apikey パラメータとして送信します。 キーは、このデバイスにとどまり、バックアップには含まれていません.</string>
+    <string name="weather_cfg_custom_desc">サービスはOpen-Meteoの予報API(セルフホスト型Open-MeteoまたはカスタムAPI)のように応答する必要があります。おおよその位置とキーがapikeyパラメータとして送信されます。キーはこの端末にのみ保存され、バックアップには含まれません.</string>
     <string name="weather_cfg_pill_title">丸薬の表示</string>
     <string name="weather_cfg_pill_temp_icon">テンペ+アイコン</string>
     <string name="weather_cfg_pill_temp_only">温度のみ</string>
@@ -988,7 +988,7 @@
     <string name="weather_cfg_readout_sun">日の出/日没</string>
     <string name="weather_cfg_readout_aqi">空気の質</string>
     <string name="weather_cfg_readout_hourly">次の4時間</string>
-    <string name="weather_cfg_readouts_desc">天候の島が開いているときの余分列。 値のない行が出てきます。 選択する行のみが尋ねられます。空気品質は、Open-Meteo\のエアサービスへの2番目のリクエストです.</string>
+    <string name="weather_cfg_readouts_desc">天気の島が開いているときの追加の項目。値のない行は省略されます。選択した行のみがリクエストされます。空気質はOpen-Meteoの空気質サービスへの2回目のリクエストです.</string>
     <string name="weather_cfg_readout_aqi_custom">エアクオリティはOpen-Meteoのみなので、カスタムプロバイダが選ばれている間に残っています.</string>
     <string name="weather_cfg_icon_animated">アニメーションの天気アイコン</string>
     <string name="weather_cfg_icon_saver">バッテリーセーバーがオンになっている間、マウス</string>
@@ -1008,7 +1008,7 @@
     <string name="net_cfg_conn_any">任意の接続</string>
     <string name="net_cfg_conn_wifi">Wi-Fiのみ</string>
     <string name="net_cfg_conn_mobile">モバイルのみ</string>
-    <string name="net_cfg_conn_note">Wi-Fiは、ウィジェットをモバイルデータに隠すだけです。 モバイルはモバイルデータだけに表示します。 島は常に現在の接続、今日の合計を表示します(このウィジェットが切り替わっている間カウント)、Android\のデータセーバーがオンにしている間「データセーバー」ライン.</string>
+    <string name="net_cfg_conn_note">Wi-Fiのみにするとモバイルデータ通信時にウィジェットが非表示になります。モバイルのみにするとモバイルデータ通信時のみ表示されます。島は常に現在の接続、今日の合計(このウィジェットがオンの間にカウント)、およびAndroidのデータセーバーがオンのときの「データセーバー有効」を表示します.</string>
     <string name="net_conn_wifi">無線LAN</string>
     <string name="net_conn_mobile">モバイルデータ</string>
     <string name="net_conn_other">ネットワーク</string>
