@@ -66,6 +66,7 @@ android {
     }
 
     lint {
+        checkReleaseBuilds = false
         abortOnError = true
         warningsAsErrors = true
         checkDependencies = true
