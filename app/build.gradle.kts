@@ -91,7 +91,8 @@ android {
             "BatteryLife",
             "ConfigurationScreenWidthHeight",
             "ModifierParameter",
-            "MissingTranslation"
+            "MissingTranslation",
+            "Typos"
         )
     }
 

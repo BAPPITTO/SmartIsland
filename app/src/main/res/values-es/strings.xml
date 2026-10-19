@@ -119,7 +119,7 @@
     <string name="shizuku_btn_run">Configuración automática</string>
     <string name="shizuku_btn_running">Corriendo..</string>
     <string name="shizuku_not_running">Shizuku no está funcionando o no se concede permiso</string>
-    <string name="shizuku_success">Permissions granted via Shizuku</string>
+    <string name="shizuku_success">Permisos otorgados a través de Shizuku</string>
     <string name="shizuku_failed">La configuración de Shizuku falló: %1$s</string>
     <string name="perm_accessibility_title">Superposición de accesibilidad</string>
     <string name="perm_accessibility_desc">Permite a Smart Island flotar dinámicamente por encima de la barra de estado y área de notch</string>
@@ -132,10 +132,10 @@
     <string name="perm_status_granted">Subvenciones</string>
     <string name="perm_status_action_required">Medidas necesarias</string>
     <string name="btn_open">Abierto</string>
-    <string name="btn_grant">Grant</string>
-    <string name="presets_title">Quick Layout Presets</string>
+    <string name="btn_grant">Conceder</string>
+    <string name="presets_title">Ajustes preestablecidos de diseño</string>
     <string name="presets_desc">Posición instantánea 1-tap calibrada a la pantalla del dispositivo (%1$d dp)</string>
-    <string name="preset_center_hole">Center Hole</string>
+    <string name="preset_center_hole">Cámara central</string>
     <string name="preset_center_hole_desc">Cámara de perforación central</string>
     <string name="preset_wide_island">Isla ancha</string>
     <string name="preset_wide_island_desc">Amplia distribución ampliada</string>
