@@ -99,7 +99,7 @@
     <string name="detail_title_color_studio">外观、 不透明及颜色</string>
     <string name="detail_title_gestures_guide">手势和指南</string>
     <string name="card_updates_downloads_title">更新下载( D)</string>
-    <string name="card_updates_downloads_desc">下载数据、 更新检查器和更改日志</string>
+    <string name="card_updates_downloads_desc">更新检查器和更改日志</string>
     <string name="detail_title_updates_downloads">App 更新下载</string>
     <string name="total_downloads_title">下载总数</string>
     <string name="total_downloads_subtitle">官方 GitHub APK 下载</string>

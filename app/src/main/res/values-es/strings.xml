@@ -99,7 +99,7 @@
     <string name="detail_title_color_studio">Apariencia, Opacity &amp; Colors</string>
     <string name="detail_title_gestures_guide">Gestos &amp; Guía</string>
     <string name="card_updates_downloads_title">Actualizaciones &gt; Descargas</string>
-    <string name="card_updates_downloads_desc">Estadísticas de descarga, checker de actualización y cambios</string>
+    <string name="card_updates_downloads_desc">Checker de actualización y cambios</string>
     <string name="detail_title_updates_downloads">Actualizaciones de aplicaciones &gt; Descargas</string>
     <string name="total_downloads_title">Descargas totales</string>
     <string name="total_downloads_subtitle">Descargas oficiales GitHub APK</string>

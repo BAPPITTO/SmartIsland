@@ -105,7 +105,7 @@
     <string name="detail_title_color_studio">Appearance, Opacity &amp; Colors</string>
     <string name="detail_title_gestures_guide">Gestures &amp; Guide</string>
     <string name="card_updates_downloads_title">Updates &amp; Downloads</string>
-    <string name="card_updates_downloads_desc">Download stats, update checker &amp; changelogs</string>
+    <string name="card_updates_downloads_desc">Update checker &amp; changelogs</string>
     <string name="detail_title_updates_downloads">App Updates &amp; Downloads</string>
     <string name="total_downloads_title">Total Downloads</string>
     <string name="total_downloads_subtitle">Official GitHub APK Downloads</string>
