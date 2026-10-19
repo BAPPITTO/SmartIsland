@@ -47,7 +47,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Article
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.Commit
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.ErrorOutline
@@ -98,8 +97,6 @@ import com.agupta07505.smartisland.util.GitHubContributor
 import com.agupta07505.smartisland.util.GitHubReleaseItem
 import com.agupta07505.smartisland.util.runCatchingLogged
 import kotlinx.coroutines.launch
-import java.text.NumberFormat
-import java.util.Locale
 
 private sealed interface UpdateCheckStatus {
     object Idle : UpdateCheckStatus
@@ -121,7 +118,6 @@ fun UpdatesAndDownloadsSection(
     val currentVersion = remember(context) { getAppVersion(context) }
 
     var releases by remember { mutableStateOf<List<GitHubReleaseItem>>(emptyList()) }
-    var totalDownloads by remember { mutableStateOf<Int?>(null) }
     var contributors by remember { mutableStateOf<List<GitHubContributor>>(emptyList()) }
     var recentCommits by remember { mutableStateOf<List<GitHubCommit>>(emptyList()) }
 
@@ -144,7 +140,6 @@ fun UpdatesAndDownloadsSection(
             val result = GitHubApiService.getAllReleases(currentVersion)
             result.onSuccess { releaseList ->
                 releases = releaseList
-                totalDownloads = releaseList.sumOf { it.downloadCount }
 
                 val newestRelease = releaseList.firstOrNull()
                 if (newestRelease != null && newestRelease.isNewer) {
@@ -171,7 +166,6 @@ fun UpdatesAndDownloadsSection(
         launch {
             GitHubApiService.getAllReleases(currentVersion).onSuccess { releaseList ->
                 releases = releaseList
-                totalDownloads = releaseList.sumOf { it.downloadCount }
                 val newest = releaseList.firstOrNull()
                 if (newest != null && newest.isNewer) {
                     updateStatus = UpdateCheckStatus.UpdateAvailable(newest)
@@ -191,19 +185,6 @@ fun UpdatesAndDownloadsSection(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        TotalDownloadsHeroCard(
-            totalDownloads = totalDownloads,
-            releaseCount = releases.size,
-            latestVersion = releases.firstOrNull()?.tagName ?: "v$currentVersion",
-            isLoading = isLoadingData && totalDownloads == null,
-            onViewReleasesClick = {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/agupta07505/SmartIsland/releases"))
-                runCatchingLogged("UpdatesAndDownloads", "Failed to open releases") {
-                    context.startActivity(intent)
-                }
-            }
-        )
-
         AppUpdateCheckerCard(
             currentVersion = currentVersion,
             updateStatus = updateStatus,
@@ -249,138 +230,6 @@ fun UpdatesAndDownloadsSection(
     }
 }
 
-@Composable
-private fun TotalDownloadsHeroCard(
-    totalDownloads: Int?,
-    releaseCount: Int,
-    latestVersion: String,
-    isLoading: Boolean,
-    onViewReleasesClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.CloudDownload,
-                            contentDescription = "Total Downloads",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-
-                    Column {
-                        Text(
-                            text = stringResource(R.string.total_downloads_title),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = stringResource(R.string.total_downloads_subtitle),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
-                    modifier = Modifier.clickable(onClick = onViewReleasesClick)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = "Releases",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(12.dp)
-                        )
-                    }
-                }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    val formattedDownloads = when {
-                        isLoading -> "Calculating…"
-                        totalDownloads != null -> NumberFormat.getNumberInstance(Locale.US).format(totalDownloads)
-                        else -> "15,600+"
-                    }
-
-                    Text(
-                        text = formattedDownloads,
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = MaterialTheme.colorScheme.primary,
-                        letterSpacing = (-0.5).sp
-                    )
-                    Text(
-                        text = "Official APK Packages Downloaded",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                if (releaseCount > 0) {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
-                    ) {
-                        Text(
-                            text = "$releaseCount Versions",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
 
 @Composable
 private fun AppUpdateCheckerCard(
@@ -746,20 +595,6 @@ private fun ReleaseChangelogItem(release: GitHubReleaseItem) {
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
-                    if (release.downloadCount > 0) {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                        ) {
-                            Text(
-                                text = "${release.downloadCount} dl",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
                 }
 
                 if (release.publishedAt.isNotBlank()) {
