@@ -24,26 +24,46 @@ PLACEHOLDER = re.compile(
 )
 
 
+def sanitize_for_android_xml(text):
+    if not text:
+        return text
+    # Clean up stray backslashes that are not valid Android escapes (n, t, ', ", \\, @, ?, u)
+    def clean_slash(match):
+        nxt = match.group(1)
+        if nxt in ("n", "t", "'", '"', "\\", "@", "?", "u"):
+            return "\\" + nxt
+        return nxt
+    text = re.sub(r'\\(.)', clean_slash, text)
+    # Ensure unescaped single quotes are escaped with \'
+    # Match single quotes not preceded by backslash
+    text = re.sub(r"(?<!\\)'", r"\'", text)
+    return text
+
+
 def translate(text, language):
     if not text or not text.strip():
         return text
 
     protected = {}
 
+    # Unescape common Android XML escapes for translation accuracy
+    cleaned_input = text.replace(r"\'", "'").replace(r'\"', '"').replace(r"\\", "\\")
+
     def replace(match):
-        token = f"ZXQTOKEN{len(protected)}QXZ"
-        protected[token] = match.group()
+        idx = len(protected)
+        token = f"ZXQTOKEN{idx}QXZ"
+        protected[idx] = (token, match.group())
         return token
 
     original = text
-    text = PLACEHOLDER.sub(replace, text)
+    cleaned_input = PLACEHOLDER.sub(replace, cleaned_input)
 
     for attempt in range(3):
         try:
             response = requests.post(
                 API,
                 data={
-                    "q": text,
+                    "q": cleaned_input,
                     "source": "en",
                     "target": language,
                     "format": "text",
@@ -53,13 +73,26 @@ def translate(text, language):
             response.raise_for_status()
             result = response.json()["translatedText"]
 
-            for token, value in protected.items():
-                result = result.replace(token, value)
+            # Restore tokens flexibly handling case or spacing alterations by MT engines
+            for idx, (token, value) in protected.items():
+                # Direct match
+                if token in result:
+                    result = result.replace(token, value)
+                else:
+                    # Fuzzy / regex match for case-insensitive or spaced variants
+                    pattern = re.compile(
+                        rf"Z[XQ][Q]?[\s_]*(?:TOKEN|token|トークン|托肯)[\s_]*{idx}[\s_]*[QXZ]+",
+                        re.IGNORECASE
+                    )
+                    result = pattern.sub(value, result)
 
-            if any(token in result for token in protected):
+            # Verification: all placeholders must be restored and no token residue
+            token_residue = re.search(r"Z[XQ].*?Q[XZ]", result, re.IGNORECASE)
+            all_restored = all(val in result for _, val in protected.values())
+            if token_residue or not all_restored:
                 return original
 
-            return result
+            return sanitize_for_android_xml(result)
 
         except requests.RequestException as error:
             if attempt == 2:

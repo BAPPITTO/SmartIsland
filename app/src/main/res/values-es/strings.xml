@@ -81,7 +81,7 @@
     <string name="card_notification_history_status_disabled">Discapacitados</string>
     <string name="card_color_studio_title">Colores &amp; Opacity</string>
     <string name="card_color_studio_desc">Antecedentes opacidad, fondo de álbum &amp; temas de color</string>
-    <string name="card_color_studio_status">%1$dXQTOKEN1QXZ Opacity</string>
+    <string name="card_color_studio_status">%1$d%% Opacidad</string>
     <string name="card_gestures_guide_title">Gestures</string>
     <string name="card_gestures_guide_desc">Guía de Gestura, tour &amp; swipe acciones</string>
     <string name="card_gestures_guide_status">Guía</string>
@@ -475,7 +475,7 @@
     <string name="backup_overview_title">Ajustes Backup &amp; Restore</string>
     <string name="backup_overview_desc">Guarde su posicionamiento personalizado, dimensiones personalizadas, temas de color, atajos de aplicaciones y reglas de notificación a un archivo de copia de seguridad, o restaurar una configuración previamente guardada.</string>
     <string name="backup_status_summary">Resumen de configuración</string>
-    <string name="backup_status_details">Ancho: %1$ddp • Opacity: %2$dXQTOKEN2QXZ • Elevación: %3$ddp • %4$d Atajos</string>
+    <string name="backup_status_details">Ancho: %1$ddp • Opacidad: %2$d%% • Elevación: %3$ddp • %4$d Atajos</string>
     <string name="backup_export_card_title">Ajustes de exportación</string>
     <string name="backup_export_card_desc">Guarda su geometría de la isla actual, temas personalizados y reglas en un archivo .json portátil con Android Storage Access Framework.</string>
     <string name="btn_export_backup">Export Backup (JSON)</string>
@@ -726,8 +726,8 @@
     <string name="floating_window_mode_title">Abierto con</string>
     <string name="floating_window_mode_system">Sistema</string>
     <string name="floating_window_mode_lmo">LMO Freeform</string>
-    <string name="floating_window_mode_system_desc">Android\'s propias ventanas freeform. Necesita soporte freeform en este ROM (Desarrollar opciones).</string>
-    <string name="floating_window_mode_lmo_desc">Utiliza la aplicación LMO Freeform (com.libremobileos.freeform) que se encuentra en ROMs basados en LibreMobileOS. Abre la pantalla principal de la aplicación\ en su ventana.</string>
+    <string name="floating_window_mode_system_desc">Ventanas freeform propias de Android. Necesita soporte freeform en esta ROM (Opciones de desarrollador).</string>
+    <string name="floating_window_mode_lmo_desc">Utiliza la aplicación LMO Freeform (com.libremobileos.freeform) que se encuentra en ROMs basados en LibreMobileOS. Abre la pantalla principal de la aplicación en su ventana.</string>
     <string name="haptics_title">Haptic feedback</string>
     <string name="haptics_desc">Una pequeña vibración cuando la isla se abre, cierra, o una acción swipe corre. Mantener la píldora mantiene su propio pulso más fuerte.</string>
     <string name="haptics_off">Fuera</string>
@@ -820,7 +820,7 @@
     <string name="idle_widget_clock_desc">Sin reloj (la barra de estado tiene uno). En cada hora completa la hora y los minutos marcan el corte, lo que sea que muestre, 12 o 24 horas como el sistema.</string>
     <string name="cal_cfg_title">Calendario: próximo evento</string>
     <string name="cal_cfg_no_permission">Permitir el acceso al calendario para que se muestre el próximo evento. Todos los días, cancelados y rechazados eventos son saltados.</string>
-    <string name="cal_cfg_intro">El widget de fecha\'s island nombra su próximo evento bajo la fecha (por ejemplo "Standup · 10:30", "en 25 min"). Los eventos sólo se leen en este teléfono.</string>
+    <string name="cal_cfg_intro">El widget de fecha de la isla nombra su próximo evento bajo la fecha (por ejemplo "Standup · 10:30", "en 25 min"). Los eventos sólo se leen en este teléfono.</string>
     <string name="cal_cfg_allowed">Se permite el acceso al calendario.</string>
     <string name="cal_cfg_allow">Permitir el acceso al calendario</string>
     <string name="idle_battery_only_charging_title">Batería: sólo cuando se carga</string>
@@ -850,7 +850,7 @@
     <string name="idle_widgets_seconds">%1$d s</string>
     <string name="idle_widgets_island_close_title">Cierra la isla del widget después</string>
     <string name="idle_widgets_island_never">Nunca</string>
-    <string name="idle_widgets_island_close_desc">Toque el icono o valor de un widget\ en el corte colapsado para abrirlo más grande. Se cierra después de este tiempo sin un toque, o a la vez con un toque fuera de él. Su botón de pausa sostiene la píldora en el widget actual.</string>
+    <string name="idle_widgets_island_close_desc">Toque el icono o valor de un widget en el corte colapsado para abrirlo más grande. Se cierra después de este tiempo sin un toque, o a la vez con un toque fuera de él. Su botón de pausa sostiene la píldora en el widget actual.</string>
     <string name="idle_widgets_battery_metric_title">Carging island shows</string>
     <string name="idle_widgets_battery_metric_watt">Wattage</string>
     <string name="idle_widgets_battery_metric_volt">Voltaje</string>
@@ -942,7 +942,7 @@
     <string name="weather_cfg_source_auto">Auto</string>
     <string name="weather_cfg_source_manual">Ciudad manual</string>
     <string name="weather_cfg_source_last">Último conocido</string>
-    <string name="weather_cfg_source_auto_desc">Usa la ubicación aproximada del dispositivo\ (aproximadamente 10 km). Sin acceso a la ubicación se remonta al lugar de su conexión a Internet, que es incorrecto mientras que un VPN está encendido.</string>
+    <string name="weather_cfg_source_auto_desc">Usa la ubicación aproximada del dispositivo (aproximadamente 10 km). Sin acceso a la ubicación se remonta al lugar de su conexión a Internet, que es incorrecto mientras que un VPN está encendido.</string>
     <string name="weather_cfg_source_last_desc">Usa sólo el lugar donde la aplicación almacenaba la última vez que podía leer su ubicación. Nunca lee su ubicación o mira su lugar de Internet por sí mismo, que ahorra batería y datos.</string>
     <string name="weather_cfg_last_needs_permission">Permitir una ubicación aproximada una vez por lo que hay un lugar para recordar.</string>
     <string name="weather_cfg_last_none">Todavía no hay lugar almacenado. Abra esta pantalla con acceso a la ubicación permitido, o cambie a Auto una vez.</string>
@@ -952,7 +952,7 @@
     <string name="weather_cfg_city_search">Búsqueda</string>
     <string name="weather_cfg_city_searching">Buscando..</string>
     <string name="weather_cfg_city_no_results">No hay ciudad encontrada. Revise la ortografía, o que los cheques de red están encendidos.</string>
-    <string name="weather_cfg_city_privacy">No se necesita permiso de ubicación. El texto de búsqueda va al servicio de geocodificación de Open-Meteo\; sólo se mantiene el lugar redondeado de la ciudad elegida.</string>
+    <string name="weather_cfg_city_privacy">No se necesita permiso de ubicación. El texto de búsqueda va al servicio de geocodificación de Open-Meteo; sólo se mantiene el lugar redondeado de la ciudad elegida.</string>
     <string name="weather_cfg_refresh_title">Intervalo de referencia</string>
     <string name="weather_cfg_refresh_15m">15 minutos</string>
     <string name="weather_cfg_refresh_30m">30 min</string>
@@ -973,7 +973,7 @@
     <string name="weather_cfg_custom_url_invalid">Introduzca una dirección https, por ejemplo https://example.com/v1/forecast.</string>
     <string name="weather_cfg_custom_key">Clave de API (opcional)</string>
     <string name="weather_cfg_custom_save">Guardar</string>
-    <string name="weather_cfg_custom_desc">El servicio debe responder como API de pronóstico Open-Meteo\ (un Open-Meteo auto hospedado o su API de cliente). Recibe el lugar redondeado y la llave, que se envía como parámetro apikey. La llave permanece en este dispositivo y no está incluida en copias de seguridad.</string>
+    <string name="weather_cfg_custom_desc">El servicio debe responder como API de pronóstico Open-Meteo (un Open-Meteo auto hospedado o su API de cliente). Recibe el lugar redondeado y la llave, que se envía como parámetro apikey. La llave permanece en este dispositivo y no está incluida en copias de seguridad.</string>
     <string name="weather_cfg_pill_title">Pantalla de carga</string>
     <string name="weather_cfg_pill_temp_icon">Temp + icono</string>
     <string name="weather_cfg_pill_temp_only">Temporada</string>
@@ -988,7 +988,7 @@
     <string name="weather_cfg_readout_sun">Sunrise / Sunset</string>
     <string name="weather_cfg_readout_aqi">Calidad del aire</string>
     <string name="weather_cfg_readout_hourly">Siguiente 4 horas</string>
-    <string name="weather_cfg_readouts_desc">Hileras adicionales cuando la isla del tiempo está abierta. Se deja una fila sin valor. Sólo se piden las filas que elijas; la calidad del aire es una segunda petición al servicio de calidad del aire de Open-Meteo\.</string>
+    <string name="weather_cfg_readouts_desc">Hileras adicionales cuando la isla del tiempo está abierta. Se deja una fila sin valor. Sólo se piden las filas que elijas; la calidad del aire es una segunda petición al servicio de calidad del aire de Open-Meteo.</string>
     <string name="weather_cfg_readout_aqi_custom">La calidad del aire sólo viene de Open-Meteo, por lo que se deja fuera mientras se elige un proveedor personalizado.</string>
     <string name="weather_cfg_icon_animated">Icono meteorológico animado</string>
     <string name="weather_cfg_icon_saver">Pausa mientras el guardabosques está encendido</string>
@@ -1008,7 +1008,7 @@
     <string name="net_cfg_conn_any">Cualquier conexión</string>
     <string name="net_cfg_conn_wifi">Wi-Fi sólo</string>
     <string name="net_cfg_conn_mobile">Móvil sólo</string>
-    <string name="net_cfg_conn_note">Wi-Fi sólo oculta el widget en datos móviles. El móvil solo lo muestra sólo en datos móviles. La isla siempre muestra la conexión actual, el total de hoy para ella (contada mientras este widget se activa) y una línea "Data Saver on" mientras que Android\'s Data Saver se activa.</string>
+    <string name="net_cfg_conn_note">Wi-Fi sólo oculta el widget en datos móviles. El móvil sólo lo muestra en datos móviles. La isla siempre muestra la conexión actual, el total de hoy para ella (contada mientras este widget se activa) y una línea "Ahorro de datos activado" mientras el Ahorro de datos de Android se activa.</string>
     <string name="net_conn_wifi">Wi-Fi</string>
     <string name="net_conn_mobile">Datos móviles</string>
     <string name="net_conn_other">Red</string>

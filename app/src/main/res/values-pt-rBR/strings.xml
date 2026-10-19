@@ -727,7 +727,7 @@
     <string name="floating_window_mode_system">Sistema</string>
     <string name="floating_window_mode_lmo">LMO Freeform</string>
     <string name="floating_window_mode_system_desc">Janelas freeform do próprio Android. Precisa de suporte freeform nesta ROM (opções de desenvolvimento).</string>
-    <string name="floating_window_mode_lmo_desc">Utiliza o aplicativo LMO Freeform (com.libremobileos.freeform) encontrado em ROMs baseados em LibreMobileOS. Abre a tela principal do app\ em sua janela.</string>
+    <string name="floating_window_mode_lmo_desc">Utiliza o aplicativo LMO Freeform (com.libremobileos.freeform) encontrado em ROMs baseados em LibreMobileOS. Abre a tela principal do aplicativo em sua janela.</string>
     <string name="haptics_title">Feedback táctico</string>
     <string name="haptics_desc">Uma pequena vibração quando a ilha abre, fecha, ou uma ação furtiva corre. Segurar a pílula mantém o seu pulso mais forte.</string>
     <string name="haptics_off">Desligado</string>
@@ -742,7 +742,7 @@
     <string name="toggle_show_during_dnd_title">Mostrar a ilha durante Não Perturbar</string>
     <string name="toggle_show_during_dnd_desc">Continue a mostrar cartas enquanto Não Perturba as notificações. Os sons de alerta ficam mudos.</string>
     <string name="option_expanded_card">Cartão expandido</string>
-    <string name="option_expanded_card_desc">Tapping cartão deste aplicativo 's abre o grande cartão.</string>
+    <string name="option_expanded_card_desc">Tocar no cartão deste aplicativo abre o cartão grande.</string>
     <string name="tag_card_never_expands">O cartão nunca se expande</string>
     <string name="option_auto_expand">Expansão automática</string>
     <string name="option_auto_expand_desc">Apenas notificações altas (não silenciosas) deste aplicativo abrem seu cartão por si mesmos.</string>
@@ -820,7 +820,7 @@
     <string name="idle_widget_clock_desc">Nenhum relógio (a barra de estado tem um). A cada hora completa a hora e os minutos passam no recorte, o que quer que ele mostre, 12 ou 24 horas como o sistema.</string>
     <string name="cal_cfg_title">Calendário: o próximo evento</string>
     <string name="cal_cfg_no_permission">Permitir o acesso ao calendário para que o próximo evento possa ser mostrado. Todos os dias, eventos cancelados e recusados são ignorados.</string>
-    <string name="cal_cfg_intro">O widget de data\'s island nomeia o seu próximo evento sob a data (por exemplo "Standup · 10:30", "em 25 min"). Os eventos são lidos apenas neste telefone.</string>
+    <string name="cal_cfg_intro">O widget de data da ilha nomeia o seu próximo evento sob a data (por exemplo "Standup · 10:30", "em 25 min"). Os eventos são lidos apenas neste telefone.</string>
     <string name="cal_cfg_allowed">O acesso ao calendário é permitido.</string>
     <string name="cal_cfg_allow">Permitir o acesso ao calendário</string>
     <string name="idle_battery_only_charging_title">Bateria: somente quando carregar</string>
@@ -843,14 +843,14 @@
     <string name="idle_widget_notifications_title">Número de notificações</string>
     <string name="idle_widget_notifications_desc">Mensagens e e-mails não lidos de todas as suas mensagens e aplicativos de e-mail, como um número à esquerda do recorte. Toque nele para ver quantos cada aplicativo tem. Saltou enquanto não há nenhum.</string>
     <string name="idle_widget_modes_title">Não Perturbar / modo</string>
-    <string name="idle_widget_modes_desc">O modo ativo (Não Perturbe, hora de dormir, condução, ...) como seu ícone à esquerda do recorte. Toque nele para o nome do modo\. Saltou enquanto ninguém está ligado. Grant Não Perturbe o acesso para diferenciar os modos (Android 15 ou posterior).</string>
+    <string name="idle_widget_modes_desc">O modo ativo (Não Perturbe, hora de dormir, condução, ...) como seu ícone à esquerda do recorte. Toque nele para o nome do modo. Saltou enquanto ninguém está ligado. Conceda acesso a Não Perturbe para diferenciar os modos (Android 15 ou posterior).</string>
     <string name="idle_modes_access_desc">O widget modo mostra Não Perturbar como está. Para dizer Bedtime, Condução e seus outros modos de distância (Android 15 ou posterior) e mostrar seus nomes, permitir Smart Island sob Não Perturbar o acesso. Ele só lê qual modo está ligado; não muda nada.</string>
     <string name="idle_modes_access_button">Conceder Não Perturbar o Acesso</string>
     <string name="idle_widgets_cycle_title">Mudar para cada</string>
     <string name="idle_widgets_seconds">%1$d s</string>
     <string name="idle_widgets_island_close_title">Fechar a ilha do elemento depois</string>
     <string name="idle_widgets_island_never">Nunca</string>
-    <string name="idle_widgets_island_close_desc">Toque no ícone ou valor de um widget\ no recorte colapsado para o abrir maior. Fecha após este tempo sem um toque, ou imediatamente com uma torneira fora dele. Seu botão de pausa mantém a pílula no widget atual.</string>
+    <string name="idle_widgets_island_close_desc">Toque no ícone ou valor de um widget no recorte colapsado para o abrir maior. Fecha após este tempo sem um toque, ou imediatamente com um toque fora dele. Seu botão de pausa mantém a pílula no widget atual.</string>
     <string name="idle_widgets_battery_metric_title">A carregar mostras da ilha</string>
     <string name="idle_widgets_battery_metric_watt">Wattage</string>
     <string name="idle_widgets_battery_metric_volt">Tensão</string>
@@ -952,7 +952,7 @@
     <string name="weather_cfg_city_search">Procurar</string>
     <string name="weather_cfg_city_searching">A procurar..</string>
     <string name="weather_cfg_city_no_results">Nenhuma cidade foi encontrada. Verifique a ortografia, ou a verificação da rede está ligada.</string>
-    <string name="weather_cfg_city_privacy">Nenhuma permissão de localização é necessária. O texto de pesquisa vai para o serviço de geocodificação Open-Meteo\; somente o lugar arredondado da cidade escolhida é mantido.</string>
+    <string name="weather_cfg_city_privacy">Nenhuma permissão de localização é necessária. O texto de pesquisa vai para o serviço de geocodificação Open-Meteo; somente o lugar arredondado da cidade escolhida é mantido.</string>
     <string name="weather_cfg_refresh_title">Intervalo de atualização</string>
     <string name="weather_cfg_refresh_15m">15 min</string>
     <string name="weather_cfg_refresh_30m">30 min</string>
@@ -973,7 +973,7 @@
     <string name="weather_cfg_custom_url_invalid">Introduza um endereço https, por exemplo https://example.com/v1/precast.</string>
     <string name="weather_cfg_custom_key">Chave da API (opcional)</string>
     <string name="weather_cfg_custom_save">Gravar</string>
-    <string name="weather_cfg_custom_desc">O serviço deve responder como a API de previsão do Open-Meteo\ (um Open-Meteo self-hosted ou sua API do cliente). Recebe o lugar arredondado e a chave, que é enviada como parâmetro apikey. A chave permanece neste dispositivo e não está incluída em backups.</string>
+    <string name="weather_cfg_custom_desc">O serviço deve responder como a API de previsão do Open-Meteo (um Open-Meteo self-hosted ou sua API do cliente). Recebe o lugar arredondado e a chave, que é enviada como parâmetro apikey. A chave permanece neste dispositivo e não está incluída em backups.</string>
     <string name="weather_cfg_pill_title">Exibição de comprimidos</string>
     <string name="weather_cfg_pill_temp_icon">Temp + ícone</string>
     <string name="weather_cfg_pill_temp_only">Apenas temp</string>
@@ -1008,7 +1008,7 @@
     <string name="net_cfg_conn_any">Qualquer ligação</string>
     <string name="net_cfg_conn_wifi">Apenas Wi-Fi</string>
     <string name="net_cfg_conn_mobile">Apenas móvel</string>
-    <string name="net_cfg_conn_note">Wi-Fi só esconde o widget em dados móveis. O telemóvel só o mostra apenas em dados móveis. A ilha sempre mostra a conexão atual, hoje\'s total para ele (contado enquanto este widget é ligado) e um "Data Saver on" linha enquanto Android\'s Data Saver é ligado.</string>
+    <string name="net_cfg_conn_note">Wi-Fi só esconde o widget em dados móveis. O telemóvel só o mostra apenas em dados móveis. A ilha sempre mostra a conexão atual, o total de hoje para ela (contado enquanto este widget é ligado) e uma linha "Economia de dados ativada" enquanto a Economia de dados do Android estiver ativada.</string>
     <string name="net_conn_wifi">Wi-Fi</string>
     <string name="net_conn_mobile">Dados móveis</string>
     <string name="net_conn_other">Rede</string>
