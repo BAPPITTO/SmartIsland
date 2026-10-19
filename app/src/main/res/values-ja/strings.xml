@@ -99,7 +99,7 @@
     <string name="detail_title_color_studio">出現、不透明及び色</string>
     <string name="detail_title_gestures_guide">ジオスチャー&amp;ガイド</string>
     <string name="card_updates_downloads_title">アップデートとダウンロード</string>
-    <string name="card_updates_downloads_desc">統計をダウンロード, 更新チェッカー &amp; 変更ログ</string>
+    <string name="card_updates_downloads_desc">更新チェッカー &amp; 変更ログ</string>
     <string name="detail_title_updates_downloads">アプリの更新とダウンロード</string>
     <string name="total_downloads_title">ダウンロード</string>
     <string name="total_downloads_subtitle">公式GitHub APKダウンロード</string>
