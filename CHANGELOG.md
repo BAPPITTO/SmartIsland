@@ -4,6 +4,14 @@ All notable changes to Smart Island should be documented in this file.
 
 The format is inspired by Keep a Changelog, and this project uses the GNU General Public License v3.0.
 
+## [7.6.0] - 2026-10-19
+
+### Highlights (v7.6.0)
+- **Multilingual Support**: Added Spanish and Japanese translations; expanded Brazilian Portuguese and Simplified Chinese.
+- **Translation Automation**: Integrated string extraction and translation script with local LibreTranslate support.
+- **Updated Screenshots**: Refreshed showcase screenshots across README.
+- **System Events & UI Polish**: Audio jack and USB connection refinements, welcome card opacity adjustments, and overlay stability fixes.
+
 ## [7.5.0] - 2026-10-18
 
 ### Major Release Highlights (v7.5.0)

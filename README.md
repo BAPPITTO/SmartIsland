@@ -9,18 +9,19 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Platform-Android%208.0%2B%20(API%2026--36)-3DDC84?logo=android&logoColor=white" alt="Android 8.0+" />
-  <img src="https://img.shields.io/badge/Kotlin-2.0%20%7C%20JVM%2017-7F52FF?logo=kotlin&logoColor=white" alt="Kotlin 2.0" />
-  <img src="https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white" alt="Jetpack Compose Material 3" />
-  <img src="https://img.shields.io/badge/License-GNU%20GPLv3-blue.svg" alt="GNU GPLv3" />
-  <a href="https://github.com/agupta07505/SmartIsland/actions/workflows/android.yml">
-    <img src="https://github.com/agupta07505/SmartIsland/actions/workflows/android.yml/badge.svg" alt="CI Build Status" />
+  <a href="https://github.com/agupta07505/SmartIsland/releases">
+    <img src="https://img.shields.io/github/v/release/agupta07505/SmartIsland?style=for-the-badge&color=6366f1&labelColor=1e1e2e&logo=github&logoColor=white" alt="Latest Release" />
+  </a>
+  <img src="https://img.shields.io/badge/Platform-Android%208.0%2B-3DDC84?style=for-the-badge&labelColor=1e1e2e&logo=android&logoColor=white" alt="Android 8.0+" />
+  <img src="https://img.shields.io/badge/License-GNU%20GPLv3-3b82f6?style=for-the-badge&labelColor=1e1e2e&logo=gnu&logoColor=white" alt="GNU GPLv3" />
+  <a href="https://github.com/agupta07505/SmartIsland/actions/workflows/build.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/agupta07505/SmartIsland/build.yml?branch=main&style=for-the-badge&labelColor=1e1e2e&label=CI&color=10b981&logo=githubactions&logoColor=white" alt="CI Build Status" />
   </a>
   <a href="https://telegram.me/SmartIslandApp" target="_blank">
-    <img src="https://img.shields.io/badge/Telegram-Community-2CA5E0?logo=telegram&logoColor=white" alt="Telegram Community" />
+    <img src="https://img.shields.io/badge/Telegram-Community-2CA5E0?style=for-the-badge&labelColor=1e1e2e&logo=telegram&logoColor=white" alt="Telegram Community" />
   </a>
   <a href="https://www.virustotal.com/gui/file/c07da408e7fa3e3fdeb25ec6415af07f1d56eff099840221138e9364c6065102/details" target="_blank">
-    <img src="https://img.shields.io/badge/VirusTotal-Verified%20Clean-007ACC?logo=virustotal&logoColor=white" alt="VirusTotal Verified Clean" />
+    <img src="https://img.shields.io/badge/VirusTotal-Verified%20Clean-007ACC?style=for-the-badge&labelColor=1e1e2e&logo=virustotal&logoColor=white" alt="VirusTotal Verified Clean" />
   </a>
 </p>
 
@@ -108,33 +109,26 @@ The app is built with **Material 3**, so settings, switches and dialogs match th
 
 **Shizuku** can set up the awkward permissions in one tap. There are tips for **Xiaomi, Samsung, OnePlus, Oppo, Huawei, Vivo, Asus and Nubia** so the system does not kill the service, and a baseline profile helps keep animations smooth. Tap the version seven times to unlock **developer mode** with diagnostics and log export.
 
+### Languages
+
+Smart Island is translated into **Spanish, Japanese, Brazilian Portuguese, and Simplified Chinese** in addition to English.
+
+Translations live in `app/src/main/res/values-<locale>/`. If you would like to help translate into another language or polish existing phrases, see [CONTRIBUTING.md](CONTRIBUTING.md). An automated helper script is included at [`scripts/translate_strings.py`](scripts/translate_strings.py) powered by LibreTranslate.
+
 ---
 
 ## Screenshots
 
 <p align="center">
-  <img src="assets/screenshots/01_home_try_it_out.jpg" width="24%" alt="Home Screen & Try It Out" />
-  <img src="assets/screenshots/02_layout_appearance_controls.jpg" width="24%" alt="Layout & Appearance Controls" />
-  <img src="assets/screenshots/03_notifications_privacy_rules.jpg" width="24%" alt="Notifications & OEM Privacy Rules" />
-  <img src="assets/screenshots/04_live_activities_app_alerts.jpg" width="24%" alt="Live Activities & App Alerts Manager" />
+  <img src="assets/screenshots/01_home_event_controls.jpg" width="31%" alt="Home Screen & Per-Event Controls" />
+  <img src="assets/screenshots/02_layout_appearance_controls.jpg" width="31%" alt="Layout & Appearance Controls" />
+  <img src="assets/screenshots/03_media_player_idle_widgets.jpg" width="31%" alt="Media Player Island & Idle Widgets" />
 </p>
 
 <p align="center">
-  <img src="assets/screenshots/05_app_shortcuts_launcher.jpg" width="24%" alt="App Shortcuts Launcher" />
-  <img src="assets/screenshots/06_notification_history_log.jpg" width="24%" alt="Virtualized Notification History Log" />
-  <img src="assets/screenshots/07_appearance_colors_studio.jpg" width="24%" alt="Appearance & Colors Studio" />
-  <img src="assets/screenshots/08_gesture_guide_playground.jpg" width="24%" alt="Gesture Guide & In-Pill Playground" />
-</p>
-
-<p align="center">
-  <img src="assets/screenshots/09_permissions_setup_center.jpg" width="24%" alt="Permissions Setup Center" />
-  <img src="assets/screenshots/10_backup_and_restore.jpg" width="24%" alt="Settings Backup & Restore" />
-  <img src="assets/screenshots/11_app_updates_and_downloads.jpg" width="24%" alt="App Updates & Community Hub" />
-  <img src="assets/screenshots/12_expanded_navigation_and_about.jpg" width="24%" alt="Expanded Navigation & Community" />
-</p>
-
-<p align="center">
-  <img src="assets/screenshots/13_developer_options_diagnostics.jpg" width="24%" alt="Developer Options & System Diagnostics" />
+  <img src="assets/screenshots/04_demo_lab_live_overlays.jpg" width="31%" alt="Demo Lab & Live Card Overlays" />
+  <img src="assets/screenshots/05_settings_overview.jpg" width="31%" alt="Settings & Customization" />
+  <img src="assets/screenshots/06_gesture_guide_playground.jpg" width="31%" alt="Gesture Guide & Playground" />
 </p>
 
 ---
