@@ -687,7 +687,7 @@
     <string name="about_open_original">打开原始工程</string>
     <string name="about_no_browser">没有找到打开链接的应用程序 .</string>
     <string name="about_license_title">许可证</string>
-    <string name="about_license_body">根据GNU通用公共许可证 v3.0. 原版权通知"版权2026 Animesh Gupta"按许可要求保留.</string>
+    <string name="about_license_body">根据GNU通用公共许可证 v3.0. 原版权通知\"版权2026 Animesh Gupta\"按许可要求保留.</string>
     <string name="about_fonts_title">字体</string>
     <string name="about_fonts_body">Lora,Inter Display和Poppins在SIL Open字体许可证1.1下捆绑. 您在设备上添加的字体, 并包含在自己的许可证中 .</string>
     <string name="card_timing_title">时间安排</string>
