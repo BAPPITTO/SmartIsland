@@ -1,20 +1,10 @@
 /*
  * Smart Island (2026)
- * © Animesh Gupta — github.com/agupta07505
+ * Original Copyright (c) 2026 Animesh Gupta — github.com/agupta07505
+ * Modifications Copyright (c) 2026 Jericho Foster — github.com/BAPPITTO
  * Licensed under the GNU GPL v3 License
- * Do not remove or alter this notice. - Per GPL-3.0 Section 4 & Section 5
  */
 
-buildscript {
-    repositories {
-        google()
-        mavenCentral()
-    }
-    dependencies {
-        classpath("com.android.tools.build:gradle:9.1.1")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.3.21")
-        classpath("org.jetbrains.kotlin:compose-compiler-gradle-plugin:2.3.21")
-        classpath("com.google.dagger:hilt-android-gradle-plugin:2.60.1")
-        classpath("androidx.baselineprofile:androidx.baselineprofile.gradle.plugin:1.4.1")
-    }
-}
+// This file is intentionally minimal. 
+// All plugin versions are managed centrally in gradle/libs.versions.toml
+// and applied directly in the respective module build.gradle.kts files.
