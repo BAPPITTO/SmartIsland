@@ -20,44 +20,39 @@ test-ext-junit = "1.2.1"
 espresso = "3.6.1"
 
 [libraries]
-# AndroidX Core
-"androidx.activity.compose" = { module = "androidx.activity:activity-compose", version.ref = "activity-compose" }
-"androidx.core.ktx" = { module = "androidx.core:core-ktx", version.ref = "core-ktx" }
-"androidx.datastore.preferences" = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
-"androidx.lifecycle.runtime.ktx" = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "lifecycle" }
-"androidx.lifecycle.service" = { module = "androidx.lifecycle:lifecycle-service", version.ref = "lifecycle" }
-"androidx.lifecycle.viewmodel.compose" = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
-"androidx.profileinstaller" = { module = "androidx.profileinstaller:profileinstaller", version.ref = "profileinstaller" }
+"androidx.activity.compose" = { group = "androidx.activity", name = "activity-compose", version.ref = "activity-compose" }
+"androidx.core.ktx" = { group = "androidx.core", name = "core-ktx", version.ref = "core-ktx" }
+"androidx.datastore.preferences" = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
+"androidx.lifecycle.runtime.ktx" = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }
+"androidx.lifecycle.service" = { group = "androidx.lifecycle", name = "lifecycle-service", version.ref = "lifecycle" }
+"androidx.lifecycle.viewmodel.compose" = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+"androidx.profileinstaller" = { group = "androidx.profileinstaller", name = "profileinstaller", version.ref = "profileinstaller" }
 
-# Compose BOM & Components (Versions managed by BOM, no version.ref needed)
-"compose.bom" = { module = "androidx.compose:compose-bom", version.ref = "compose-bom" }
-"androidx.compose.animation" = { module = "androidx.compose.animation:animation" }
-"androidx.compose.foundation" = { module = "androidx.compose.foundation:foundation" }
-"androidx.compose.material3" = { module = "androidx.compose.material3:material3" }
-"androidx.compose.material.icons.extended" = { module = "androidx.compose.material:material-icons-extended" }
-"androidx.compose.ui" = { module = "androidx.compose.ui:ui" }
-"androidx.compose.ui.tooling.preview" = { module = "androidx.compose.ui:ui-tooling-preview" }
-"androidx.compose.ui.tooling" = { module = "androidx.compose.ui:ui-tooling" }
-"androidx.compose.ui.test.junit4" = { module = "androidx.compose.ui:ui-test-junit4" }
-"androidx.compose.ui.test.manifest" = { module = "androidx.compose.ui:ui-test-manifest" }
+"androidx.compose.bom" = { group = "androidx.compose", name = "compose-bom", version.ref = "compose-bom" }
+"androidx.compose.animation" = { group = "androidx.compose.animation", name = "animation" }
+"androidx.compose.foundation" = { group = "androidx.compose.foundation", name = "foundation" }
+"androidx.compose.material3" = { group = "androidx.compose.material3", name = "material3" }
+"androidx.compose.material.icons.extended" = { group = "androidx.compose.material", name = "material-icons-extended" }
+"androidx.compose.ui" = { group = "androidx.compose.ui", name = "ui" }
+"androidx.compose.ui.tooling.preview" = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+"androidx.compose.ui.tooling" = { group = "androidx.compose.ui", name = "ui-tooling" }
+"androidx.compose.ui.test.junit4" = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+"androidx.compose.ui.test.manifest" = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 
-# Hilt
-"hilt.android" = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
-"hilt.compiler" = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
+"hilt.android" = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
+"hilt.compiler" = { group = "com.google.dagger", name = "hilt-compiler", version.ref = "hilt" }
 
-# Third Party
-"shizuku.api" = { module = "dev.rikka.shizuku:api", version.ref = "shizuku" }
-"shizuku.provider" = { module = "dev.rikka.shizuku:provider", version.ref = "shizuku" }
-"hiddenapibypass" = { module = "org.lsposed.hiddenapibypass:hiddenapibypass", version.ref = "hiddenapibypass" }
+"shizuku.api" = { group = "dev.rikka.shizuku", name = "api", version.ref = "shizuku" }
+"shizuku.provider" = { group = "dev.rikka.shizuku", name = "provider", version.ref = "shizuku" }
+"hiddenapibypass" = { group = "org.lsposed.hiddenapibypass", name = "hiddenapibypass", version.ref = "hiddenapibypass" }
 
-# Testing
-"junit" = { module = "junit:junit", version.ref = "junit" }
-"mockk" = { module = "io.mockk:mockk", version.ref = "mockk" }
-"kotlinx.coroutines.test" = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
-"turbine" = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
-"json" = { module = "org.json:json", version.ref = "json" }
-"androidx.test.ext.junit" = { module = "androidx.test.ext:junit", version.ref = "test-ext-junit" }
-"androidx.test.espresso.core" = { module = "androidx.test.espresso:espresso-core", version.ref = "espresso" }
+"junit" = { group = "junit", name = "junit", version.ref = "junit" }
+"mockk" = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
+"kotlinx.coroutines.test" = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
+"turbine" = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
+"json" = { group = "org.json", name = "json", version.ref = "json" }
+"androidx.test.ext.junit" = { group = "androidx.test.ext", name = "junit", version.ref = "test-ext-junit" }
+"androidx.test.espresso.core" = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espresso" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
