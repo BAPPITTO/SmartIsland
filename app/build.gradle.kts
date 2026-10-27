@@ -6,10 +6,15 @@
  */
 
 plugins {
+    // 1. The Foundation. MUST be first.
     alias(libs.plugins.android.application)
-    // AGP 9.0+ handles Kotlin compilation natively. No kotlin-android plugin needed.
-    alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.hilt.android)
+    // 2. KAPT
+    id("com.google.devtools.ksp")  
+    // 3. Compose Compiler
+    alias(libs.plugins.kotlin.compose)    
+    // 4. Hilt. Now it can safely find the Android extension.
+    alias(libs.plugins.hilt.android)    
+    // 5. Baseline Profile
     alias(libs.plugins.baselineprofile)
 }
 
