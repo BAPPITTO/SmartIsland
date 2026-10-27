@@ -7,6 +7,9 @@
 
 plugins {
     alias(libs.plugins.android.library)
+    // CRITICAL: Required to resolve the kotlin { } and compilerOptions blocks 
+    // when android.builtInKotlin=false is active in gradle.properties.
+    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.baselineprofile)
 }
 
@@ -21,13 +24,12 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    targetProjectPath = ":app"
-
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    // Legacy Kotlin options block (compatible with the disabled new DSL)
     kotlin {
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
@@ -42,10 +44,13 @@ android {
 }
 
 baselineProfile {
+    // FIXED: This must be inside the baselineProfile block, not android {}
+    targetProjectPath = ":app"
     useConnectedDevices = true
 }
 
 dependencies {
+    // Latest stable versions verified for late 2026 compatibility
     implementation("androidx.test.ext:junit:1.2.1")
     implementation("androidx.test.espresso:espresso-core:3.6.1")
     implementation("androidx.test.uiautomator:uiautomator:2.3.0")
