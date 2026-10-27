@@ -142,7 +142,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-service:2.10.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
     implementation("androidx.profileinstaller:profileinstaller:1.4.1")
-    "baselineProfile"(project(":baselineprofile"))
+    // "baselineProfile"(project(":baselineprofile"))
     implementation("com.google.dagger:hilt-android:2.60.1")
     kapt(libs.hilt.compiler)
 
