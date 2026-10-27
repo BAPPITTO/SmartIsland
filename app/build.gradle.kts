@@ -7,9 +7,10 @@
 
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android) // MUST be here for KAPT bypass to work
     alias(libs.plugins.kotlin.kapt)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.hilt.android)
+    alias(libs.plugins.hilt)
     alias(libs.plugins.baselineprofile)
 }
 
@@ -143,7 +144,7 @@ dependencies {
     implementation("androidx.profileinstaller:profileinstaller:1.4.1")
     "baselineProfile"(project(":baselineprofile"))
     implementation("com.google.dagger:hilt-android:2.60.1")
-    kapt("com.google.dagger:hilt-compiler:2.60.1")
+    kapt(libs.hilt.compiler)
 
     // Rikka Shizuku API
     implementation("dev.rikka.shizuku:api:13.1.5")
