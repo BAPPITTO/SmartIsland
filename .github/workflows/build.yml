@@ -1,13 +1,14 @@
 # Smart Island (2026)
-# Copyright Animesh Gupta — github.com/agupta07505
+# Original Copyright (c) 2026 Animesh Gupta — github.com/agupta07505
+# Modifications Copyright (c) 2026 Jericho Foster — github.com/BAPPITTO
 # Licensed under the GNU GPL v3 License
 
-name: Build & Notify
+name: Build & Test
 
 on:
   push:
     branches: [main, dev]
-    paths-ignore: &non_code_paths
+    paths-ignore:
       - "**/*.md"
       - "assets/**"
       - "screenshots/**"
@@ -16,6 +17,9 @@ on:
       - ".github/PULL_REQUEST_TEMPLATE.md"
   workflow_dispatch:
 
+# Prevents multiple workflows from running concurrently on the same branch.
+# This saves GitHub Actions minutes and prevents race conditions if you 
+# aggressively push commits while the previous build is still crawling along.
 concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
@@ -23,55 +27,44 @@ concurrency:
 permissions:
   contents: read
 
-defaults:
-  run:
-    shell: bash
-
 jobs:
-  notify-telegram:
-    name: Notify Telegram
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python 3
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.x"
-
-      - name: Install dependencies
-        run: pip install requests
-
-      - name: Send build notification
-        env:
-          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          TOPIC_ID: ${{ secrets.TELEGRAM_TOPIC_ID }}
-        run: python ./.github/workflows/notify_telegram.py
-        continue-on-error: true
-
   build:
-    name: Lint, test & debug build
+    name: Lint, Test & Assemble Debug
     runs-on: ubuntu-latest
-    needs: notify-telegram
     timeout-minutes: 30
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        # Standard checkout. We don't limit fetch-depth here because some 
+        # Gradle plugins (like version code generators) occasionally need full git history.
 
-      - name: Set up JDK 17
+      - name: Set up JDK 27
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: "17"
-          cache: gradle
+          distribution: 'temurin'
+          java-version: '27'
+          cache: 'gradle'
+        # Temurin provides stable, production-ready OpenJDK builds. 
+        # The 'cache: gradle' flag is crucial: it caches dependencies and 
+        # the Gradle wrapper, turning a 10-minute download fest into a 2-minute build.
 
-      - name: Make Gradle executable
+      - name: Grant execute permission for Gradle wrapper
         run: chmod +x ./gradlew
+        # Windows/macOS devs sometimes commit the gradlew script without execute 
+        # permissions. This ensures the Linux runner can actually run it.
+
+      - name: Accept Android SDK licenses
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+        # Automated runners do not have a human to click "I agree". 
+        # This preemptively accepts licenses to prevent obscure, screaming build failures 
+        # when Gradle tries to download missing SDK components.
 
       - name: Run lint, tests, and debug build
         run: ./gradlew --no-daemon --stacktrace lintDebug testDebugUnitTest assembleDebug
+        # --no-daemon: Prevents background Gradle processes from hoarding the runner's RAM.
+        # --stacktrace: Provides readable error output if the build fails, rather than a single cryptic line.
+        # We chain these tasks to maximize the efficiency of the single Gradle initialization.
 
       - name: Upload lint reports
         if: ${{ !cancelled() }}
@@ -81,6 +74,8 @@ jobs:
           path: app/build/reports/lint-results-*.html
           if-no-files-found: warn
           retention-days: 14
+        # Preserves lint output for review. The '!cancelled()' condition ensures 
+        # you still get the report even if the build fails, so you can see why.
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
@@ -89,28 +84,6 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
-
-  send-apk:
-    name: Forward debug APK to Telegram
-    runs-on: ubuntu-latest
-    needs: build
-    if: ${{ github.ref == 'refs/heads/dev' || github.event_name == 'workflow_dispatch' }}
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Download debug APK
-        uses: actions/download-artifact@v4
-        with:
-          name: SmartIsland-Debug-apk
-
-      - name: Send to Telegram
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          TELEGRAM_TOPIC_ID: ${{ secrets.TELEGRAM_TOPIC_ID }}
-          TELEGRAM_DEBUG_TOPIC_ID: ${{ secrets.TELEGRAM_DEBUG_TOPIC_ID }}
-        run: |
-          chmod +x ./scripts/send-telegram.sh
-          ./scripts/send-telegram.sh "app-debug.apk" "Debug"
+        # Makes the compiled APK available for direct download from the GitHub Actions UI.
+        # 'if-no-files-found: error' ensures the workflow actually fails if the APK 
+        # wasn't generated, rather than silently succeeding and uploading nothing.
