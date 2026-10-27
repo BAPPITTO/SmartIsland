@@ -66,7 +66,7 @@ android {
         }
     }
 
-    lint {
+        lint {
         checkReleaseBuilds = false
         abortOnError = true
         warningsAsErrors = true
@@ -75,22 +75,17 @@ android {
             "AndroidGradlePluginVersion",
             "GradleDependency",
             "ObsoleteSdkInt",
-            "InternalInsetResource",
             "DiscouragedApi",
             "OldTargetApi",
             "UnusedAttribute",
-            "LocalContextResourcesRead",
-            "LocalContextGetResourceValueCall",
             "PluralsCandidate",
             "TypographyEllipsis",
-            "FrequentlyChangingValue",
             "UnusedResources",
             "IconLauncherShape",
             "MonochromeLauncherIcon",
             "UseKtx",
             "IconXmlAndPng",
             "BatteryLife",
-            "ConfigurationScreenWidthHeight",
             "ModifierParameter",
             "MissingTranslation",
             "Typos"
