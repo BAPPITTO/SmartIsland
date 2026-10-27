@@ -28,7 +28,7 @@ androidx-lifecycle-service = { group = "androidx.lifecycle", name = "lifecycle-s
 androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profileinstaller", version.ref = "profileinstaller" }
 
-androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "compose-bom" }
+compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "compose-bom" }
 androidx-compose-animation = { group = "androidx.compose.animation", name = "animation" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
