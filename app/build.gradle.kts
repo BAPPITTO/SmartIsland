@@ -1,17 +1,16 @@
 /*
  * Smart Island (2026)
- * © Animesh Gupta — github.com/agupta07505
+ * Original Copyright (c) 2026 Animesh Gupta — github.com/agupta07505
+ * Modifications Copyright (c) 2026 Jericho Foster — github.com/BAPPITTO
  * Licensed under the GNU GPL v3 License
- * Do not remove or alter this notice. - Per GPL-3.0 Section 4 & Section 5
  */
 
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.compose")
-    id("org.jetbrains.kotlin.kapt")
-    id("com.google.dagger.hilt.android")
-    id("androidx.baselineprofile")
+    alias(libs.plugins.android.application)
+    // AGP 9.0+ handles Kotlin compilation natively. No kotlin-android plugin needed.
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.hilt.android)
+    alias(libs.plugins.baselineprofile)
 }
 
 val signingStoreFile = providers.environmentVariable("SIGNING_STORE_FILE")
