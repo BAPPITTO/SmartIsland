@@ -19,7 +19,7 @@
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
-    <!-- Never granted by the install dialog. Android 15+ replaces the text of notifications it thinks are
+    <!-- Never granted by the installation dialog. Android 15+ replaces the text of notifications it thinks are
          sensitive (and, on some ROMs, all of them) with "Sensitive notification content hidden" for every
          notification listener without this permission. Granted from Shizuku or adb (see ShizukuManager). -->
     <uses-permission

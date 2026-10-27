@@ -36,7 +36,7 @@ External links in the app may open GitHub, email, or social/profile pages in ano
 
 ## Data Retention
 
-Notification details are kept in app memory while Smart Island is running and while the notification is active in the island. Local settings are stored on your device using AndroidX DataStore Preferences until you clear app data or uninstall the app.
+Notification details are kept in app memory while Smart Island is running and while the notification is active on the island. Local settings are stored on your device using AndroidX DataStore Preferences until you clear app data or uninstall the app.
 
 ## Your Controls
 

@@ -35,7 +35,7 @@ Smart Island **v7.5.0** adds idle widgets and a full landscape mode, and reworks
   - **Schedules**: choose which widgets show during work hours (weekdays only option), at night or while charging, drag them into your own order and pin one to always lead.
   - **Tick styles**: smooth, or an LED board with hop patterns, speed, stagger and red, amber, green or white colours, with ambient LED motions for sun, rain and wind.
 - **Weather Widget (`WeatherConfig.kt`, `WeatherDisplay.kt`, `WeatherSettingsCard.kt`)**:
-  - Location from auto detect, a chosen city or the last known place.
+  - Location from auto-detect, a chosen city or the last known place.
   - Open-Meteo by default, or your own compatible https service with an optional API key that is never part of a backup.
   - Refresh interval or manual only, and island rows for high and low, rain chance, humidity, UV, sun times, air quality and hourly forecast.
 - **Net Speed Widget (`NetSpeedRules.kt`, `NetUsage.kt`, `NetSpeedSettingsCard.kt`)**: shows the busier direction above a threshold you set, with hysteresis so it does not flicker, can be limited to Wi-Fi or mobile data, and keeps a daily Wi-Fi and mobile usage counter that restarts at midnight.
@@ -95,7 +95,7 @@ Smart Island **v7.0.0** is a landmark major release delivering comprehensive imp
 - **Dedicated App Updates & Downloads Hub**: New dedicated settings section with live Total Downloads statistics (15,648+), in-app GitHub update checker, version insights, top community contributors, and recent commits feed.
 - **Selective App Alerts & Sound Manager**: Redesigned lightweight app alert manager modal that prevents UI stutter by selectively loading apps on-demand, allowing granular notification, sound, and exclusion controls.
 - **Unified Deep Burnt-Orange (`#D84315`) Design System**: Completely renovated settings aesthetics with cohesive dark slate surfaces, burnt-orange accenting, crisp typography, and unified icon tinting (eliminating rainbow clutter).
-- **Configurable Companion Circle Placement**: Position the multi-tasking companion circle on either the Left or Right of the main pill with anti-overlap layout geometry clamping.
+- **Configurable Companion Circle Placement**: Position the multitasking companion circle on either the Left or Right of the main pill with anti-overlap layout geometry clamping.
 - **iPhone Notch Mode**: Authentic top-docked notch mode (`y = 0`) with curved bottom corners and suppression of the companion split bubble.
 - **Developer Options & System Diagnostics**: 7-tap version unlock, in-memory logcat ring buffer (3,000 entries), and one-tap `.txt` report export via Storage Access Framework.
 - **Full Settings Backup & Restore System**: Atomic JSON backup and restore via Android SAF with bounds validation and factory reset.
@@ -104,7 +104,8 @@ Smart Island **v7.0.0** is a landmark major release delivering comprehensive imp
 ### Added
 
 - **In-Pill Swipe Gestures & Media Control Engine (`IslandOverlayView.kt`, `GesturesSection.kt`, `SmartIslandSettings.kt`, `SmartIslandSettingsRepository.kt`, `SwipeAction.kt`, `ExpandedActions.kt`)**:
-  - **Independent Pill Gesture Master Switch**: Toggle `enablePillSwipeActions` enables or disables swipe gestures on the compact collapsed pill independently from expanded card gestures, preventing accidental swipes while keeping tap-to-expand intact.
+**Independent Pill Gesture Master Switch**: Toggle `enablePillSwipeActions` enables or disables swipe gestures on the compact collapsed pill independently of expanded card gestures, preventing accidental swipes while keeping tap-to-expand intact.
+    ly from expanded card gestures, preventing accidental swipes while keeping tap-to-expand intact.
   - **Horizontal Swipe Notification Cycling**: Swiping left or right across the collapsed pill cycles through active notifications in the stack.
   - **Direct In-Pill Media Track Skip**: Configurable option to map Swipe Left / Swipe Right on the collapsed pill directly to `skipToPrevious` and `skipToNext` for music players (Spotify, YouTube Music, Apple Music, podcasts, system players) without expanding the card.
   - **4-Directional In-Pill Customization**:
@@ -141,7 +142,7 @@ Smart Island **v7.0.0** is a landmark major release delivering comprehensive imp
   - **Refined Card Typography**: High-contrast white headers (`#FFFFFF`) with subtle slate secondary text (`#B0BEC5`) for effortless readability.
 
 - **Configurable Companion Circle Position (`PositionsSection.kt`, `IslandOverlayView.kt`, `SmartIslandOverlayService.kt`, `SmartIslandSettings.kt`, `SmartIslandSettingsRepository.kt`)**:
-  - **Left or Right Placement Option**: Added `circlePosition` setting (`"right"` vs `"left"`, default `"right"`) allowing users to position the multi-tasking companion circle on either the left or right side of the main pill.
+  - **Left or Right Placement Option**: Added `circlePosition` setting (`"right"` vs `"left"`, default `"right"`) allowing users to position the multitasking companion circle on either the left or right side of the main pill.
   - **Optimized for Corner Displays**: Avoids edge crowding and collisions on devices with right-aligned punch-hole cameras (Galaxy S10, Huawei, Honor, etc.) by anchoring the companion circle on the left.
   - **Dedicated UI Card in Positions & Sizing**: Segmented selector with visual direction icons (`AlignHorizontalLeft` and `AlignHorizontalRight`).
   - **Symmetric Anti-Collapse Geometry Clamping**: Unified layout math ensuring the companion circle and pill maintain at least `compactGap` (8dp) separation across all screen widths and orientations.
@@ -407,7 +408,7 @@ Smart Island **v7.0.0** is a landmark major release delivering comprehensive imp
 - **Wallpaper Dynamic Color Support**: Enabled Android 12+ (API 31+) Dynamic System Color extraction (`dynamicLightColorScheme` / `dynamicDarkColorScheme`) for seamless wallpaper color harmonization.
 - **Wi-Fi Hotspot Monitor (`HotspotExpanded` & `HotspotUtil`)**: Added real-time Wi-Fi tethering monitoring via `HotspotUtil`, showing active connected client count parsed from system hotspot notifications, SSID details, data usage indicators, static hotspot icon and labels, and a quick turn-off action button.
 - **Live Activity Engine (`LiveActivityParser`, `LiveActivityExpanded`)**: Full live activity support for delivery and ride tracking with real-time status cards, dynamic brand colors per app, smooth Compose animations, and structured notification extras parsing.
-- **Download/Upload Progress Mode (`DownloadExpanded`)**: Real-time download and upload progress bars with transfer speeds (MB/s), file names, custom transfer icons, and refined download detection logic. Notifications are hidden from the system shade by default when displayed in the island.
+- **Download/Upload Progress Mode (`DownloadExpanded`)**: Real-time download and upload progress bars with transfer speeds (MB/s), file names, custom transfer icons, and refined download detection logic. Notifications are hidden from the system shade by default when displayed on the island.
 - **Turn-by-Turn Navigation Mode (`NavigationExpanded`, `NavigationParser`)**: Step-by-step navigation guidance showing next instruction, distance, ETA, maneuver arrow icons, and a dedicated navigation mode card.
 - **Per-App Notification & Sound Controls**: Added granular per-app notification enable/disable toggles and independent sound controls under `NotificationsAndPrivacySection`.
 - **Grouped Settings Architecture**: Consolidated 8 standalone settings sections into **4 minimal, clean expandable Category Hub Cards**:
@@ -594,7 +595,7 @@ Smart Island **v7.0.0** is a landmark major release delivering comprehensive imp
 
 ### Fixed
 
-- **App Startup Crash**: Resolved startup crash on launch due to Compose `painterResource` trying to parse the adaptive vector launcher icon xml. Fixed by dynamically extracting the launcher icon drawable and rendering it to a Canvas-backed bitmap.
+- **App Startup Crash**: Resolved startup crash on launch due to Compose `painterResource` trying to parse the adaptive vector launcher icon XML. Fixed by dynamically extracting the launcher icon drawable and rendering it to a Canvas-backed bitmap.
 - **Overlay "Non-Touchable" Dead Zone**: Corrected height calculation of the collapsed overlay window by removing the status bar height offset and extra padding, keeping the window size tight to the visual bounds.
 - **Pill Gestures and Swipe Interceptions**: Fixed direct tap gesture failures in the collapsed pill and swipe-up/down failures by capturing reactive state delegates to prevent stale state retention.
 - **Controls State Synchronization**: Fixed state mismatch issues where loop state changes made inside external media apps (e.g., Spotify) did not reflect in the Smart Island overlay. Added custom extras query prioritization and strict toggling logic to avoid double-activation cycles.

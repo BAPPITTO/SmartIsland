@@ -66,7 +66,7 @@ android {
         }
     }
 
-        lint {
+    lint {
         checkReleaseBuilds = false
         abortOnError = true
         warningsAsErrors = true
@@ -86,11 +86,11 @@ android {
             "UseKtx",
             "IconXmlAndPng",
             "BatteryLife",
-            "ModifierParameter",
             "MissingTranslation",
             "Typos"
         )
     }
+
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -133,7 +133,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.service)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.profileinstaller)
-    
+
     implementation(libs.hilt.android)
     kapt(libs.hilt.compiler)
 
