@@ -7,7 +7,7 @@
 
 plugins {
     alias(libs.plugins.android.application)
-    id("kotlin-kapt")
+    alias(libs.plugins.kotlin.kapt)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.baselineprofile)
