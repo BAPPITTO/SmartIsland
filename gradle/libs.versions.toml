@@ -1,0 +1,14 @@
+[versions]
+agp = "9.4.1"
+kotlin = "2.1.20"
+hilt = "2.55"
+baselineprofile = "1.5.0"
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+# Note: AGP 9.0+ includes built-in Kotlin support. 
+# The 'org.jetbrains.kotlin.android' plugin is deprecated and no longer required.
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+hilt-android = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
+baselineprofile = { id = "androidx.baselineprofile", version.ref = "baselineprofile" }
